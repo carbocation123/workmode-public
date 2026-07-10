@@ -155,6 +155,21 @@ fn migrate_legacy(
     }
 }
 
+#[tauri::command]
+fn desktop_prepare_update(runtime: State<'_, DesktopRuntime>) -> Result<(), String> {
+    runtime.stop_backend();
+    Ok(())
+}
+
+#[tauri::command]
+fn desktop_recover_update(
+    app: tauri::AppHandle,
+    runtime: State<'_, DesktopRuntime>,
+) -> Result<(), String> {
+    let version = app.package_info().version.to_string();
+    runtime.start_backend(&version)
+}
+
 fn open_log(path: &Path) -> std::io::Result<File> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -285,7 +300,11 @@ pub fn run() {
                 window.app_handle().exit(0);
             }
         })
-        .invoke_handler(tauri::generate_handler![desktop_bootstrap, migrate_legacy]);
+        .invoke_handler(tauri::generate_handler![
+            desktop_bootstrap,
+            migrate_legacy,
+            desktop_prepare_update, desktop_recover_update
+        ]);
 
     let app = builder
         .build(tauri::generate_context!())

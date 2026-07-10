@@ -92,6 +92,8 @@ scripts/
 
 The shell starts the bundled Python backend on an available loopback port, waits for `/api/health`, then gives the dynamic API base to the frontend. Closing the main window exits the application and terminates the backend process tree. A single-instance guard focuses the existing window. The tray can restore a minimized window or stop and exit. The bundled interpreter runs with `PYTHONDONTWRITEBYTECODE=1`, so runtime caches do not mutate the installation directory or survive uninstall.
 
+Desktop updates download and verify the signed installer while the backend remains available. Immediately before installation, the frontend invokes a Rust lifecycle command that terminates and waits for the bundled backend process tree, preventing loaded Python extension modules from locking files that NSIS must replace. If installer startup rejects before Windows exits the app, a recovery command restarts the same backend port.
+
 Installed resources are immutable application files. User-owned state lives under `%LOCALAPPDATA%\WorkmodePublic`:
 
 ```text

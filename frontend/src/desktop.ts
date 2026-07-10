@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { check } from '@tauri-apps/plugin-updater'
+import { check, type DownloadEvent } from '@tauri-apps/plugin-updater'
+import { runDesktopUpdateFlow } from './desktopUpdateFlow'
 
 export interface DesktopInfo {
   apiBase: string
@@ -53,18 +54,25 @@ export async function installDesktopUpdate(
   if (!pendingUpdate) throw new Error('没有待安装的更新，请先检查更新')
   let downloaded = 0
   let total: number | null = null
-  await pendingUpdate.downloadAndInstall((event) => {
-    if (event.event === 'Started') {
-      total = event.data.contentLength ?? null
-      onProgress(downloaded, total)
-    } else if (event.event === 'Progress') {
-      downloaded += event.data.chunkLength
-      onProgress(downloaded, total)
-    } else if (event.event === 'Finished') {
-      onProgress(total ?? downloaded, total)
+  await runDesktopUpdateFlow(
+    pendingUpdate,
+    {
+      prepare: () => invoke('desktop_prepare_update'),
+      recover: () => invoke('desktop_recover_update'),
+      relaunch
+    },
+    (event: DownloadEvent) => {
+      if (event.event === 'Started') {
+        total = event.data.contentLength ?? null
+        onProgress(downloaded, total)
+      } else if (event.event === 'Progress') {
+        downloaded += event.data.chunkLength
+        onProgress(downloaded, total)
+      } else if (event.event === 'Finished') {
+        onProgress(total ?? downloaded, total)
+      }
     }
-  })
-  await relaunch()
+  )
 }
 
 export async function chooseAndMigrateLegacyPortable() {
