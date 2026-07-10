@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -8,8 +9,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import APP_NAME, APP_VERSION, settings
+from .history_repair import repair_stale_tool_runs
 from .routes import router
-from .storage import ensure_data_dirs
+from .storage import data_dir, ensure_data_dirs, sessions_dir
+
+
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)
@@ -49,6 +54,19 @@ async def local_security_boundary(request: Request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     ensure_data_dirs()
+    report = repair_stale_tool_runs(
+        sessions_dir(),
+        data_dir() / "backups" / "history-repair",
+    )
+    if report.inserted_results or report.failed_files:
+        logger.info(
+            "historical tool repair: scanned=%s repaired=%s inserted=%s failed=%s backup=%s",
+            report.scanned_files,
+            report.repaired_files,
+            report.inserted_results,
+            report.failed_files,
+            report.backup_dir,
+        )
 
 
 app.include_router(router)

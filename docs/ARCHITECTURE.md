@@ -28,6 +28,8 @@ Main modules:
   uncapped project tool-calling loop.
 - `turn_recorder.py` — persists streamed assistant text segments and tool events
   in their original interleaved order and closes pending tools on interruption.
+- `history_repair.py` — idempotent startup migration for legacy dangling tool
+  starts, with timestamped JSONL/metadata backups before atomic rewrites.
 - `routes.py` — `/api/work/*` resources.
   - `POST /api/work/pick-directory` opens a native folder picker for local desktop use.
   - `PATCH/DELETE /api/work/sessions/{id}` rename and archive conversations.
@@ -217,6 +219,12 @@ operator safety boundary.
 - A tool that was running when cancellation arrived receives a durable
   `tool_result` with status=`cancelled`; inactive historical cards are never
   left displaying `running`.
+- On startup, legacy `tool_call_start` rows without any matching result are
+  closed by inserting a repaired `cancelled` result immediately after the
+  start row. Original JSONL and session metadata are copied under
+  `backups/history-repair/<batch>/` first. Existing results and legacy combined
+  assistant text are preserved; unavailable historical text boundaries are not
+  guessed.
 - Deleting a conversation sets `deleted_at` in its metadata. The JSONL archive remains on disk.
 - Deleting a project sets `archived_at` in its app metadata. Its registered filesystem root is never removed. Direct child registrations are promoted one level so they remain visible.
 

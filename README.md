@@ -301,6 +301,7 @@ npm run dev
 Workmode Public 采用动态预算上下文策略：
 
 - JSONL 会保存完整会话历史，包括用户消息、助手消息、工具调用和工具结果；
+- 启动时会检查旧版本留下的悬空工具调用；修复前先备份原 JSONL/元数据到 `%LOCALAPPDATA%\WorkmodePublic\backups\history-repair\`，再把缺失结果标记为「已取消」。迁移可重复运行且不会改写已有成功/失败结果；旧版未曾保存的文字分段不会凭猜测重建；
 - 模型侧不会无脑加载全部历史；
 - 每轮会先扣除 system prompt、工具 schema、固定导入和工作记忆的 token；
 - 剩余预算从最近历史向前动态装载；
