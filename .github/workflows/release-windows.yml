@@ -33,7 +33,9 @@ jobs:
               desktop/src-tauri/tauri.conf.json `
               desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock
             git commit -m "chore: release v$version"
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to commit synchronized version files.' }
             git push origin "HEAD:${{ github.ref_name }}"
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to push synchronized version files.' }
           }
           "sha=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
 
@@ -55,17 +57,25 @@ jobs:
         shell: pwsh
         run: |
           rustup default stable
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to select the Rust toolchain.' }
           rustup target add x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to install the Rust Windows target.' }
           rustup component add rustfmt
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to install rustfmt.' }
 
       - name: Install dependencies
         shell: pwsh
         run: |
           python -m venv backend/.venv
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to create the backend virtualenv.' }
           backend/.venv/Scripts/python.exe -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to upgrade pip.' }
           backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to install backend dependencies.' }
           npm ci --prefix frontend
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to install frontend dependencies.' }
           npm ci --prefix desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to install desktop dependencies.' }
 
       - name: Restore updater signing key
         shell: pwsh

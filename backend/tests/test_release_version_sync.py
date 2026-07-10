@@ -8,9 +8,22 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "sync-version.ps1"
+WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release-windows.yml"
 
 
 class ReleaseVersionSyncTest(unittest.TestCase):
+    def test_release_workflow_stops_immediately_when_dependency_install_fails(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            workflow,
+            r"npm ci --prefix frontend\s+if \(\$LASTEXITCODE -ne 0\)",
+        )
+        self.assertRegex(
+            workflow,
+            r"npm ci --prefix desktop\s+if \(\$LASTEXITCODE -ne 0\)",
+        )
+
     def test_sync_updates_every_release_version_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
