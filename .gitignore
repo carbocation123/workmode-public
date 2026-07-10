@@ -16,6 +16,15 @@ desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/resources/*
 !desktop/src-tauri/resources/.gitkeep
+# `tauri icon` generates every platform. The current product ships Windows NSIS only.
+desktop/src-tauri/icons/android/
+desktop/src-tauri/icons/ios/
+desktop/src-tauri/icons/icon.icns
+desktop/src-tauri/icons/icon.png
+desktop/src-tauri/icons/64x64.png
+desktop/src-tauri/icons/Square*.png
+desktop/src-tauri/icons/StoreLogo.png
+desktop/src-tauri/icons/workmode-public.svg
 .release-secrets/
 .run/tauri-release-*.json
 *.log

@@ -1,42 +1,82 @@
-# Product roadmap
+# 产品路线图
 
-This file records accepted follow-up work that is intentionally outside the current desktop packaging change.
+本文记录当前已交付基线和仍需明确设计的产品方向。它不是发布日期承诺；只有已经实现并验证的能力才会进入“已交付”。
 
-## Completed baseline: unified conversation timeline
+## 已交付基线（v0.3.4）
 
-- New messages, streamed text, and tool completion are followed automatically while the reader remains near the bottom.
-- Upward scrolling pauses automatic following and exposes a `Back to latest` affordance.
-- One tool invocation is rendered as one compact card whose status changes in place; parameters, output, and changed paths stay collapsed by default.
+### 本地科研工作台
 
-## Completed baseline: parallel web access
+- Windows x64 安装器，目标电脑不需要 Node.js、Python 或 Rust；
+- 多项目注册和切换、真实目录父子层级、活动项目持久化；
+- 会话重命名、会话软删除、项目安全移除；
+- UTF-8 文本、Markdown、PDF 和图片浏览，Markdown 编辑；
+- 可调整宽度的文件面板和长文档独立滚动。
 
-- `web_search` accepts 1–5 query variants and runs them concurrently with bounded workers and result counts.
-- `web_fetch` reads 1–4 public text pages concurrently with redirect, content-type, response-size, and private-network protections.
-- Both tools are loaded directly with the other required work tools; source text is explicitly treated as untrusted input.
+### 模型工作能力
 
-## Rich literature-research workflow — design pending
+- 项目读、写、精确编辑、目录、glob、grep、shell 和 Python 工具；
+- 工作记忆和计划工具；
+- 并行 `web_search` 和 `web_fetch`，带公开网络边界；
+- 所有必要工具固定加载，不依赖动态工具搜索；
+- 工具循环没有固定轮数上限，可由用户停止。
 
-The baseline tools deliberately stop short of a scholarly research pipeline. A later explicit workflow may add:
+### 上下文与历史
 
-1. turn the research question into several query variants;
-2. add end-to-end cancellation and a per-search budget;
-3. prefer scholarly/primary sources and retain title, author, venue, year, DOI, URL, and retrieval time;
-4. deduplicate by DOI, normalized title, and canonical URL;
-5. separate source excerpts from model inference and produce traceable citations;
-6. let the user inspect, select, and inject findings into the working context.
+- 项目工作记忆中的 `@相对路径` 固定导入；
+- 结构化工作记忆索引和正文固定注入；
+- token 预算动态历史窗口和前端占用指示；
+- 手动上下文压缩，保留完整 JSONL；
+- 最近 60 条前端分页加载；
+- “文字 → 工具 → 文字”持久化顺序、工具卡原位更新、停止后的已取消状态；
+- 启动时备份并修复旧版悬空工具事件。
 
-Provider selection beyond the current no-key baseline, credentials, rate limits, PDF/full-text access, and citation export format need a focused design before implementation.
+### 桌面产品化
 
-## Sub-agents — design discussion required
+- 单实例、托盘、动态本地端口和后端进程树生命周期；
+- GitHub Releases 检查更新、下载进度、Tauri 签名验证和应用内安装；
+- GitHub Actions 一次输入版本号完成同步、测试、构建、签名和发布；
+- 0.1.x 便携数据非破坏性导入。
 
-Do not add autonomous sub-agents until these boundaries are agreed:
+## 下一阶段：文献研究流水线
 
-- which tools and project paths each child may access;
-- maximum concurrency, token budget, time limit, and cancellation behavior;
-- read-only versus editing roles;
-- how simultaneous file edits are isolated or reconciled;
-- what context is inherited and what result schema is returned;
-- how responsibility, progress, and failures appear in the main conversation;
-- whether delegation is model-decided, user-confirmed, or explicitly requested only.
+当前网页工具适合基础检索和原文核对，但还不是专业文献管理系统。候选范围：
 
-The first useful candidate is a bounded read-only literature-review team. Code-editing agents should come later, after file-conflict and approval semantics are proven.
+1. 从研究问题生成可检查的多组 query；
+2. 优先学术/一手来源，记录标题、作者、期刊、年份、DOI、URL 和检索时间；
+3. 按 DOI、规范化标题和 canonical URL 去重；
+4. 区分来源原文、模型推断和无法验证的结论；
+5. 让用户选择哪些结果进入项目上下文；
+6. 导出可追踪引用和项目内研究记录；
+7. 为一次调研设置搜索次数、token、时间和取消预算。
+
+需要先确定搜索供应商、凭据、限流、PDF/全文权限、引用格式和失败降级语义。
+
+## 下一阶段候选：受限子 agent
+
+暂不加入自主子 agent，直到以下边界有可测试的设计：
+
+- 子任务允许访问哪些工具和项目路径；
+- 最大并发、token、时间和网络预算；
+- 只读、建议修改和直接编辑角色的区别；
+- 同时修改同一文件时的隔离、冲突检测和合并；
+- 继承哪些上下文，返回何种结构化结果；
+- 主对话如何显示进度、来源、失败和取消；
+- 委派由用户显式发起、用户确认，还是允许模型自主决定。
+
+最小可行候选是“有界、只读、可取消的文献检索团队”。代码编辑 agent 应在文件冲突和批准语义成熟之后再考虑。
+
+## 工程与发行待办
+
+- Windows Authenticode，降低 SmartScreen 摩擦；
+- 安装、首启、覆盖升级、卸载保留数据的自动化 smoke test；
+- 更明确的本地 token 首次配置与状态提示；
+- 对上下文估算与供应商真实 token usage 做可观测性对比；
+- 为大项目文件树增加增量加载/虚拟化，继续降低前端卡顿；
+- 在有真实需求和测试机器后评估 macOS/Linux，而不是提前提交未使用平台资源。
+
+## 明确非目标
+
+- 不恢复私人伴侣、生活记忆或关系人格模块；
+- 不把用户项目、会话或 API Key 默认上传到云端；
+- 不把 shell/Python 描述为安全容器；
+- 不在来源不可验证时伪造论文、DOI、实验结果或引用。

@@ -1,252 +1,202 @@
-# Workmode Public Architecture
+# Workmode Public 架构
 
-## Design goal
+本文描述当前 `main` 分支和正式桌面发行版的真实实现。历史便携包只作为数据迁移来源，不再属于当前运行架构。
 
-Workmode Public is a standalone research-work assistant. It intentionally excludes companion/persona modules and starts from a minimal local-first architecture.
+## 设计目标
 
-## Backend
+Workmode Public 是本地优先的科研工作助手：
 
-Backend entry:
+- 以用户明确注册的本地项目为权限和数据边界；
+- 保存完整、可追踪的会话和工具事件；
+- 按 token 预算构建模型上下文，而不是把整个 session 无条件发送给模型；
+- 固定加载项目协议、工作记忆和任务计划；
+- 不加载伴侣人格、生活记忆或私人关系模块；
+- 桌面版把应用文件与用户数据分离，支持签名更新。
 
-```text
-backend/app/main.py
-```
+## 运行拓扑
 
-Main modules:
-
-- `config.py` — environment-based configuration, local data directory, model settings, release env/static path overrides.
-- `storage.py` — file-based projects, sessions, messages, and project memory. Registered project roots keep an optional parent relationship; project/session removal is soft-delete metadata and never deletes the user's project directory.
-- `context_imports.py` — expands project-local `@relative/path.md` imports.
-- `files.py` — project sandbox, stable depth-first file tree, text/media preview whitelist, and Markdown save path.
-- `project_tools.py` — model-callable work tools: project read/write/edit/list_dir/glob/grep/bash/python plus web/state-tool dispatch.
-- `web_tools.py` — bounded parallel `web_search` / `web_fetch`, HTML-to-text extraction, redirect validation, response-size limits, and SSRF defenses.
-- `work_state.py` — project/global work memory and current plan state; memory index, memory bodies, and plan summary are injected into prompt.
-- `session_compactor.py` — manual context compression marker insertion; full JSONL history is preserved.
-- `context_window.py` — token-budget history selection; keeps recent legal user/system starts and avoids orphan tool results.
-- `prompt.py` — neutral research assistant system prompt and token usage estimate.
-- `llm.py` — OpenAI-compatible streaming chat client with a cancellation-aware,
-  uncapped project tool-calling loop.
-- `turn_recorder.py` — persists streamed assistant text segments and tool events
-  in their original interleaved order and closes pending tools on interruption.
-- `history_repair.py` — idempotent startup migration for legacy dangling tool
-  starts, with timestamped JSONL/metadata backups before atomic rewrites.
-- `routes.py` — `/api/work/*` resources.
-  - `POST /api/work/pick-directory` opens a native folder picker for local desktop use.
-  - `PATCH/DELETE /api/work/sessions/{id}` rename and archive conversations.
-  - `DELETE /api/work/projects/{slug}` archives only the app registration and returns `local_files_deleted=false`.
-  - `POST /api/work/sessions/{id}/stop` cancels an active model/tool run.
-- `chat_runs.py` — per-session run registry and cancellation tokens used by streaming chat and cancellable command tools.
-
-Runtime data defaults to `%APPDATA%\WorkmodePublic` on Windows and `~/.workmode-public` elsewhere. Set `WORKMODE_PUBLIC_DATA_DIR` to override. The Tauri desktop shell explicitly sets it to `%LOCALAPPDATA%\WorkmodePublic\data`; the legacy portable package sets it to package-local `data/`.
-
-Release startup sets:
-
-- `WORKMODE_ENV_FILE=<package>/config/.env`
-- `WORKMODE_STATIC_DIR=<package>/app/frontend-dist`
-- `WORKMODE_PUBLIC_DATA_DIR=<package>/data`
-- `WORKMODE_APP_VERSION` from `<package>/app/version.json`
-
-## Frontend
-
-Frontend entry:
+正式 Windows 桌面版由三个部分组成：
 
 ```text
-frontend/src/App.tsx
+Tauri 2 desktop process
+  ├─ 启动捆绑的 Python/FastAPI 后端（动态 loopback 端口）
+  ├─ 等待 /api/health
+  ├─ 把 API base 交给 React 前端
+  └─ 关闭、更新或退出时终止后端进程树
+
+React/Vite frontend
+  └─ 通过 /api 与本地 FastAPI 通信
+
+FastAPI backend
+  ├─ 文件型项目、会话和工作状态存储
+  ├─ OpenAI-compatible 模型流
+  └─ 项目工具与公开网页工具执行器
 ```
 
-The frontend is a standalone React workspace with an IDE-style shell:
+源码开发可以不用 Tauri：Vite 运行在 `127.0.0.1:5173`，FastAPI 默认运行在 `127.0.0.1:8765`。
 
-1. 48px activity bar;
-2. project/file/session sidebar;
-3. chat and context panel;
-4. resizable file viewer;
-5. bottom status bar.
+## 后端模块
 
-The project area is a persistent hierarchy rather than a creation-order list. A registered directory nested inside another registered project is displayed below its nearest parent. Conversation rows support rename and soft delete, while the send button changes to a stop action during generation.
+入口是 `backend/app/main.py`。
 
-The project file explorer is a directory-first depth-first tree. Directory rows expand and collapse locally; each directory's descendants stay adjacent instead of being reordered by the traversal stack.
+- `config.py`：环境变量、模型设置、数据目录、静态目录和允许的前端来源。
+- `storage.py`：项目、活动项目、session 元数据、JSONL 消息和项目工作记忆。项目/会话移除采用软删除。
+- `routes.py`：`/api` 健康检查、设置、项目、会话、上下文、文件和流式聊天接口。
+- `chat_runs.py`：按 session 维护正在运行的任务与取消事件。
+- `prompt.py`：中性科研助手 system prompt、固定上下文和模型消息构建。
+- `context_imports.py`：展开项目工作记忆中的 `@相对路径` 引用。
+- `context_window.py`：从 token 预算中选择最近合法历史后缀。
+- `session_compactor.py`：生成手动压缩摘要并插入续接标记，不删除历史。
+- `llm.py`：OpenAI-compatible 流式请求和无固定轮数上限的工具循环。
+- `turn_recorder.py`：按实际流式顺序持久化助手文字、工具开始和工具结果。
+- `history_repair.py`：启动时修复旧版本留下的悬空工具开始事件，并先做原子备份。
+- `files.py`：项目文件树、UTF-8 文本、Markdown 写回和 PDF/图片白名单预览。
+- `project_tools.py`：项目文件、搜索、命令、网页和工作状态工具的 schema 与统一分发。
+- `web_tools.py`：并行网页搜索/抓取、正文提取、响应限制与 SSRF 防护。
+- `work_state.py`：项目/全局结构化记忆和当前任务计划。
 
-The conversation timeline merges `tool_call_start` and `tool_result` events by `tool_call_id` into one compact stateful card. It follows streamed content only while the reader remains near the bottom; manual upward scrolling pauses following and exposes a `Back to latest` control.
+## 本地数据模型
 
-It has no dependency on daily mode routing or private persona state.
-
-The visual shell follows the archived `work-mode-v2` IDE layout: ActivityBar, SidePanel, central AI panel, right FileViewPanel, and bottom StatusBar.
-
-The one-click Windows launcher builds `frontend/dist` and lets FastAPI serve the static app. The Vite dev server is only needed for frontend development.
-
-Release packages copy `frontend/dist` to `app/frontend-dist`; target machines do not need Node.js.
-
-## Desktop distribution
-
-The primary distribution is a Tauri 2 Windows application:
+桌面壳显式设置 `WORKMODE_PUBLIC_DATA_DIR=%LOCALAPPDATA%\WorkmodePublic\data`，配置文件和日志位于同一应用根目录的其他子目录：
 
 ```text
-desktop/
-  package.json
-  src-tauri/
-    src/
-      lib.rs                app, tray, single-instance, backend lifecycle
-      backend.rs            dynamic-port launch specification
-      paths.rs              installed resources vs user-data paths
-      migration.rs          non-destructive legacy import
-    capabilities/           narrow updater/dialog/process permissions
-    resources/              generated staging area; never contains secrets
-scripts/
-  build-desktop.ps1         test, stage, sign, bundle, and publish artifacts
+%LOCALAPPDATA%\WorkmodePublic\
+  config\.env
+  data\
+    work\
+      active.json
+      projects\<project-slug>.json
+      sessions\<project-slug>\<session-id>.meta.json
+      sessions\<project-slug>\<session-id>.jsonl
+      memory\global.md
+      memory\projects\<project-slug>.md
+      state\memory\...
+      state\plans\<project-slug>.json
+    backups\history-repair\
+  logs\
 ```
 
-The shell starts the bundled Python backend on an available loopback port, waits for `/api/health`, then gives the dynamic API base to the frontend. Closing the main window exits the application and terminates the backend process tree. A single-instance guard focuses the existing window. The tray can restore a minimized window or stop and exit. The bundled interpreter runs with `PYTHONDONTWRITEBYTECODE=1`, so runtime caches do not mutate the installation directory or survive uninstall.
+直接运行后端时，若未设置覆盖变量，Windows 默认数据目录是 `%APPDATA%\WorkmodePublic`，其他系统是 `~/.workmode-public`。
 
-Desktop updates download and verify the signed installer while the backend remains available. Immediately before installation, the frontend invokes a Rust lifecycle command that terminates and waits for the bundled backend process tree, preventing loaded Python extension modules from locking files that NSIS must replace. If installer startup rejects before Windows exits the app, a recovery command restarts the same backend port.
+项目记录只保存路径、显示信息和父项目关系，不复制用户项目。移除项目只归档注册记录，硬盘文件不受影响。会话消息是 append-only JSONL；删除会话只在元数据写入 `deleted_at`。
 
-Installed resources are immutable application files. User-owned state lives under `%LOCALAPPDATA%\WorkmodePublic`:
+## 请求与上下文流
+
+一轮模型请求的上下文装配顺序是：
 
 ```text
-WorkmodePublic/
-  config/.env
-  data/
-  logs/
+中性 system 规则
+  + 当前项目元数据
+  + 全局/项目工作记忆
+  + @项目文件展开结果与警告
+  + 结构化记忆索引和正文
+  + 当前任务计划
+  + 全部必要工具 schema
+  + token 预算允许的最近会话后缀
 ```
 
-Updater artifacts use Tauri's mandatory minisign verification. The updater public key is compiled into the app; the private key and password stay only in the ignored `.release-secrets/` directory. Windows Authenticode signing is a separate release concern and is not provided by the updater signature.
+具体流程：
 
-## Legacy portable distribution layout
+1. `prompt.build_system_prompt` 组合固定部分并估算 token；
+2. `session_compactor.messages_visible_to_llm` 从最新 `<CONTEXT_SUMMARY>` 标记确定可见历史起点；
+3. `_history_to_openai_messages` 把 JSONL 工具事件重建为 OpenAI-compatible `tool_calls` 和 `tool` 消息；
+4. `context_window.build_context_window` 扣除 system 与工具 schema 后，从最近历史向前装入合法后缀；
+5. 选中后缀必须从 user/system 消息开始，避免孤立工具结果；
+6. 使用情况通过上下文接口和 SSE 事件返回前端 token 条。
 
-Source tree:
+估算器用于装载决策和 UI 指示，不等同于模型供应商账单中的精确 tokenizer 计数。
+
+### 固定导入
+
+`@relative/file.md` 必须单独占一行，路径相对当前项目根目录。实现只接受项目内 UTF-8 文本，限制递归深度并检测循环引用。导入失败会作为可见警告进入 prompt 和上下文状态。
+
+### 工作记忆
+
+项目工作记忆文本、结构化项目/全局记忆的索引和正文、当前计划都固定注入。结构化记忆正文共享工作状态上下文的长度保护；需要刷新或逐字确认时模型仍可调用 `memory_read`。
+
+### 压缩
+
+`POST /api/work/sessions/{id}/compact` 使用八段摘要结构写入一个 system marker：主要请求、关键概念、文件与代码、错误与修复、解决过程、用户消息、待办和下一步。原始 JSONL 不被删除；重复压缩以最新 marker 作为下一次续接边界。
+
+## 工具循环与持久化顺序
+
+模型直接获得所有必要工具 schema，不使用动态工具搜索。`llm.py` 的循环没有固定轮数上限：模型返回工具调用后，后端执行工具、把结果放回模型消息，然后继续请求，直到出现最终正文、用户取消或无法继续的模型/网络错误。普通工具失败以 `ok=false` 和错误正文返回模型，不会单独触发固定轮次终止。
+
+流式事件包括：
+
+- 助手 `delta`；
+- `tool_call_start`；
+- `tool_result`；
+- `loop_continue`；
+- 上下文、完成、停止或错误事件。
+
+`TurnRecorder` 在每次工具开始前先刷出已经生成的助手文字，因此持久化回放仍保持用户看到的“文字 → 工具 → 文字”顺序。停止时：
+
+- 上游 HTTP 流和后续工具轮次被取消；
+- shell/Python 收到取消事件并终止进程树；
+- 部分助手文字带 `meta.interrupted=true` 保存；
+- 已开始但未返回的工具写入 `status=cancelled` 的结果；
+- 若完全没有助手文字，会写入小型 `generation_stopped` 标记。
+
+启动迁移会为旧版悬空 `tool_call_start` 插入已取消结果。修改前先把原 JSONL 和 session 元数据备份到 `data/backups/history-repair/<batch>/`；迁移可重复运行，不改写已有成功/失败结果，也不猜测旧版本未保存的文字边界。
+
+## 项目工具边界
+
+文件工具将路径解析到活动项目根目录并拒绝绝对路径、`..` 越界、依赖/缓存目录和敏感配置。读取支持行范围；写入和结果有大小限制。
+
+`project_bash` 和 `project_python` 在项目根目录运行，具有超时、输出截断、取消和破坏性命令黑名单，但不提供容器或 OS 级隔离。
+
+`web_search` 最多并行处理 5 个 query，每个最多返回 8 条；`web_fetch` 最多并行读取 4 个公开文本页面。网络访问只允许 HTTP(S)，拒绝内网、loopback、链路本地目标和非常用端口，并在重定向后重新解析和验证地址。网页正文始终按不可信输入处理。
+
+## 前端结构
+
+入口是 `frontend/src/App.tsx`。界面采用 IDE 式布局：
+
+1. 48px 活动栏；
+2. 项目、文件、会话或设置侧栏；
+3. 中央对话与上下文区；
+4. 可调整宽度的文件查看器；
+5. 底部状态栏。
+
+项目列表按注册目录的最近父子关系构树，同级按名称排序。文件树按目录优先、深度优先稳定展示。切换项目会重新加载项目会话、文件树和记忆；生成中禁止切换以避免活动任务跨项目。
+
+消息时间线把同一 `tool_call_id` 的开始和结果合并为一张状态卡。读者接近底部时自动跟随流式内容；向上滚动会暂停并显示「回到最新」。工具修改文件后，前端在本轮结束时刷新文件树和当前预览。
+
+文件面板支持 UTF-8 文本、Markdown 预览/编辑、PDF 和常见图片。二进制格式不会作为文本读取。PDF/图片通过经过校验的媒体端点提供，而不是直接暴露任意本地路径。
+
+## 桌面生命周期与更新
+
+`desktop/src-tauri/src/lib.rs` 负责单实例、托盘、窗口、动态端口后端和退出清理。后端使用 `PYTHONDONTWRITEBYTECODE=1`，避免在安装目录生成运行缓存。
+
+更新器下载带 minisign/Tauri 签名的安装器。安装前，前端调用 Rust 生命周期命令停止并等待 Python 后端进程树，避免已加载 `.pyd` 锁住 NSIS 需要替换的文件；若安装启动在应用退出前失败，可以在原端口恢复后端。
+
+更新公钥编译进应用，私钥和密码只存在本地忽略目录或 GitHub Actions secrets。该签名不等于 Windows Authenticode。
+
+旧版便携数据导入由 `desktop/src-tauri/src/migration.rs` 实现。它只接受包含有效 `data/work` 的旧目录，目标桌面数据非空时拒绝合并，通过 staging 目录复制 `data/` 和可选 `config/.env`，且不修改来源。
+
+## 仓库职责
 
 ```text
-workmode-public/
-  backend/
-  frontend/
-  scripts/
-    one-click-start.ps1      development/source launcher
-    build-release.ps1        release package builder
-    release/                 scripts copied into release packages
+backend/                         后端实现和回归测试
+frontend/                        React 实现和 Vitest
+desktop/src-tauri/               Rust/Tauri 实现、能力声明和 Windows 图标
+desktop/src-tauri/resources/     构建时生成的后端/runtime staging；不提交内容
+scripts/build-desktop.ps1        本地桌面构建、测试、签名和产物生成
+scripts/sync-version.ps1         同步全部版本源
+.github/workflows/               正式 Windows Release 流程
+docs/                            当前架构、开发、发行和路线图
 ```
 
-Release package:
+早期 0.1.x 便携包的构建器、CMD 更新器和 manifest 示例已经从当前仓库移除；其数据格式仍由桌面迁移器兼容。Android、iOS、macOS 和 Microsoft Store 图标不属于当前 Windows NSIS 目标，不提交到仓库。
 
-```text
-workmode-public-<version>-win-x64/
-  WorkmodePublic.cmd
-  StopWorkmodePublic.cmd
-  UpdateWorkmodePublic.cmd
-  UpgradeExistingWorkmode.cmd
-  升级已有版本.cmd
-  app/
-    backend/
-    frontend-dist/
-    version.json
-  config/
-    .env.example
-    .env                  created on first launch
-  data/                   user data, preserved across updates
-  logs/
-  runtime/
-    python-base/          copied Python base runtime
-    backend-venv/         backend dependencies
-  backups/                previous app versions after update
-```
+## 当前安全边界与待加强项
 
-The updater preserves `config/`, `data/`, `logs/`, and `runtime/`; it replaces only `app/` and refreshes docs/example files when present. This keeps user projects and model credentials stable across application updates.
+已有边界：loopback 默认绑定、可选本地 token、窄 CORS、项目路径沙箱、媒体白名单、命令限制、网页 SSRF 防护、签名更新、用户数据与安装目录分离。
 
-There are two update paths:
+仍待加强：
 
-- `升级已有版本.cmd` / `UpgradeExistingWorkmode.cmd`: migration-style update for non-technical users. It runs from the new extracted package, asks the user to choose the old package folder, copies old `config/.env` and `data/` into the new package, then starts the new app. The old folder is untouched and can be deleted after the user verifies the new app.
-- `UpdateWorkmodePublic.cmd`: in-place update for advanced users and future manifest-driven updates. It runs inside an existing package folder and replaces only `app/`.
-
-## Context flow
-
-```text
-project memory
-  ├─ @relative files
-  │   └─ context_imports.expand_project_imports_detailed
-  └─ work_state memory index + active plan summary
-      └─ prompt.build_system_prompt
-
-session JSONL
-  └─ session_compactor.messages_visible_to_llm
-      └─ prompt._history_to_openai_messages
-          └─ context_window.build_context_window
-              └─ prompt.build_llm_messages
-                  └─ llm.stream_openai_compatible
-                      ├─ all required work tool schemas
-                      ├─ project_tools.execute_project_tool
-                      ├─ work_state.execute_state_tool
-                      └─ tool_result back into model loop
-```
-
-Only project-local relative imports are accepted. Imported file metadata is returned to the frontend context strip without exposing duplicate file bodies in the UI.
-
-Work memory is fixed-injected with both index and entry bodies. `memory_read` remains available for explicit refresh or exact re-reading of a single entry.
-
-## Context compression and tool history
-
-Session JSONL is the durable archive. It preserves user messages, assistant messages, tool call events, tool result events, and context summary markers. The model view is not the full archive:
-
-1. `messages_visible_to_llm` starts from the latest `<CONTEXT_SUMMARY>` marker when one exists.
-2. `prompt._history_to_openai_messages` reconstructs persisted tool call/result UI events into OpenAI-compatible assistant `tool_calls` and `tool` messages.
-3. `context_window.build_context_window` subtracts system prompt and tool schema tokens from the configured budget, then loads the newest legal suffix of history.
-4. A selected history suffix must start from a user/system message, so the model is not handed an orphan tool result.
-
-Manual compression is exposed as `POST /api/work/sessions/{id}/compact`. It inserts a system marker with an 8-section summary and keeps the original messages before the marker. Repeated compression uses the newest marker as the next continuation boundary.
-
-## Project tool events
-
-When the model calls a project tool, the backend emits SSE events:
-
-- `tool_call_start` — tool name and JSON input;
-- `tool_result` — result text, ok/error state, and changed project paths;
-- `loop_continue` — the model continues after receiving tool results.
-
-`TurnRecorder` flushes each assistant text segment before persisting the next
-`tool_call_start`, then persists the matching result in place. This keeps durable
-JSONL replay in the same text → tool → text order that the user saw while
-streaming. `prompt.build_llm_messages` can reconstruct those events for the
-model, but `context_window.py` decides how many fit the token budget. Tool
-history is therefore preserved, but not always injected.
-
-The model tool loop has no fixed round-count cap. It continues until the model
-returns without tool calls, the user stops the turn, or a model/HTTP/tool error
-ends it. The visible stop control and command cancellation token remain the
-operator safety boundary.
-
-## Cancellation and deletion semantics
-
-- Stopping a response cancels the backend streaming task, closes the upstream HTTP stream, prevents subsequent tool rounds, and sets a cancellation event for a running shell/Python process.
-- Partial assistant text is persisted with `meta.interrupted=true`; if no text
-  was produced, a small `generation_stopped` system marker is persisted instead.
-- A tool that was running when cancellation arrived receives a durable
-  `tool_result` with status=`cancelled`; inactive historical cards are never
-  left displaying `running`.
-- On startup, legacy `tool_call_start` rows without any matching result are
-  closed by inserting a repaired `cancelled` result immediately after the
-  start row. Original JSONL and session metadata are copied under
-  `backups/history-repair/<batch>/` first. Existing results and legacy combined
-  assistant text are preserved; unavailable historical text boundaries are not
-  guessed.
-- Deleting a conversation sets `deleted_at` in its metadata. The JSONL archive remains on disk.
-- Deleting a project sets `archived_at` in its app metadata. Its registered filesystem root is never removed. Direct child registrations are promoted one level so they remain visible.
-
-## Security posture
-
-Current MVP defenses:
-
-- local bind by default;
-- optional local token;
-- narrow CORS allowlist;
-- project path sandbox for file preview/edit;
-- global framing is denied except for validated PDF/image responses; media previews use a narrow `frame-ancestors` policy for the desktop and loopback frontends;
-- project tool sandbox for model-driven file reads/writes/edits/search;
-- command tools run with project cwd, timeout, output truncation, and destructive-command blacklist;
-- web fetches reject loopback/private/link-local destinations and non-HTTP(S) schemes, revalidate every redirect, accept text-like content only, and cap response size;
-- positive file format whitelist;
-- no dynamic tool search in the public work mode; required tools are loaded directly.
-
-Remaining hardening before wider public release:
-
-- Windows Authenticode code signing to reduce SmartScreen friction;
-- stricter token/bootstrap UX;
-- release sanitizer;
-- smoke tests for first-run flow;
-- CI-built portable runtime instead of ad-hoc local runtime copying.
+- Windows Authenticode；
+- 更清晰的本地 token 首次配置体验；
+- 首次安装、升级、卸载保留数据的端到端 smoke test；
+- 完整的文献元数据、DOI 去重和可核验引用流水线；
+- 子 agent 的权限、预算、取消与文件冲突设计。
