@@ -70,6 +70,46 @@ describe('buildConversationItems', () => {
       expect.objectContaining({ kind: 'tool', callId: 'call-3', status: 'error', result: 'network failed' })
     ])
   })
+
+  it('preserves interleaved text and tools and marks a stopped tool as cancelled', () => {
+    const items = buildConversationItems([
+      message('u1', 'user', 'research it'),
+      message('a1', 'assistant', 'first note'),
+      message('t1', 'tool', 'calling web_search', {
+        event: 'tool_call_start',
+        tool_call_id: 'call-4',
+        tool_name: 'web_search',
+        status: 'running'
+      }),
+      message('t2', 'tool', 'found', {
+        event: 'tool_result',
+        tool_call_id: 'call-4',
+        tool_name: 'web_search',
+        status: 'done'
+      }),
+      message('a2', 'assistant', 'second note'),
+      message('t3', 'tool', 'calling web_fetch', {
+        event: 'tool_call_start',
+        tool_call_id: 'call-5',
+        tool_name: 'web_fetch',
+        status: 'running'
+      }),
+      message('t4', 'tool', 'stopped by user', {
+        event: 'tool_result',
+        tool_call_id: 'call-5',
+        tool_name: 'web_fetch',
+        status: 'cancelled'
+      })
+    ])
+
+    expect(items.map((item) => item.kind === 'tool' ? `${item.toolName}:${item.status}` : item.message.content)).toEqual([
+      'research it',
+      'first note',
+      'web_search:done',
+      'second note',
+      'web_fetch:cancelled'
+    ])
+  })
 })
 
 describe('isNearBottom', () => {
