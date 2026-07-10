@@ -12,9 +12,6 @@ from .config import get_settings
 from .project_tools import PROJECT_TOOL_SCHEMAS, execute_project_tool, project_tool_names
 
 
-MAX_TOOL_ROUNDS = 8
-
-
 async def stream_openai_compatible(
     messages: list[dict[str, Any]],
     *,
@@ -39,7 +36,8 @@ async def stream_openai_compatible(
     tool_names = project_tool_names()
 
     async with httpx.AsyncClient(timeout=timeout) as client:
-        for round_index in range(1, MAX_TOOL_ROUNDS + 1):
+        round_index = 1
+        while True:
             if cancel_event is not None and cancel_event.is_set():
                 yield {"type": "cancelled"}
                 return
@@ -151,8 +149,7 @@ async def stream_openai_compatible(
                 )
 
             yield {"type": "loop_continue", "round": round_index + 1}
-
-    yield {"type": "error", "message": f"工具调用超过 {MAX_TOOL_ROUNDS} 轮，已停止。"}
+            round_index += 1
 
 
 def _merge_tool_call_deltas(tool_calls: dict[int, dict[str, Any]], deltas: list[dict[str, Any]]) -> None:

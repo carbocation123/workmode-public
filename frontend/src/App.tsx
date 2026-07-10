@@ -78,7 +78,13 @@ function ToolMessage({ item }: { item: ToolConversationItem }) {
           <span className="tool-card-dot" />
           <span className="tool-card-name">{item.toolName}</span>
           <span className="tool-card-status">
-            {item.status === 'running' ? '运行中' : item.status === 'error' ? '失败' : '完成'}
+            {item.status === 'running'
+              ? '运行中'
+              : item.status === 'error'
+                ? '失败'
+                : item.status === 'cancelled'
+                  ? '已取消'
+                  : '完成'}
           </span>
         </div>
         {hasDetails && (
@@ -173,7 +179,10 @@ export default function App() {
     () => projects.find((item) => item.slug === activeSlug) || null,
     [projects, activeSlug]
   )
-  const conversationItems = useMemo(() => buildConversationItems(messages), [messages])
+  const conversationItems = useMemo(
+    () => buildConversationItems(messages, streaming ? 'running' : 'cancelled'),
+    [messages, streaming]
+  )
   const visibleEntries = useMemo(
     () => visibleFileEntries(entries, expandedDirs),
     [entries, expandedDirs]

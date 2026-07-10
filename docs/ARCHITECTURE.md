@@ -24,7 +24,10 @@ Main modules:
 - `session_compactor.py` — manual context compression marker insertion; full JSONL history is preserved.
 - `context_window.py` — token-budget history selection; keeps recent legal user/system starts and avoids orphan tool results.
 - `prompt.py` — neutral research assistant system prompt and token usage estimate.
-- `llm.py` — OpenAI-compatible streaming chat client with project tool-calling loop.
+- `llm.py` — OpenAI-compatible streaming chat client with a cancellation-aware,
+  uncapped project tool-calling loop.
+- `turn_recorder.py` — persists streamed assistant text segments and tool events
+  in their original interleaved order and closes pending tools on interruption.
 - `routes.py` — `/api/work/*` resources.
   - `POST /api/work/pick-directory` opens a native folder picker for local desktop use.
   - `PATCH/DELETE /api/work/sessions/{id}` rename and archive conversations.
@@ -194,12 +197,26 @@ When the model calls a project tool, the backend emits SSE events:
 - `tool_result` — result text, ok/error state, and changed project paths;
 - `loop_continue` — the model continues after receiving tool results.
 
-`routes.py` persists tool events as role=`tool` messages for UI replay. `prompt.build_llm_messages` can reconstruct those events for the model, but `context_window.py` decides how many fit the token budget. Tool history is therefore preserved, but not always injected.
+`TurnRecorder` flushes each assistant text segment before persisting the next
+`tool_call_start`, then persists the matching result in place. This keeps durable
+JSONL replay in the same text → tool → text order that the user saw while
+streaming. `prompt.build_llm_messages` can reconstruct those events for the
+model, but `context_window.py` decides how many fit the token budget. Tool
+history is therefore preserved, but not always injected.
+
+The model tool loop has no fixed round-count cap. It continues until the model
+returns without tool calls, the user stops the turn, or a model/HTTP/tool error
+ends it. The visible stop control and command cancellation token remain the
+operator safety boundary.
 
 ## Cancellation and deletion semantics
 
 - Stopping a response cancels the backend streaming task, closes the upstream HTTP stream, prevents subsequent tool rounds, and sets a cancellation event for a running shell/Python process.
-- Partial assistant text is persisted with `meta.interrupted=true`; if no text was produced, a small `generation_stopped` system marker is persisted instead.
+- Partial assistant text is persisted with `meta.interrupted=true`; if no text
+  was produced, a small `generation_stopped` system marker is persisted instead.
+- A tool that was running when cancellation arrived receives a durable
+  `tool_result` with status=`cancelled`; inactive historical cards are never
+  left displaying `running`.
 - Deleting a conversation sets `deleted_at` in its metadata. The JSONL archive remains on disk.
 - Deleting a project sets `archived_at` in its app metadata. Its registered filesystem root is never removed. Direct child registrations are promoted one level so they remain visible.
 

@@ -28,6 +28,7 @@ from .models import (
 )
 from .prompt import build_llm_messages
 from .session_compactor import CompactionError, compact_session, compaction_payload
+from .turn_recorder import TurnRecorder
 
 
 router = APIRouter(prefix="/api")
@@ -229,30 +230,7 @@ async def compact_context(session_id: str, payload: CompactRequest) -> dict[str,
 async def chat_stream(session_id: str, payload: ChatRequest) -> StreamingResponse:
     async def events() -> AsyncIterator[str]:
         run = None
-        assistant_parts: list[str] = []
-        turn_started = False
-        assistant_saved = False
-
-        def persist_assistant(*, interrupted: bool) -> dict[str, object] | None:
-            nonlocal assistant_saved
-            if assistant_saved or not turn_started:
-                return None
-            assistant_saved = True
-            if assistant_parts:
-                return storage.append_message(
-                    session_id,
-                    role="assistant",
-                    content="".join(assistant_parts),
-                    meta={"model": get_settings().model_name, "interrupted": interrupted},
-                )
-            if interrupted:
-                return storage.append_message(
-                    session_id,
-                    role="system",
-                    content="本轮生成已由用户停止。",
-                    meta={"event": "generation_stopped", "interrupted": True},
-                )
-            return None
+        recorder: TurnRecorder | None = None
 
         try:
             task = asyncio.current_task()
@@ -264,7 +242,7 @@ async def chat_stream(session_id: str, payload: ChatRequest) -> StreamingRespons
             session = storage.get_session(session_id)
             project = storage.get_project(session.project_slug)
             user_message = storage.append_message(session_id, role="user", content=payload.content)
-            turn_started = True
+            recorder = TurnRecorder(session_id, get_settings().model_name)
             messages, usage = build_llm_messages(project, session_id)
             yield _sse({"type": "user_message", "message": user_message})
             yield _sse({"type": "context_usage", "context": usage})
@@ -275,58 +253,42 @@ async def chat_stream(session_id: str, payload: ChatRequest) -> StreamingRespons
                 cancel_event=run.cancel_event,
             ):
                 if event["type"] == "text_delta":
-                    assistant_parts.append(event["content"])
+                    recorder.append_text(str(event["content"]))
                 elif event["type"] == "cancelled":
                     interrupted = True
                     break
                 elif event["type"] == "tool_call_start":
-                    tool_message = storage.append_message(
-                        session_id,
-                        role="tool",
-                        content=f"调用 {event.get('name', 'unknown')}…",
-                        meta={
-                            "event": "tool_call_start",
-                            "tool_call_id": event.get("id"),
-                            "tool_name": event.get("name"),
-                            "args": event.get("input") or {},
-                            "status": "running",
-                        },
-                    )
+                    tool_message = recorder.start_tool(event)
                     yield _sse({**event, "message": tool_message})
                     continue
                 elif event["type"] == "tool_result":
-                    tool_message = storage.append_message(
-                        session_id,
-                        role="tool",
-                        content=str(event.get("result") or ""),
-                        meta={
-                            "event": "tool_result",
-                            "tool_call_id": event.get("id"),
-                            "tool_name": event.get("name"),
-                            "status": "done" if event.get("ok") else "error",
-                            "ok": bool(event.get("ok")),
-                            "changed_paths": event.get("changed_paths") or [],
-                        },
-                    )
+                    tool_message = recorder.finish_tool(event)
                     yield _sse({**event, "message": tool_message})
                     continue
                 yield _sse(event)
             interrupted = interrupted or run.cancelled()
-            assistant_message = persist_assistant(interrupted=interrupted)
-            if assistant_message is not None:
-                yield _sse({"type": "assistant_message", "message": assistant_message})
+            final_messages = recorder.finalize(interrupted=interrupted)
+            for message in final_messages:
+                if message.get("role") == "assistant":
+                    yield _sse({"type": "assistant_message", "message": message})
             if interrupted:
                 yield _sse({"type": "cancelled"})
             yield _sse({"type": "done"})
         except asyncio.CancelledError:
             if run is not None:
                 run.cancel_event.set()
-            try:
-                persist_assistant(interrupted=True)
-            except Exception:
-                logger.exception("failed to persist interrupted assistant message")
+            if recorder is not None:
+                try:
+                    recorder.finalize(interrupted=True)
+                except Exception:
+                    logger.exception("failed to persist interrupted turn")
             raise
         except Exception as exc:
+            if recorder is not None:
+                try:
+                    recorder.finalize(interrupted=True)
+                except Exception:
+                    logger.exception("failed to persist failed turn")
             yield _sse({"type": "error", "message": str(exc)})
         finally:
             if run is not None:

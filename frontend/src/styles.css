@@ -885,6 +885,11 @@ pre {
   background: rgba(127, 29, 29, 0.16);
 }
 
+.tool-card.cancelled {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: rgba(120, 53, 15, 0.12);
+}
+
 .tool-card-header {
   display: flex;
   align-items: center;
@@ -902,6 +907,11 @@ pre {
 .tool-card.error .tool-card-dot {
   background: #ef4444;
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.tool-card.cancelled .tool-card-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
 }
 
 .tool-card-name {

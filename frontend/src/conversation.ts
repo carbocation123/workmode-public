@@ -1,6 +1,6 @@
 import type { Message } from './api'
 
-export type ToolRunStatus = 'running' | 'done' | 'error'
+export type ToolRunStatus = 'running' | 'done' | 'error' | 'cancelled'
 
 export interface MessageConversationItem {
   kind: 'message'
@@ -39,10 +39,15 @@ function metaStringArray(message: Message, key: string) {
 }
 
 function normalizeStatus(value: string, fallback: ToolRunStatus): ToolRunStatus {
-  return value === 'running' || value === 'done' || value === 'error' ? value : fallback
+  return value === 'running' || value === 'done' || value === 'error' || value === 'cancelled'
+    ? value
+    : fallback
 }
 
-export function buildConversationItems(messages: Message[]): ConversationItem[] {
+export function buildConversationItems(
+  messages: Message[],
+  unresolvedToolStatus: 'running' | 'cancelled' = 'running'
+): ConversationItem[] {
   const items: ConversationItem[] = []
   const toolIndexByCallId = new Map<string, number>()
 
@@ -92,7 +97,10 @@ export function buildConversationItems(messages: Message[]): ConversationItem[] 
     }
   }
 
-  return items
+  if (unresolvedToolStatus === 'running') return items
+  return items.map((item) => item.kind === 'tool' && item.status === 'running'
+    ? { ...item, status: unresolvedToolStatus }
+    : item)
 }
 
 export function isNearBottom(
