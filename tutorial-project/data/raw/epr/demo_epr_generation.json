@@ -1,0 +1,24 @@
+{
+  "simulated": true,
+  "purpose": "Workmode Public tutorial; not instrument data",
+  "seed": 20260710,
+  "points": 1024,
+  "spc_encoding": "little-endian IEEE float32",
+  "field_start_G": 3100.0,
+  "field_end_G": 3900.0,
+  "microwave_frequency_GHz": 9.8,
+  "embedded_signals": {
+    "signal_a_g": 2.003,
+    "signal_a_center_G": 3495.693759360958,
+    "signal_b_g": 1.965,
+    "signal_b_center_G": 3563.294961832061
+  },
+  "files": {
+    "demo_epr.par": {
+      "sha256": "c9ccdfd2d58317961bb0f4eb540efcbf8c63826605f8ad4b2d001adf69907a1d"
+    },
+    "demo_epr.spc": {
+      "sha256": "2627c6c29dba3c3b415de52225ede170ef29584f4554d5424b39d7570eec430f"
+    }
+  }
+}

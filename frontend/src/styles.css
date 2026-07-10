@@ -295,6 +295,24 @@ pre {
   font-size: 11px;
 }
 
+.tutorial-project-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tutorial-project-actions > button {
+  flex: 1;
+}
+
+.tutorial-reset-btn {
+  color: var(--color-danger);
+  border-color: rgba(255, 110, 64, 0.3);
+}
+
+.tutorial-reset-btn:hover:not(:disabled) {
+  background: rgba(255, 110, 64, 0.08);
+}
+
 .project-switcher-path {
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
   font-size: 10px;
@@ -1009,6 +1027,51 @@ pre {
   overflow-x: auto;
 }
 
+.markdown-table-scroll {
+  width: 100%;
+  margin: 12px 0;
+  overflow-x: auto;
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+}
+
+.message .bubble table,
+.file-view-markdown table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  white-space: normal;
+}
+
+.message .bubble th,
+.message .bubble td,
+.file-view-markdown th,
+.file-view-markdown td {
+  padding: 7px 10px;
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  text-align: left;
+  vertical-align: top;
+}
+
+.message .bubble th,
+.file-view-markdown th {
+  background: var(--color-surface-container-highest);
+  font-weight: 600;
+}
+
+.message .bubble tr:last-child td,
+.file-view-markdown tr:last-child td {
+  border-bottom: 0;
+}
+
+.message .bubble th:last-child,
+.message .bubble td:last-child,
+.file-view-markdown th:last-child,
+.file-view-markdown td:last-child {
+  border-right: 0;
+}
+
 .chat-input-wrap {
   grid-row: 4;
   border-top: 1px solid var(--color-divider);
@@ -1235,17 +1298,6 @@ pre {
 .file-view-markdown ul,
 .file-view-markdown ol {
   padding-left: 1.5em;
-}
-
-.file-view-markdown table {
-  border-collapse: collapse;
-  margin: 1em 0;
-}
-
-.file-view-markdown th,
-.file-view-markdown td {
-  border: 1px solid var(--color-divider);
-  padding: 6px 10px;
 }
 
 .file-editor {

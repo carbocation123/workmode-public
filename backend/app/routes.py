@@ -10,7 +10,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from . import files, storage
+from . import files, storage, tutorial_project
 from .chat_runs import ChatAlreadyRunningError, chat_runs
 from .config import APP_VERSION, get_settings, update_env_file
 from .llm import stream_openai_compatible
@@ -25,6 +25,7 @@ from .models import (
     ProjectUpdate,
     SessionCreate,
     SessionUpdate,
+    TutorialProjectInstall,
 )
 from .prompt import build_llm_messages
 from .session_compactor import CompactionError, compact_session, compaction_payload
@@ -33,6 +34,12 @@ from .turn_recorder import TurnRecorder
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
+
+
+def _project_payload(project: storage.Project) -> dict[str, object]:
+    payload: dict[str, object] = asdict(project)
+    payload["is_tutorial"] = tutorial_project.is_tutorial_project(project)
+    return payload
 
 
 def _handle_error(exc: Exception) -> HTTPException:
@@ -105,7 +112,16 @@ def update_model_settings(payload: ModelSettingsUpdate) -> dict[str, object]:
 @router.get("/work/projects")
 def list_projects() -> dict[str, object]:
     active = storage.get_active_project_slug()
-    return {"projects": [asdict(item) for item in storage.list_projects()], "active_slug": active}
+    return {"projects": [_project_payload(item) for item in storage.list_projects()], "active_slug": active}
+
+
+@router.post("/work/tutorial-project")
+def install_tutorial(payload: TutorialProjectInstall) -> dict[str, object]:
+    try:
+        result = tutorial_project.install_tutorial_project(payload.parent_path)
+        return {"project": _project_payload(result.project), "session": asdict(result.session)}
+    except Exception as exc:
+        raise _handle_error(exc)
 
 
 @router.post("/work/projects")
@@ -113,7 +129,7 @@ def create_project(payload: ProjectCreate) -> dict[str, object]:
     try:
         project = storage.create_project(payload.name, payload.root_path, payload.description)
         session = storage.create_session(project.slug)
-        return {"project": asdict(project), "session": asdict(session)}
+        return {"project": _project_payload(project), "session": asdict(session)}
     except Exception as exc:
         raise _handle_error(exc)
 
@@ -121,7 +137,7 @@ def create_project(payload: ProjectCreate) -> dict[str, object]:
 @router.patch("/work/projects/{slug}")
 def update_project(slug: str, payload: ProjectUpdate) -> dict[str, object]:
     try:
-        return {"project": asdict(storage.update_project(slug, name=payload.name, description=payload.description))}
+        return {"project": _project_payload(storage.update_project(slug, name=payload.name, description=payload.description))}
     except Exception as exc:
         raise _handle_error(exc)
 
@@ -134,9 +150,25 @@ def delete_project(slug: str) -> dict[str, object]:
                 raise storage.ConflictError("项目中仍有正在运行的对话，请先停止后再删除")
         project = storage.archive_project(slug)
         return {
-            "project": asdict(project),
+            "project": _project_payload(project),
             "active_slug": storage.get_active_project_slug(),
             "local_files_deleted": False,
+        }
+    except Exception as exc:
+        raise _handle_error(exc)
+
+
+@router.post("/work/projects/{slug}/reset-tutorial")
+def reset_tutorial(slug: str) -> dict[str, object]:
+    try:
+        for session in storage.list_sessions(slug, limit=10_000):
+            if chat_runs.is_running(session.id):
+                raise storage.ConflictError("教程中仍有正在运行的对话，请先停止后再重置")
+        result = tutorial_project.reset_tutorial_project(slug)
+        return {
+            "project": _project_payload(result.project),
+            "session": asdict(result.session),
+            "backup_path": str(result.backup_dir),
         }
     except Exception as exc:
         raise _handle_error(exc)

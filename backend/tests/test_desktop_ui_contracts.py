@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 STYLES = ROOT / "frontend" / "src" / "styles.css"
+APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
 
 
@@ -27,6 +28,26 @@ class DesktopUiContractTest(unittest.TestCase):
             digest,
             "4746ca99a772b049209450d7d1d7f14fa947173f6cbe677fad258aa0e7a27ecf",
         )
+
+    def test_token_bar_marks_loaded_project_prompt(self) -> None:
+        source = APP_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("context.project_prompt_file", source)
+        self.assertIn("项目提示词", source)
+
+    def test_assistant_markdown_tables_have_readable_overflow_styles(self) -> None:
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertRegex(css, r"\.markdown-table-scroll\s*\{[^}]*overflow-x\s*:\s*auto")
+        self.assertRegex(css, r"\.message \.bubble table,[^}]*border-collapse\s*:\s*collapse")
+        self.assertRegex(css, r"\.message \.bubble th,[^}]*border-(?:right|bottom)\s*:")
+
+    def test_tutorial_projects_expose_install_and_reset_actions(self) -> None:
+        source = APP_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("创建教程项目", source)
+        self.assertIn("重置教程", source)
+        self.assertIn("activeProject?.is_tutorial", source)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
 import {
   API_BASE,
   AppSettings,
@@ -26,6 +25,7 @@ import {
   type ToolConversationItem
 } from './conversation'
 import { directoryPaths, visibleFileEntries } from './fileTree'
+import { MarkdownRenderer } from './MarkdownRenderer'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -119,7 +119,7 @@ function SummaryMessage({ message }: { message: Message }) {
           <span>{summarized} 条旧消息已压缩</span>
         </summary>
         <div className="summary-card-body">
-          <ReactMarkdown>{content}</ReactMarkdown>
+          <MarkdownRenderer>{content}</MarkdownRenderer>
         </div>
       </details>
     </article>
@@ -162,6 +162,8 @@ export default function App() {
   const [streaming, setStreaming] = useState(false)
   const [compacting, setCompacting] = useState(false)
   const [pickingFolder, setPickingFolder] = useState(false)
+  const [installingTutorial, setInstallingTutorial] = useState(false)
+  const [resettingTutorial, setResettingTutorial] = useState(false)
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
   const [editingSessionTitle, setEditingSessionTitle] = useState('')
   const streamAbortRef = useRef<AbortController | null>(null)
@@ -411,6 +413,59 @@ export default function App() {
     await refreshProjects()
     setActiveSlug(created.project.slug)
     setSessionId(created.session.id)
+  }
+
+  async function createTutorialProject() {
+    if (pickingFolder || installingTutorial) return
+    setPickingFolder(true)
+    setInstallingTutorial(true)
+    setError('')
+    try {
+      const picked = await api.pickDirectory()
+      if (!picked.path) {
+        setStatus('已取消创建教程项目')
+        return
+      }
+      const created = await api.installTutorialProject(picked.path)
+      await refreshProjects()
+      setActiveSlug(created.project.slug)
+      setSessionId(created.session.id)
+      setSelectedFile(null)
+      setFileContent(null)
+      setStatus('教程项目已创建；发送“开始教程”即可体验')
+    } catch (exc) {
+      setError(String(exc))
+    } finally {
+      setPickingFolder(false)
+      setInstallingTutorial(false)
+    }
+  }
+
+  async function resetTutorialProject() {
+    if (!activeProject?.is_tutorial || streaming || resettingTutorial) return
+    const confirmed = window.confirm(
+      '重置官方教程项目？\n\n' +
+      '将恢复安装包内的初始教程文件，清空该项目的工作记忆和当前计划，并把旧会话移入本地归档。\n' +
+      '重置前会自动完整备份，其他项目不受影响。'
+    )
+    if (!confirmed) return
+    setResettingTutorial(true)
+    setError('')
+    try {
+      const result = await api.resetTutorialProject(activeProject.slug)
+      setSelectedFile(null)
+      setFileContent(null)
+      setEntries([])
+      await refreshProjects()
+      setActiveSlug(result.project.slug)
+      await loadProject(result.project.slug)
+      setSessionId(result.session.id)
+      setStatus(`教程已重置；恢复前备份：${result.backup_path}`)
+    } catch (exc) {
+      setError(String(exc))
+    } finally {
+      setResettingTutorial(false)
+    }
   }
 
   async function switchProject(slug: string) {
@@ -768,6 +823,26 @@ export default function App() {
                 })}
                 {projects.length === 0 && <div className="project-tree-empty">点 + 打开一个文件夹</div>}
               </div>
+              <div className="tutorial-project-actions">
+                <button
+                  type="button"
+                  className="project-create-cancel"
+                  onClick={createTutorialProject}
+                  disabled={pickingFolder || installingTutorial || streaming}
+                >
+                  {installingTutorial ? '创建教程中…' : '创建教程项目'}
+                </button>
+                {activeProject?.is_tutorial && (
+                  <button
+                    type="button"
+                    className="project-create-cancel tutorial-reset-btn"
+                    onClick={resetTutorialProject}
+                    disabled={resettingTutorial || streaming}
+                  >
+                    {resettingTutorial ? '重置中…' : '重置教程'}
+                  </button>
+                )}
+              </div>
               {activeProject && !showCreate && (
                 <div className="project-switcher-path" title={activeProject.root_path}>
                   {activeProject.root_path}
@@ -1106,6 +1181,7 @@ export default function App() {
               <div className="ai-panel-token-bar-fill" style={{ width: `${contextPct.toFixed(2)}%` }} />
               <span className="ai-panel-token-bar-label">
                 ≈ {formatTokens(contextTotal)} / {formatTokens(contextBudget)} tok · @文件 {context.imported_files?.length || 0}
+                {context.project_prompt_file ? ` · 项目提示词 ${formatTokens(context.project_prompt_total_tokens || context.project_prompt_tokens || 0)}` : ''}
                 {historyIncluded !== undefined && historyTotal !== undefined ? ` · 历史 ${historyIncluded}/${historyTotal}` : ''}
                 {historyDropped ? ` · 省略 ${historyDropped}` : ''}
                 {context.has_summary ? ' · 有摘要' : ''}
@@ -1140,7 +1216,7 @@ export default function App() {
                   : (
                     <article key={item.key} className={`message ${message.role}`}>
                       <div className="bubble">
-                        {message.role === 'assistant' ? <ReactMarkdown>{message.content}</ReactMarkdown> : message.content}
+                        {message.role === 'assistant' ? <MarkdownRenderer>{message.content}</MarkdownRenderer> : message.content}
                         {message.meta?.interrupted === true && (
                           <div className="message-interrupted">已停止生成</div>
                         )}
@@ -1218,7 +1294,7 @@ export default function App() {
               <section className="welcome-section">
                 <h2>可以做什么</h2>
                 <ul>
-                  <li>固定注入项目协议：在工作记忆里写 @docs/protocol.md</li>
+                  <li>固定注入项目协议：在项目根 WORKMODE.md 中写 @docs/protocol.md</li>
                   <li>阅读 Markdown / 代码 / UTF-8 文本</li>
                   <li>预览 PDF 和图片</li>
                   <li>编辑已存在的 Markdown 文件</li>
@@ -1236,7 +1312,7 @@ export default function App() {
           )}
           {fileContent && !editing && (
             fileContent.markdown
-              ? <article className="file-view-markdown"><ReactMarkdown>{fileContent.content}</ReactMarkdown></article>
+              ? <article className="file-view-markdown"><MarkdownRenderer>{fileContent.content}</MarkdownRenderer></article>
               : <pre className="file-view-pre">{fileContent.content}</pre>
           )}
           {fileContent && editing && (

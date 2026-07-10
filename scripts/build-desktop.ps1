@@ -14,6 +14,7 @@ $Root = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $Backend = Join-Path $Root "backend"
 $Frontend = Join-Path $Root "frontend"
 $Desktop = Join-Path $Root "desktop"
+$TutorialProject = Join-Path $Root "tutorial-project"
 $TauriRoot = Join-Path $Desktop "src-tauri"
 $Resources = Join-Path $TauriRoot "resources"
 $ReleaseRoot = Join-Path $Root "release"
@@ -146,6 +147,9 @@ function Stage-Resources {
   if (-not (Test-Path $venvSitePackages)) {
     throw "Backend virtualenv site-packages is missing: $venvSitePackages"
   }
+  if (-not (Test-Path $TutorialProject -PathType Container)) {
+    throw "Bundled tutorial project is missing: $TutorialProject"
+  }
 
   Write-Step "Staging backend and bundled Python runtime."
   Reset-Directory -Path $Resources -AllowedParent $TauriRoot
@@ -155,10 +159,12 @@ function Stage-Resources {
   $configTarget = Join-Path $Resources "config"
   $pythonTarget = Join-Path $Resources "runtime\python-base"
   $venvLibTarget = Join-Path $Resources "runtime\backend-venv\Lib"
+  $tutorialTarget = Join-Path $Resources "tutorial-project"
   New-Item -ItemType Directory -Force -Path $backendTarget, $configTarget, $pythonTarget, $venvLibTarget | Out-Null
 
   Copy-Item -LiteralPath (Join-Path $Backend "app") -Destination $backendTarget -Recurse
   Copy-Item -LiteralPath (Join-Path $Root ".env.example") -Destination (Join-Path $configTarget ".env.example")
+  Copy-Item -LiteralPath $TutorialProject -Destination $tutorialTarget -Recurse
   Get-ChildItem -LiteralPath $pythonBase -Force | Copy-Item -Destination $pythonTarget -Recurse -Force
   Copy-Item -LiteralPath $venvSitePackages -Destination $venvLibTarget -Recurse
 
@@ -176,7 +182,10 @@ function Stage-Resources {
       (Join-Path $Resources "backend\app\main.py"),
       (Join-Path $Resources "runtime\python-base\pythonw.exe"),
       (Join-Path $Resources "runtime\backend-venv\Lib\site-packages\uvicorn"),
-      (Join-Path $Resources "config\.env.example")
+      (Join-Path $Resources "config\.env.example"),
+      (Join-Path $Resources "tutorial-project\WORKMODE_TUTORIAL.json"),
+      (Join-Path $Resources "tutorial-project\WORKMODE.md"),
+      (Join-Path $Resources "tutorial-project\papers\s41467-019-13638-9.pdf")
     )) {
     if (-not (Test-Path $required)) {
       throw "Staged desktop resource is missing: $required"
@@ -191,6 +200,17 @@ function Invoke-Checks {
   }
   $python = Resolve-Python
   $cargo = Resolve-Cargo
+
+  $frontendStarted = Get-Date
+  Write-Step "Running frontend tests."
+  Push-Location $Frontend
+  try {
+    & npm test
+    if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed." }
+  } finally {
+    Pop-Location
+  }
+  Write-Step ("Frontend tests completed in {0:N1}s." -f ((Get-Date) - $frontendStarted).TotalSeconds)
 
   $backendStarted = Get-Date
   Write-Step "Running backend tests."

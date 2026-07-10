@@ -90,7 +90,8 @@ fn updater_lifecycle_commands_are_registered_for_the_frontend() {
 
     assert!(source.contains("fn desktop_prepare_update("));
     assert!(source.contains("fn desktop_recover_update("));
-    assert!(source.contains("desktop_prepare_update, desktop_recover_update"));
+    assert!(source.contains("desktop_prepare_update,"));
+    assert!(source.contains("desktop_recover_update"));
 }
 
 #[test]

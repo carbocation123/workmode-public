@@ -1,0 +1,8 @@
+{
+  "mode": "tutorial-precomputed-snapshot",
+  "simulated_api_result": true,
+  "network_upload_performed": false,
+  "source_pdf": "s41467-019-13638-9.pdf",
+  "source_pdf_sha256": "2f344e31fcf66c201249de47305ed9a8ae567a1a795f5b10302d6cbd929f2c69",
+  "scope": "representative blocks only; not a complete MinerU extraction"
+}

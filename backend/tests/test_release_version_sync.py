@@ -44,8 +44,16 @@ class ReleaseVersionSyncTest(unittest.TestCase):
     def test_release_tests_use_the_release_profile_for_tauri_build_reuse(self):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
 
+        self.assertIn("& npm test", script)
         self.assertIn("& $cargo test --release", script)
         self.assertIn("Rust release-profile tests completed in", script)
+
+    def test_release_stages_the_initial_tutorial_project(self):
+        script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn('Join-Path $Root "tutorial-project"', script)
+        self.assertIn('Join-Path $Resources "tutorial-project"', script)
+        self.assertIn('tutorial-project\\WORKMODE_TUTORIAL.json', script)
 
     def test_sync_updates_every_release_version_source(self):
         with tempfile.TemporaryDirectory() as tmp:

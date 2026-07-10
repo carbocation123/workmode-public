@@ -100,6 +100,34 @@ class ProjectToolsTest(unittest.TestCase):
         self.assertIn("exit_code: 0", result.content)
         self.assertEqual((self.root / "made_by_python.txt").read_text(encoding="utf-8"), "ok")
 
+    def test_project_python_file_runs_project_script_with_bundled_interpreter(self):
+        script = self.root / "tools" / "runner.py"
+        script.parent.mkdir()
+        script.write_text(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "Path('script-args.txt').write_text('|'.join(sys.argv[1:]), encoding='utf-8')\n"
+            "print(Path.cwd().name)\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_tool(
+            "project_python_file",
+            path="tools/runner.py",
+            args=["first value", "第二项"],
+        )
+
+        self.assertTrue(result.ok)
+        self.assertIn("exit_code: 0", result.content)
+        self.assertEqual(
+            (self.root / "script-args.txt").read_text(encoding="utf-8"),
+            "first value|第二项",
+        )
+
+        escaped = self.run_tool("project_python_file", path="../outside.py")
+        self.assertFalse(escaped.ok)
+        self.assertIn("路径越界", escaped.content)
+
     def test_project_python_can_be_cancelled_while_running(self):
         cancel_event = threading.Event()
 

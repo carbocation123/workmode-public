@@ -1,0 +1,16 @@
+# 文献来源标识: s41467-019-13638-9
+# 解析来源: Tutorial precomputed snapshot (no API call); 共 15 页, 12 个 block
+# 页码映射 (page_idx -> 印刷页码): {0: '1', 1: '2', 14: '15'}
+
+[p.1] [META-HEADER] Nature Communications | Perspective | tutorial precomputed snapshot
+[p.1] # CO2 hydrogenation to high-value products via heterogeneous catalysis
+[p.1] [DEMO PARAPHRASE] This Perspective reviews heterogeneous catalytic routes from carbon dioxide and renewable hydrogen to fuels and chemicals, with emphasis on methanol-mediated and Fischer-Tropsch-based routes.
+[p.1] [META-FOOTER] Nature Communications 10, 5698 (2019); DOI 10.1038/s41467-019-13638-9
+[p.2] ## Methanol reaction based CO2 hydrogenation
+[p.2] [DEMO PARAPHRASE] The authors describe bifunctional systems that combine methanol synthesis with downstream dehydration or coupling, and they summarize previously published Cu- and In-based catalyst results.
+[p.2] [TABLE]
+caption: Tutorial traceability table: claims summarized by the Perspective; original references must be checked before reuse
+body:
+<table><tr><th>System</th><th>Claim reported by Perspective</th><th>Primary ref.</th></tr><tr><td>In2O3</td><td>7.1% CO2 conversion and 39.7% methanol selectivity at 330 C and 5 MPa</td><td>39</td></tr><tr><td>Pd/In2O3</td><td>Above 20% conversion and methanol STY 0.89 gMeOH gcat-1 h-1 at 300 C and 5 MPa</td><td>31</td></tr><tr><td>In2O3/ZrO2</td><td>99.8% methanol selectivity, 5.2% conversion and 1000 h stability</td><td>40</td></tr></table>
+[p.15] ## Open Access
+[p.15] [DEMO PARAPHRASE] The article is distributed under Creative Commons Attribution 4.0; attribution, source, license link and change indication are required. Separately credited third-party material may require additional permission.
