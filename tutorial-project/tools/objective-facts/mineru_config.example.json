@@ -1,0 +1,9 @@
+{
+  "api_key": "",
+  "api_base": "https://mineru.net/api/v4",
+  "model_version": "pipeline",
+  "language": "en",
+  "is_ocr": false,
+  "enable_formula": true,
+  "enable_table": true
+}

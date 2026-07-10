@@ -303,7 +303,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             desktop_bootstrap,
             migrate_legacy,
-            desktop_prepare_update, desktop_recover_update
+            desktop_prepare_update,
+            desktop_recover_update
         ]);
 
     let app = builder

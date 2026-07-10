@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -257,6 +258,19 @@ def execute_state_tool(project_slug: str, name: str, args: dict[str, Any]) -> st
 
 def state_tool_names() -> set[str]:
     return {"memory_read", "memory_write", "memory_list", "plan_my_steps", "mark_step_done"}
+
+
+def archive_and_clear_project_state(project_slug: str, backup_dir: Path) -> None:
+    """Archive and remove project-scoped structured memory and its active plan."""
+    memory_folder = _memory_dir("project", project_slug)
+    plan_path = _plan_file(project_slug)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    if memory_folder.exists():
+        shutil.copytree(memory_folder, backup_dir / "structured-memory")
+        shutil.rmtree(memory_folder)
+    if plan_path.exists():
+        shutil.copy2(plan_path, backup_dir / "plan.json")
+        plan_path.unlink()
 
 
 def _state_root() -> Path:

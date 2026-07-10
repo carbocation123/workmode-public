@@ -54,6 +54,7 @@ FastAPI backend
 - `project_tools.py`：项目文件、搜索、命令、网页和工作状态工具的 schema 与统一分发。
 - `web_tools.py`：并行网页搜索/抓取、正文提取、响应限制与 SSRF 防护。
 - `work_state.py`：项目/全局结构化记忆和当前任务计划。
+- `tutorial_project.py`：官方教程标识、安装、重置、备份和新会话切换。
 
 ## 本地数据模型
 
@@ -72,6 +73,11 @@ FastAPI backend
       memory\projects\<project-slug>.md
       state\memory\...
       state\plans\<project-slug>.json
+      tutorial-projects\<project-slug>.json
+      tutorial-backups\<project-slug>\<reset-id>\
+        project-files\
+        project-memory.md
+        work-state\
     backups\history-repair\
   logs\
 ```
@@ -80,6 +86,8 @@ FastAPI backend
 
 项目记录只保存路径、显示信息和父项目关系，不复制用户项目。移除项目只归档注册记录，硬盘文件不受影响。会话消息是 append-only JSONL；删除会话只在元数据写入 `deleted_at`。
 
+官方教程是例外的显式复制流程：`tutorial-project/` 在构建时进入桌面资源，用户点击「创建教程项目」后才复制到其选择的目录。教程身份由项目内 `WORKMODE_TUTORIAL.json` 与应用数据中的 slug/root 注册记录共同确认；复制标识到普通项目不能获得重置权限。重置先备份文件和项目状态，再恢复内置模板并软删除旧会话。
+
 ## 请求与上下文流
 
 一轮模型请求的上下文装配顺序是：
@@ -87,6 +95,7 @@ FastAPI backend
 ```text
 中性 system 规则
   + 当前项目元数据
+  + WORKMODE.md 项目级提示词及其 @文件展开结果
   + 全局/项目工作记忆
   + @项目文件展开结果与警告
   + 结构化记忆索引和正文
@@ -109,6 +118,10 @@ FastAPI backend
 ### 固定导入
 
 `@relative/file.md` 必须单独占一行，路径相对当前项目根目录。实现只接受项目内 UTF-8 文本，限制递归深度并检测循环引用。导入失败会作为可见警告进入 prompt 和上下文状态。
+
+### 项目级提示词
+
+若项目根目录存在 `WORKMODE.md`，`prompt.build_system_prompt` 会先读取并展开其中的 `@相对路径`，再以“仅当前项目”的独立 system prompt 段注入。它不写入基础 `SYSTEM_BASE`，也不依赖应用数据目录中的工作记忆，因此协议可随项目复制和分发。缺少该文件的项目不会出现这一段；读取失败、越界、非 UTF-8、二进制和循环引用会进入上下文警告。token 状态分别记录入口正文、展开总量和导入文件。
 
 ### 工作记忆
 
@@ -144,7 +157,7 @@ FastAPI backend
 
 文件工具将路径解析到活动项目根目录并拒绝绝对路径、`..` 越界、依赖/缓存目录和敏感配置。读取支持行范围；写入和结果有大小限制。
 
-`project_bash` 和 `project_python` 在项目根目录运行，具有超时、输出截断、取消和破坏性命令黑名单，但不提供容器或 OS 级隔离。
+`project_bash` 和 `project_python` 在项目根目录运行命令或内联代码。`project_python_file` 使用当前后端的 `sys.executable` 直接运行项目内已有 `.py` 文件，因此桌面安装版复用内置 Python，不依赖系统 Python 或 shell PATH。三者具有超时、输出截断和取消能力；shell 命令另有破坏性命令黑名单，但都不提供容器或 OS 级隔离。
 
 `web_search` 最多并行处理 5 个 query，每个最多返回 8 条；`web_fetch` 最多并行读取 4 个公开文本页面。网络访问只允许 HTTP(S)，拒绝内网、loopback、链路本地目标和非常用端口，并在重定向后重新解析和验证地址。网页正文始终按不可信输入处理。
 
@@ -161,6 +174,8 @@ FastAPI backend
 项目列表按注册目录的最近父子关系构树，同级按名称排序。文件树按目录优先、深度优先稳定展示。切换项目会重新加载项目会话、文件树和记忆；生成中禁止切换以避免活动任务跨项目。
 
 消息时间线把同一 `tool_call_id` 的开始和结果合并为一张状态卡。读者接近底部时自动跟随流式内容；向上滚动会暂停并显示「回到最新」。工具修改文件后，前端在本轮结束时刷新文件树和当前预览。
+
+AI 回复、压缩摘要和 Markdown 文件预览共用 `MarkdownRenderer.tsx`。渲染器启用 `remark-gfm`，把管道表格解析为语义化 HTML；table 外层滚动容器避免宽列撑破聊天布局。
 
 文件面板支持 UTF-8 文本、Markdown 预览/编辑、PDF 和常见图片。二进制格式不会作为文本读取。PDF/图片通过经过校验的媒体端点提供，而不是直接暴露任意本地路径。
 
@@ -181,6 +196,7 @@ backend/                         后端实现和回归测试
 frontend/                        React 实现和 Vitest
 desktop/src-tauri/               Rust/Tauri 实现、能力声明和 Windows 图标
 desktop/src-tauri/resources/     构建时生成的后端/runtime staging；不提交内容
+tutorial-project/                官方教程的版本化初始模板和项目级提示词
 scripts/build-desktop.ps1        本地桌面构建、测试、签名和产物生成
 scripts/sync-version.ps1         同步全部版本源
 .github/workflows/               正式 Windows Release 流程

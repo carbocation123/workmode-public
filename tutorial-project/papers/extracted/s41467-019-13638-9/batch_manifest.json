@@ -1,0 +1,10 @@
+{
+  "mode": "tutorial-precomputed-simulation",
+  "network_calls": 0,
+  "model": null,
+  "prompt": "tools/objective-facts/prompts/literature_summary_6sections.txt",
+  "input": "s41467-019-13638-9_prepared.txt",
+  "output": "s41467-019-13638-9_客观事实抽取报告_v2.md",
+  "verification": "manually checked against the bundled CC BY PDF",
+  "note": "This manifest demonstrates provenance fields and is not an API billing record."
+}

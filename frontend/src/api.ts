@@ -5,6 +5,7 @@ export interface Project {
   description: string
   created_at: string
   updated_at: string
+  is_tutorial?: boolean
   parent_slug?: string | null
   archived_at?: string | null
 }
@@ -46,6 +47,9 @@ export interface FileContent {
 export interface ContextUsage {
   budget_tokens: number
   prompt_tokens_estimate: number
+  project_prompt_file?: string | null
+  project_prompt_tokens?: number
+  project_prompt_total_tokens?: number
   estimated_prompt_tokens?: number
   history_tokens?: number
   total_tokens_estimate?: number
@@ -153,6 +157,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload)
     })
+  },
+  async installTutorialProject(parentPath: string) {
+    return request<{ project: Project; session: Session }>('/work/tutorial-project', {
+      method: 'POST',
+      body: JSON.stringify({ parent_path: parentPath })
+    })
+  },
+  async resetTutorialProject(slug: string) {
+    return request<{ project: Project; session: Session; backup_path: string }>(
+      `/work/projects/${encodeURIComponent(slug)}/reset-tutorial`,
+      { method: 'POST' }
+    )
   },
   async deleteProject(slug: string) {
     return request<{ project: Project; active_slug: string | null; local_files_deleted: boolean }>(

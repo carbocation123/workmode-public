@@ -20,6 +20,10 @@ class ActiveProjectUpdate(BaseModel):
     slug: str
 
 
+class TutorialProjectInstall(BaseModel):
+    parent_path: str = Field(min_length=1)
+
+
 class SessionCreate(BaseModel):
     title: str = Field(default="新对话", max_length=80)
 

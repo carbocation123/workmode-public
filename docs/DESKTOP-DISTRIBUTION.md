@@ -10,7 +10,7 @@
 workmode-public-<version>-windows-x86_64-setup.exe
 ```
 
-安装器包含 React 前端、FastAPI 后端、Python runtime 和后端依赖。目标电脑不需要 Node.js、Python 或 Rust，默认按当前用户安装，不要求管理员权限。
+安装器包含 React 前端、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。目标电脑不需要 Node.js、Python 或 Rust，默认按当前用户安装，不要求管理员权限。
 
 用户状态位于 `%LOCALAPPDATA%\WorkmodePublic`，不放进安装目录：
 
@@ -49,7 +49,7 @@ Actions → Publish Windows release → Run workflow
 3. 安装锁文件指定的 Node、Python 和 Rust 依赖；
 4. 恢复 pip、Cargo registry/git 和 Tauri target 缓存；
 5. 运行后端、前端与 Rust/Tauri 验证；
-6. staging 后端、Python runtime、依赖和默认配置；
+6. staging 后端、Python runtime、依赖、默认配置和 `tutorial-project/` 初始模板；
 7. 构建 Windows NSIS 安装器；
 8. 生成 Tauri 更新签名、`latest.json` 和 `SHA256SUMS.txt`；
 9. 创建 `v<version>` Release，或安全覆盖同版本 Release 的产物。
@@ -145,6 +145,7 @@ Windows Shell 可能缓存旧桌面快捷方式图标。安装新版本后若图
 - `main` 工作区干净且已推送；
 - 所有版本源一致；
 - 后端、前端和 Rust/Tauri 测试通过；
+- staging 中存在教程标识、`WORKMODE.md` 和真实教学 PDF，教程进度保持初始态；
 - 安装器文件名、`latest.json` URL 和签名一致；
 - Release 不是 draft/prerelease，且被标记为 latest；
 - 发行产物和 Git 历史中没有 `.env`、`sk-`、私钥或密码；

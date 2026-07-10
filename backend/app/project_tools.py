@@ -275,6 +275,30 @@ PROJECT_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "project_python_file",
+            "description": (
+                "用 Workmode Public 自带的 Python 运行当前项目内已有的 .py 脚本，"
+                "不依赖用户安装 Python。参数按数组传入，不经过 shell。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "项目内 .py 脚本的相对路径"},
+                    "args": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "传给脚本的参数数组，不包含 Python 命令和脚本路径",
+                        "default": [],
+                    },
+                    "timeout": {"type": "integer", "description": "超时秒数，默认 30，上限 300", "default": DEFAULT_COMMAND_TIMEOUT},
+                },
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "memory_write",
             "description": "写入或覆盖工作记忆条目。记忆索引会固定注入上下文，正文按需用 memory_read 读取。",
             "parameters": {
@@ -407,6 +431,8 @@ def execute_project_tool_at_root(
             return _project_bash(project_root, args, cancel_event=cancel_event)
         if name == "project_python":
             return _project_python(project_root, args, cancel_event=cancel_event)
+        if name == "project_python_file":
+            return _project_python_file(project_root, args, cancel_event=cancel_event)
         raise ProjectToolError(f"未知项目工具：{name}")
     except ProjectToolError as exc:
         return ProjectToolResult(ok=False, content=f"ERROR: {exc}")
@@ -691,6 +717,46 @@ def _project_python(
         stdout=completed.stdout or "",
         stderr=completed.stderr or "",
         label=f"python: {Path(sys.executable).name}",
+    )
+    return ProjectToolResult(ok=ok, content=_truncate_result(content))
+
+
+def _project_python_file(
+    root: Path,
+    args: dict[str, Any],
+    *,
+    cancel_event: threading.Event | None = None,
+) -> ProjectToolResult:
+    path = _resolve_project_path(root, _require_string(args, "path"))
+    if not path.exists():
+        raise ProjectToolError(f"脚本不存在：{_display_path(root, path)}")
+    if not path.is_file() or path.suffix.lower() != ".py":
+        raise ProjectToolError("project_python_file 只允许运行项目内已有的 .py 文件")
+
+    raw_argv = args.get("args", [])
+    if not isinstance(raw_argv, list) or not all(isinstance(item, str) for item in raw_argv):
+        raise ProjectToolError("args 必须是字符串数组")
+    if len(raw_argv) > 100:
+        raise ProjectToolError("args 最多 100 项")
+    if any("\x00" in item for item in raw_argv):
+        raise ProjectToolError("args 不允许包含 NUL 字符")
+
+    timeout = min(max(1, _optional_int(args, "timeout", DEFAULT_COMMAND_TIMEOUT)), MAX_COMMAND_TIMEOUT)
+    completed = _run_cancellable_process(
+        [sys.executable, str(path), *raw_argv],
+        cwd=root,
+        timeout=timeout,
+        cancel_event=cancel_event,
+        shell=False,
+        timeout_message=f"python 脚本超时（{timeout}s 内未结束）",
+        start_error_prefix="python 脚本启动失败",
+    )
+    ok = completed.returncode == 0
+    content = _format_process_output(
+        exit_code=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+        label=f"python-file: {_display_path(root, path)}",
     )
     return ProjectToolResult(ok=ok, content=_truncate_result(content))
 
