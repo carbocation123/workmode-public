@@ -1,0 +1,75 @@
+# Desktop distribution and updates
+
+## What users receive
+
+For Windows x64, distribute one file:
+
+```text
+workmode-public-<version>-windows-x86_64-setup.exe
+```
+
+The installer uses current-user installation by default, so ordinary users do not need administrator rights. It carries the frontend, backend, Python runtime, and backend dependencies; target computers do not need Node.js, Python, or Rust.
+
+After installation:
+
+- launch Workmode Public from the Start menu;
+- close the window to stop the bundled backend and exit;
+- use `Settings → Desktop application` to check, download, install, and relaunch an update;
+- user data remains under `%LOCALAPPDATA%\WorkmodePublic` instead of the installation directory.
+
+## Build-machine command
+
+The build machine needs Node.js, Rust with the MSVC target, Visual Studio C++ Build Tools, WebView2 build support, and the prepared `backend/.venv`.
+
+```powershell
+.\scripts\build-desktop.ps1
+```
+
+The default updater endpoint is the latest GitHub Release for `carbocation123/workmode-public`; the artifact URL is version-specific. Both remain overridable through `-UpdateEndpoint` and `-ArtifactBaseUrl`.
+
+The script performs these operations as one release command:
+
+1. verifies version consistency;
+2. runs backend and Rust contract tests;
+3. stages the backend, Python base runtime, virtualenv packages, and default config;
+4. builds the frontend and Tauri release binary;
+5. builds the NSIS setup executable;
+6. signs the updater artifact;
+7. writes `latest.json` and `SHA256SUMS.txt` under `release/desktop-<version>/`;
+8. checks that private signing material is absent from release output.
+
+Use `-SkipTests` only after the same source revision has already passed the checks.
+
+## Signing boundary
+
+The following files are local release secrets and must never be distributed, uploaded, or committed:
+
+```text
+.release-secrets/workmode-public-updater.key
+.release-secrets/updater-password.txt
+```
+
+The public key may be compiled into `tauri.conf.json`. Tauri updater signatures authenticate update content, but they are not Windows Authenticode signatures. A public release may still trigger SmartScreen until the project obtains a Windows code-signing certificate and signs the installer.
+
+## Publishing an update
+
+For every version:
+
+1. bump `VERSION`, `frontend/package.json`, `desktop/package.json`, and `desktop/src-tauri/tauri.conf.json` together;
+2. build with the final HTTPS `UpdateEndpoint` and `ArtifactBaseUrl`;
+3. upload the generated setup executable to the exact URL recorded in `latest.json`;
+4. upload `latest.json` to the endpoint compiled into the application;
+5. keep the previous release available until installed clients have upgraded;
+6. test update from the previous installed version before announcing the release.
+
+The compiled updater endpoint is:
+
+```text
+https://github.com/carbocation123/workmode-public/releases/latest/download/latest.json
+```
+
+Each non-draft, non-prerelease GitHub Release must contain `latest.json` and the exact signed installer named by its `platforms.windows-x86_64.url` field.
+
+## Legacy portable-data migration
+
+The desktop settings page can import a 0.1.x portable folder. Migration copies only the old `data/` directory and `config/.env` into an empty desktop user-data location. It does not modify the source folder and refuses to merge over existing non-empty desktop data.

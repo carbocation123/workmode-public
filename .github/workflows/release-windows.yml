@@ -1,0 +1,90 @@
+name: Publish Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version already recorded in VERSION and package files
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Prepare Rust
+        shell: pwsh
+        run: |
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+          rustup component add rustfmt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/Scripts/python.exe -m pip install --upgrade pip
+          backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+          npm ci --prefix frontend
+          npm ci --prefix desktop
+
+      - name: Restore updater signing key
+        shell: pwsh
+        env:
+          UPDATER_PRIVATE_KEY: ${{ secrets.WORKMODE_UPDATER_PRIVATE_KEY }}
+          UPDATER_PASSWORD: ${{ secrets.WORKMODE_UPDATER_PASSWORD }}
+        run: |
+          if (-not $env:UPDATER_PRIVATE_KEY -or -not $env:UPDATER_PASSWORD) {
+            throw 'Updater signing secrets are not configured.'
+          }
+          New-Item -ItemType Directory -Force .release-secrets | Out-Null
+          [IO.File]::WriteAllText((Join-Path $PWD '.release-secrets/workmode-public-updater.key'), $env:UPDATER_PRIVATE_KEY)
+          [IO.File]::WriteAllText((Join-Path $PWD '.release-secrets/updater-password.txt'), $env:UPDATER_PASSWORD)
+
+      - name: Build signed desktop release
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'.Trim()
+          $recorded = (Get-Content VERSION -Raw).Trim()
+          if ($version -ne $recorded) {
+            throw "Workflow version $version does not match VERSION $recorded."
+          }
+          ./scripts/build-desktop.ps1 `
+            -Version $version `
+            -UpdateEndpoint 'https://github.com/carbocation123/workmode-public/releases/latest/download/latest.json' `
+            -ArtifactBaseUrl "https://github.com/carbocation123/workmode-public/releases/download/v$version" `
+            -ReleaseNotes "Workmode Public $version"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ inputs.version }}'.Trim()
+          $tag = "v$version"
+          $files = Get-ChildItem "release/desktop-$version" -File | ForEach-Object { $_.FullName }
+          gh release create $tag @files `
+            --repo '${{ github.repository }}' `
+            --target '${{ github.sha }}' `
+            --title "Workmode Public $version" `
+            --generate-notes
