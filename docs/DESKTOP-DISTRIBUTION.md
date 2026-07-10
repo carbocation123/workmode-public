@@ -53,14 +53,13 @@ The public key may be compiled into `tauri.conf.json`. Tauri updater signatures 
 
 ## Publishing an update
 
-For every version:
+For every version, the repository owner can open `Actions → Publish Windows release → Run workflow` and enter the new version once. The workflow:
 
-1. bump `VERSION`, `frontend/package.json`, `desktop/package.json`, and `desktop/src-tauri/tauri.conf.json` together;
-2. build with the final HTTPS `UpdateEndpoint` and `ArtifactBaseUrl`;
-3. upload the generated setup executable to the exact URL recorded in `latest.json`;
-4. upload `latest.json` to the endpoint compiled into the application;
-5. keep the previous release available until installed clients have upgraded;
-6. test update from the previous installed version before announcing the release.
+1. validates the SemVer input and synchronizes every application/package/lock-file version source;
+2. commits and pushes that version change as `github-actions[bot]` when needed;
+3. tests and builds with the final HTTPS `UpdateEndpoint` and `ArtifactBaseUrl`;
+4. signs and uploads the setup executable plus `latest.json`;
+5. creates the version tag/Release or replaces the same version's assets on a safe rerun.
 
 The compiled updater endpoint is:
 
@@ -77,7 +76,7 @@ Each non-draft, non-prerelease GitHub Release must contain `latest.json` and the
 - `WORKMODE_UPDATER_PRIVATE_KEY`: the complete contents of `.release-secrets/workmode-public-updater.key`;
 - `WORKMODE_UPDATER_PASSWORD`: the complete contents of `.release-secrets/updater-password.txt`.
 
-The private key must be configured by the repository owner and must never be pasted into an issue, commit, workflow file, or chat. After the secrets exist, update the four version files, push the source commit, open `Actions → Publish Windows release → Run workflow`, and enter the same version. The workflow builds and signs the app, then creates the `v<version>` Release or safely replaces that Release's assets when rerun.
+The private key must be configured by the repository owner and must never be pasted into an issue, commit, workflow file, or chat. After the secrets exist, open `Actions → Publish Windows release → Run workflow` and enter the desired version once. The workflow synchronizes source versions, builds and signs the app, then creates the `v<version>` Release or safely replaces that Release's assets when rerun.
 
 ## Legacy portable-data migration
 

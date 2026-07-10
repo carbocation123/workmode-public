@@ -4,7 +4,8 @@ param(
   [string]$UpdateEndpoint = "https://github.com/carbocation123/workmode-public/releases/latest/download/latest.json",
   [string]$ArtifactBaseUrl,
   [string]$ReleaseNotes = "Workmode Public desktop release",
-  [switch]$SkipTests
+  [switch]$SkipTests,
+  [switch]$ValidateOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -95,11 +96,30 @@ function Resolve-PythonBase {
 function Assert-VersionConsistency {
   $tauri = Get-Content -LiteralPath (Join-Path $TauriRoot "tauri.conf.json") -Encoding UTF8 -Raw | ConvertFrom-Json
   $frontendPackage = Get-Content -LiteralPath (Join-Path $Frontend "package.json") -Encoding UTF8 -Raw | ConvertFrom-Json
+  $frontendLockText = Get-Content -LiteralPath (Join-Path $Frontend "package-lock.json") -Encoding UTF8 -Raw
   $desktopPackage = Get-Content -LiteralPath (Join-Path $Desktop "package.json") -Encoding UTF8 -Raw | ConvertFrom-Json
+  $desktopLockText = Get-Content -LiteralPath (Join-Path $Desktop "package-lock.json") -Encoding UTF8 -Raw
+  $cargoText = Get-Content -LiteralPath (Join-Path $TauriRoot "Cargo.toml") -Encoding UTF8 -Raw
+  $cargoLockText = Get-Content -LiteralPath (Join-Path $TauriRoot "Cargo.lock") -Encoding UTF8 -Raw
+  $cargoMatch = [regex]::Match($cargoText, '(?ms)\[package\].*?^version\s*=\s*"([^"]+)"')
+  $cargoLockMatch = [regex]::Match($cargoLockText, '(?ms)\[\[package\]\]\s*\r?\nname\s*=\s*"workmode-public"\s*\r?\nversion\s*=\s*"([^"]+)"')
+  if (-not $cargoMatch.Success -or -not $cargoLockMatch.Success) {
+    throw "Could not read the Workmode Public Cargo version."
+  }
+  $frontendLockVersion = [regex]::Match($frontendLockText, '"version"\s*:\s*"([^"]+)"').Groups[1].Value
+  $frontendLockRoot = [regex]::Match($frontendLockText, '(?s)"packages"\s*:\s*\{\s*""\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"').Groups[1].Value
+  $desktopLockVersion = [regex]::Match($desktopLockText, '"version"\s*:\s*"([^"]+)"').Groups[1].Value
+  $desktopLockRoot = [regex]::Match($desktopLockText, '(?s)"packages"\s*:\s*\{\s*""\s*:\s*\{.*?"version"\s*:\s*"([^"]+)"').Groups[1].Value
   foreach ($entry in @(
       @{ Name = "tauri.conf.json"; Value = $tauri.version },
       @{ Name = "frontend/package.json"; Value = $frontendPackage.version },
-      @{ Name = "desktop/package.json"; Value = $desktopPackage.version }
+      @{ Name = "frontend/package-lock.json"; Value = $frontendLockVersion },
+      @{ Name = "frontend/package-lock.json packages root"; Value = $frontendLockRoot },
+      @{ Name = "desktop/package.json"; Value = $desktopPackage.version },
+      @{ Name = "desktop/package-lock.json"; Value = $desktopLockVersion },
+      @{ Name = "desktop/package-lock.json packages root"; Value = $desktopLockRoot },
+      @{ Name = "desktop/src-tauri/Cargo.toml"; Value = $cargoMatch.Groups[1].Value },
+      @{ Name = "desktop/src-tauri/Cargo.lock"; Value = $cargoLockMatch.Groups[1].Value }
     )) {
     if ($entry.Value -ne $Version) {
       throw "Version mismatch: $($entry.Name) is $($entry.Value), VERSION is $Version."
@@ -295,6 +315,10 @@ function Publish-Artifacts {
 }
 
 Assert-VersionConsistency
+if ($ValidateOnly) {
+  Write-Step "Version sources are consistent at $Version."
+  return
+}
 Invoke-Checks
 Stage-Resources
 Invoke-TauriBuild

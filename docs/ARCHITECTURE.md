@@ -18,7 +18,8 @@ Main modules:
 - `storage.py` — file-based projects, sessions, messages, and project memory. Registered project roots keep an optional parent relationship; project/session removal is soft-delete metadata and never deletes the user's project directory.
 - `context_imports.py` — expands project-local `@relative/path.md` imports.
 - `files.py` — project sandbox, text/media preview whitelist, Markdown save path.
-- `project_tools.py` — model-callable work tools: project read/write/edit/list_dir/glob/grep/bash/python plus state-tool dispatch.
+- `project_tools.py` — model-callable work tools: project read/write/edit/list_dir/glob/grep/bash/python plus web/state-tool dispatch.
+- `web_tools.py` — bounded parallel `web_search` / `web_fetch`, HTML-to-text extraction, redirect validation, response-size limits, and SSRF defenses.
 - `work_state.py` — project/global work memory and current plan state; memory index, memory bodies, and plan summary are injected into prompt.
 - `session_compactor.py` — manual context compression marker insertion; full JSONL history is preserved.
 - `context_window.py` — token-budget history selection; keeps recent legal user/system starts and avoids orphan tool results.
@@ -58,6 +59,8 @@ The frontend is a standalone React workspace with an IDE-style shell:
 
 The project area is a persistent hierarchy rather than a creation-order list. A registered directory nested inside another registered project is displayed below its nearest parent. Conversation rows support rename and soft delete, while the send button changes to a stop action during generation.
 
+The conversation timeline merges `tool_call_start` and `tool_result` events by `tool_call_id` into one compact stateful card. It follows streamed content only while the reader remains near the bottom; manual upward scrolling pauses following and exposes a `Back to latest` control.
+
 It has no dependency on daily mode routing or private persona state.
 
 The visual shell follows the archived `work-mode-v2` IDE layout: ActivityBar, SidePanel, central AI panel, right FileViewPanel, and bottom StatusBar.
@@ -68,7 +71,7 @@ Release packages copy `frontend/dist` to `app/frontend-dist`; target machines do
 
 ## Desktop distribution
 
-The primary 0.2.x distribution is a Tauri 2 Windows application:
+The primary distribution is a Tauri 2 Windows application:
 
 ```text
 desktop/
@@ -206,13 +209,13 @@ Current MVP defenses:
 - project path sandbox for file preview/edit;
 - project tool sandbox for model-driven file reads/writes/edits/search;
 - command tools run with project cwd, timeout, output truncation, and destructive-command blacklist;
+- web fetches reject loopback/private/link-local destinations and non-HTTP(S) schemes, revalidate every redirect, accept text-like content only, and cap response size;
 - positive file format whitelist;
 - no dynamic tool search in the public work mode; required tools are loaded directly.
 
 Remaining hardening before wider public release:
 
 - Windows Authenticode code signing to reduce SmartScreen friction;
-- completion of the repository-owner-only GitHub Actions signing-secret setup;
 - stricter token/bootstrap UX;
 - release sanitizer;
 - smoke tests for first-run flow;

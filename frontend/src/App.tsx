@@ -20,6 +20,11 @@ import {
   getDesktopInfo,
   installDesktopUpdate
 } from './desktop'
+import {
+  buildConversationItems,
+  isNearBottom,
+  type ToolConversationItem
+} from './conversation'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -61,47 +66,30 @@ function projectDepth(project: Project, projects: Project[]) {
   return depth
 }
 
-function metaString(meta: Record<string, unknown>, key: string, fallback = '') {
-  const value = meta[key]
-  return typeof value === 'string' ? value : fallback
-}
-
-function metaStringArray(meta: Record<string, unknown>, key: string) {
-  const value = meta[key]
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
-}
-
-function ToolMessage({ message }: { message: Message }) {
-  const toolName = metaString(message.meta, 'tool_name', 'project_tool')
-  const status = metaString(message.meta, 'status', 'done')
-  const event = metaString(message.meta, 'event', 'tool_result')
-  const changedPaths = metaStringArray(message.meta, 'changed_paths')
-  const args = message.meta.args ? JSON.stringify(message.meta.args, null, 2) : ''
-  const isStart = event === 'tool_call_start'
+function ToolMessage({ item }: { item: ToolConversationItem }) {
+  const args = Object.keys(item.args).length ? JSON.stringify(item.args, null, 2) : ''
+  const hasDetails = Boolean(args || item.result)
 
   return (
     <article className="message tool">
-      <div className={`tool-card ${status}`}>
+      <div className={`tool-card ${item.status}`}>
         <div className="tool-card-header">
           <span className="tool-card-dot" />
-          <span className="tool-card-name">{toolName}</span>
-          <span className="tool-card-status">{isStart ? '运行中' : status === 'error' ? '失败' : '完成'}</span>
+          <span className="tool-card-name">{item.toolName}</span>
+          <span className="tool-card-status">
+            {item.status === 'running' ? '运行中' : item.status === 'error' ? '失败' : '完成'}
+          </span>
         </div>
-        {args && (
+        {hasDetails && (
           <details className="tool-card-details">
-            <summary>参数</summary>
-            <pre>{args}</pre>
+            <summary>{item.status === 'running' ? '查看参数' : '查看详情'}</summary>
+            {args && <pre><span className="tool-card-detail-label">参数</span>{'\n'}{args}</pre>}
+            {item.result && <pre><span className="tool-card-detail-label">结果</span>{'\n'}{item.result}</pre>}
           </details>
         )}
-        {!isStart && (
-          <details className="tool-card-details">
-            <summary>结果</summary>
-            <pre>{message.content || '（无输出）'}</pre>
-          </details>
-        )}
-        {changedPaths.length > 0 && (
+        {item.changedPaths.length > 0 && (
           <div className="tool-card-changed">
-            已修改：{changedPaths.join(', ')}
+            已修改：{item.changedPaths.join(', ')}
           </div>
         )}
       </div>
@@ -170,6 +158,9 @@ export default function App() {
   const [editingSessionTitle, setEditingSessionTitle] = useState('')
   const streamAbortRef = useRef<AbortController | null>(null)
   const stopRequestedRef = useRef(false)
+  const messagesViewportRef = useRef<HTMLElement | null>(null)
+  const followingLatestRef = useRef(true)
+  const [showBackToLatest, setShowBackToLatest] = useState(false)
   const [desktopInfo] = useState(() => getDesktopInfo())
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState('')
   const [desktopUpdateVersion, setDesktopUpdateVersion] = useState<string | null>(null)
@@ -180,6 +171,7 @@ export default function App() {
     () => projects.find((item) => item.slug === activeSlug) || null,
     [projects, activeSlug]
   )
+  const conversationItems = useMemo(() => buildConversationItems(messages), [messages])
 
   const contextTotal = context?.total_tokens_estimate || context?.estimated_prompt_tokens || context?.prompt_tokens_estimate || 0
   const contextBudget = context?.budget_tokens || 0
@@ -217,6 +209,22 @@ export default function App() {
     const [messagePayload, contextPayload] = await Promise.all([api.messages(id), api.context(id)])
     setMessages(messagePayload.messages)
     setContext(contextPayload.context)
+  }
+
+  function scrollToLatest(behavior: ScrollBehavior = 'auto') {
+    const viewport = messagesViewportRef.current
+    if (!viewport) return
+    followingLatestRef.current = true
+    setShowBackToLatest(false)
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+  }
+
+  function handleMessagesScroll() {
+    const viewport = messagesViewportRef.current
+    if (!viewport) return
+    const nearBottom = isNearBottom(viewport)
+    followingLatestRef.current = nearBottom
+    setShowBackToLatest(!nearBottom)
   }
 
   useEffect(() => {
@@ -257,6 +265,17 @@ export default function App() {
       .then(() => setStatus('项目已加载'))
       .catch((exc) => setError(String(exc)))
   }, [activeSlug])
+
+  useEffect(() => {
+    followingLatestRef.current = true
+    setShowBackToLatest(false)
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!followingLatestRef.current) return
+    const frame = window.requestAnimationFrame(() => scrollToLatest())
+    return () => window.cancelAnimationFrame(frame)
+  }, [messages])
 
   useEffect(() => {
     if (!sessionId) {
@@ -512,6 +531,8 @@ export default function App() {
     const controller = new AbortController()
     streamAbortRef.current = controller
     stopRequestedRef.current = false
+    followingLatestRef.current = true
+    setShowBackToLatest(false)
     setInput('')
     setStreaming(true)
     setError('')
@@ -1072,28 +1093,39 @@ export default function App() {
           </section>
         )}
 
-        <section className="ai-panel-messages">
-          {messages.length === 0 ? (
-            <div className="empty-hint">{sessionId ? '本会话还没消息' : '新会话 · 输入消息开始对话'}</div>
-          ) : (
-            messages.map((message) => (
-              message.role === 'system' && message.meta?.event === 'context_summary'
-                ? <SummaryMessage key={message.id} message={message} />
-                : message.role === 'tool'
-                ? <ToolMessage key={message.id} message={message} />
-                : (
-                  <article key={message.id} className={`message ${message.role}`}>
-                    <div className="bubble">
-                      {message.role === 'assistant' ? <ReactMarkdown>{message.content}</ReactMarkdown> : message.content}
-                      {message.meta?.interrupted === true && (
-                        <div className="message-interrupted">已停止生成</div>
-                      )}
-                    </div>
-                  </article>
-                )
-            ))
+        <div className="ai-panel-messages-shell">
+          <section
+            className="ai-panel-messages"
+            ref={messagesViewportRef}
+            onScroll={handleMessagesScroll}
+          >
+            {conversationItems.length === 0 ? (
+              <div className="empty-hint">{sessionId ? '本会话还没消息' : '新会话 · 输入消息开始对话'}</div>
+            ) : (
+              conversationItems.map((item) => {
+                if (item.kind === 'tool') return <ToolMessage key={item.key} item={item} />
+                const message = item.message
+                return message.role === 'system' && message.meta?.event === 'context_summary'
+                  ? <SummaryMessage key={item.key} message={message} />
+                  : (
+                    <article key={item.key} className={`message ${message.role}`}>
+                      <div className="bubble">
+                        {message.role === 'assistant' ? <ReactMarkdown>{message.content}</ReactMarkdown> : message.content}
+                        {message.meta?.interrupted === true && (
+                          <div className="message-interrupted">已停止生成</div>
+                        )}
+                      </div>
+                    </article>
+                  )
+              })
+            )}
+          </section>
+          {showBackToLatest && (
+            <button type="button" className="back-to-latest" onClick={() => scrollToLatest('smooth')}>
+              回到最新 ↓
+            </button>
           )}
-        </section>
+        </div>
 
         <footer className="chat-input-wrap">
           {error && <div className="inline-error">{error}</div>}

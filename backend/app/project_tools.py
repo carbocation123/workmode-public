@@ -13,6 +13,8 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Literal
 
+from .web_tools import WEB_TOOL_SCHEMAS, execute_web_tool, web_tool_names
+
 
 TEXT_EXTENSIONS = frozenset(
     {
@@ -351,6 +353,7 @@ PROJECT_TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
 ]
+PROJECT_TOOL_SCHEMAS.extend(WEB_TOOL_SCHEMAS)
 
 
 def execute_project_tool(
@@ -365,6 +368,9 @@ def execute_project_tool(
 
     if cancel_event is not None and cancel_event.is_set():
         return ProjectToolResult(ok=False, content="ERROR: 用户已停止本轮对话")
+    if name in web_tool_names():
+        result = execute_web_tool(name, args, cancel_event=cancel_event)
+        return ProjectToolResult(ok=result.ok, content=result.content)
     if name in state_tool_names():
         result = execute_state_tool(project_slug, name, args)
         return ProjectToolResult(ok=not result.startswith("ERROR:"), content=result)

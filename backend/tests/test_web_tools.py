@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import threading
 import unittest
+from unittest.mock import patch
 
+from app.project_tools import execute_project_tool, project_tool_names
 from app.web_tools import (
+    WebToolResult,
     WebToolError,
     parse_duckduckgo_html,
     run_web_fetch,
@@ -19,6 +22,14 @@ PUBLIC_IP = ["93.184.216.34"]
 class WebToolsTest(unittest.TestCase):
     def test_tool_names_are_fixed_loaded(self):
         self.assertEqual(web_tool_names(), {"web_search", "web_fetch"})
+        self.assertTrue(web_tool_names().issubset(project_tool_names()))
+
+    @patch("app.project_tools.execute_web_tool", return_value=WebToolResult(ok=True, content='{"results": []}'))
+    def test_web_tool_dispatch_does_not_require_a_project_lookup(self, mocked):
+        result = execute_project_tool("missing-project", "web_search", {"queries": ["test"]})
+
+        self.assertTrue(result.ok)
+        mocked.assert_called_once()
 
     def test_public_url_validation_blocks_local_network_and_unsafe_schemes(self):
         blocked = [
@@ -26,6 +37,7 @@ class WebToolsTest(unittest.TestCase):
             "http://localhost/admin",
             "http://127.0.0.1:8000/health",
             "http://169.254.169.254/latest/meta-data",
+            "http://198.18.0.10/",
             "https://user:pass@example.com/",
             "https://example.com:22/",
         ]
@@ -38,6 +50,12 @@ class WebToolsTest(unittest.TestCase):
             resolver=lambda _host: PUBLIC_IP,
         )
         self.assertEqual(normalized, "https://example.com/paper?q=1")
+
+        proxied = validate_public_web_url(
+            "https://example.com/proxied",
+            resolver=lambda _host: ["198.18.0.10"],
+        )
+        self.assertEqual(proxied, "https://example.com/proxied")
 
     def test_search_parser_extracts_title_url_and_snippet(self):
         html = """

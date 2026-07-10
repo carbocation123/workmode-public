@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version already recorded in VERSION and package files
+        description: Version to write, build, sign and publish (for example 0.2.1)
         required: true
         type: string
 
@@ -17,6 +17,25 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+
+      - name: Synchronize release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'.Trim()
+          ./scripts/sync-version.ps1 -Version $version
+          if (git status --porcelain) {
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add VERSION `
+              frontend/package.json frontend/package-lock.json `
+              desktop/package.json desktop/package-lock.json `
+              desktop/src-tauri/tauri.conf.json `
+              desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock
+            git commit -m "chore: release v$version"
+            git push origin "HEAD:${{ github.ref_name }}"
+          }
+          "sha=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -65,10 +84,6 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ inputs.version }}'.Trim()
-          $recorded = (Get-Content VERSION -Raw).Trim()
-          if ($version -ne $recorded) {
-            throw "Workflow version $version does not match VERSION $recorded."
-          }
           ./scripts/build-desktop.ps1 `
             -Version $version `
             -UpdateEndpoint 'https://github.com/carbocation123/workmode-public/releases/latest/download/latest.json' `
@@ -96,7 +111,7 @@ jobs:
           } else {
             gh release create $tag @files `
               --repo '${{ github.repository }}' `
-              --target '${{ github.sha }}' `
+              --target '${{ steps.version.outputs.sha }}' `
               --title "Workmode Public $version" `
               --generate-notes
           }
