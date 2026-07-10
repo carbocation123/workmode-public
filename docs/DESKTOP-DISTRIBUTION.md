@@ -78,6 +78,13 @@ Each non-draft, non-prerelease GitHub Release must contain `latest.json` and the
 
 The private key must be configured by the repository owner and must never be pasted into an issue, commit, workflow file, or chat. After the secrets exist, open `Actions → Publish Windows release → Run workflow` and enter the desired version once. The workflow synchronizes source versions, builds and signs the app, then creates the `v<version>` Release or safely replaces that Release's assets when rerun.
 
+The workflow uses the official GitHub caches for pip downloads, Cargo registries,
+and the Tauri `target` directory. Rust tests run with the release profile so their
+compiled dependencies can be reused by the signed application build. The release
+script reports backend-test, Rust-test, resource-staging, NSIS-build, and artifact
+publication durations; compare a cold run with the next warm-cache run before
+changing compression or skipping checks.
+
 ## Legacy portable-data migration
 
 The desktop settings page can import a 0.1.x portable folder. Migration copies only the old `data/` directory and `config/.env` into an empty desktop user-data location. It does not modify the source folder and refuses to merge over existing non-empty desktop data.

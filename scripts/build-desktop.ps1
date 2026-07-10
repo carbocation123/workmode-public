@@ -140,6 +140,7 @@ function Reset-Directory {
 }
 
 function Stage-Resources {
+  $started = Get-Date
   $pythonBase = Resolve-PythonBase
   $venvSitePackages = Join-Path $Backend ".venv\Lib\site-packages"
   if (-not (Test-Path $venvSitePackages)) {
@@ -181,6 +182,7 @@ function Stage-Resources {
       throw "Staged desktop resource is missing: $required"
     }
   }
+  Write-Step ("Resource staging completed in {0:N1}s." -f ((Get-Date) - $started).TotalSeconds)
 }
 
 function Invoke-Checks {
@@ -190,6 +192,7 @@ function Invoke-Checks {
   $python = Resolve-Python
   $cargo = Resolve-Cargo
 
+  $backendStarted = Get-Date
   Write-Step "Running backend tests."
   Push-Location $Backend
   try {
@@ -198,18 +201,22 @@ function Invoke-Checks {
   } finally {
     Pop-Location
   }
+  Write-Step ("Backend tests completed in {0:N1}s." -f ((Get-Date) - $backendStarted).TotalSeconds)
 
-  Write-Step "Running desktop Rust tests."
+  $rustStarted = Get-Date
+  Write-Step "Running desktop Rust tests in release profile."
   Push-Location $TauriRoot
   try {
-    & $cargo test
+    & $cargo test --release
     if ($LASTEXITCODE -ne 0) { throw "Desktop Rust tests failed." }
   } finally {
     Pop-Location
   }
+  Write-Step ("Rust release-profile tests completed in {0:N1}s." -f ((Get-Date) - $rustStarted).TotalSeconds)
 }
 
 function Invoke-TauriBuild {
+  $started = Get-Date
   $tauri = Join-Path $Desktop "node_modules\.bin\tauri.cmd"
   if (-not (Test-Path $tauri)) {
     throw "Desktop npm dependencies are missing. Run npm install in desktop/."
@@ -252,9 +259,11 @@ function Invoke-TauriBuild {
     if ($null -eq $previousKey) { Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue } else { $env:TAURI_SIGNING_PRIVATE_KEY = $previousKey }
     if ($null -eq $previousPassword) { Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue } else { $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $previousPassword }
   }
+  Write-Step ("Signed NSIS build completed in {0:N1}s." -f ((Get-Date) - $started).TotalSeconds)
 }
 
 function Publish-Artifacts {
+  $started = Get-Date
   $bundleRoot = Join-Path $TauriRoot "target\release\bundle\nsis"
   if (-not (Test-Path $bundleRoot)) {
     throw "NSIS bundle output is missing: $bundleRoot"
@@ -311,6 +320,7 @@ function Publish-Artifacts {
   if (Get-ChildItem -LiteralPath $OutputRoot -Recurse -Force | Where-Object { $_.Name -in @("workmode-public-updater.key", "updater-password.txt") }) {
     throw "Release output contains a private signing secret."
   }
+  Write-Step ("Artifact publication completed in {0:N1}s." -f ((Get-Date) - $started).TotalSeconds)
   Write-Step "Desktop release ready: $OutputRoot"
 }
 
