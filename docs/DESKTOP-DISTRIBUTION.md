@@ -25,6 +25,13 @@ The build machine needs Node.js, Rust with the MSVC target, Visual Studio C++ Bu
 .\scripts\build-desktop.ps1
 ```
 
+`desktop/src-tauri/icons/icon-source.png` is the canonical application-icon
+source. After replacing it, regenerate the platform and installer assets with:
+
+```powershell
+npm --prefix desktop run tauri -- icon src-tauri/icons/icon-source.png
+```
+
 The default updater endpoint is the latest GitHub Release for `carbocation123/workmode-public`; the artifact URL is version-specific. Both remain overridable through `-UpdateEndpoint` and `-ArtifactBaseUrl`.
 
 The script performs these operations as one release command:

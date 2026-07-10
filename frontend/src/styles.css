@@ -1262,7 +1262,9 @@ pre {
 }
 
 .media.pdf {
-  height: 72vh;
+  display: block;
+  height: 100%;
+  min-height: 0;
 }
 
 .media.image {
