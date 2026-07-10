@@ -25,6 +25,7 @@ import {
   isNearBottom,
   type ToolConversationItem
 } from './conversation'
+import { directoryPaths, visibleFileEntries } from './fileTree'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -127,6 +128,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [entries, setEntries] = useState<FileEntry[]>([])
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set())
   const [selectedFile, setSelectedFile] = useState<FileEntry | null>(null)
   const [fileContent, setFileContent] = useState<FileContent | null>(null)
   const [fileDraft, setFileDraft] = useState('')
@@ -172,6 +174,10 @@ export default function App() {
     [projects, activeSlug]
   )
   const conversationItems = useMemo(() => buildConversationItems(messages), [messages])
+  const visibleEntries = useMemo(
+    () => visibleFileEntries(entries, expandedDirs),
+    [entries, expandedDirs]
+  )
 
   const contextTotal = context?.total_tokens_estimate || context?.estimated_prompt_tokens || context?.prompt_tokens_estimate || 0
   const contextBudget = context?.budget_tokens || 0
@@ -195,6 +201,7 @@ export default function App() {
     ])
     setSessions(sessionPayload.sessions)
     setEntries(treePayload.entries)
+    setExpandedDirs(directoryPaths(treePayload.entries))
     setMemoryDraft(memoryPayload.project)
     if (sessionPayload.sessions[0]) {
       setSessionId(sessionPayload.sessions[0].id)
@@ -466,6 +473,7 @@ export default function App() {
       setSelectedFile(null)
       setFileContent(null)
       setEntries([])
+      setExpandedDirs(new Set())
       setSessions([])
       setSessionId(null)
       const payload = await refreshProjects()
@@ -476,7 +484,15 @@ export default function App() {
   }
 
   async function openFile(entry: FileEntry) {
-    if (entry.kind === 'dir') return
+    if (entry.kind === 'dir') {
+      setExpandedDirs((previous) => {
+        const next = new Set(previous)
+        if (next.has(entry.path)) next.delete(entry.path)
+        else next.add(entry.path)
+        return next
+      })
+      return
+    }
     setSelectedFile(entry)
     setFileContent(null)
     setFileDraft('')
@@ -590,6 +606,10 @@ export default function App() {
       if (projectFilesChanged && activeSlug) {
         const treePayload = await api.tree(activeSlug)
         setEntries(treePayload.entries)
+        setExpandedDirs((previous) => {
+          const nextDirectories = directoryPaths(treePayload.entries)
+          return new Set([...previous].filter((path) => nextDirectories.has(path)))
+        })
         if (selectedFile?.preview === 'text') {
           try {
             const contentPayload = await api.readFile(activeSlug, selectedFile.path)
@@ -802,7 +822,7 @@ export default function App() {
               <div className="project-section-body project-section-body-tree">
                 {activeSlug ? (
                   <div className="file-explorer-tree">
-                    {entries.map((entry) => (
+                    {visibleEntries.map((entry) => (
                       <button
                         type="button"
                         key={entry.path}
@@ -810,9 +830,10 @@ export default function App() {
                         style={{ paddingLeft: 6 + fileDepth(entry.path) * 12 }}
                         onClick={() => openFile(entry).catch((exc) => setError(String(exc)))}
                         title={entry.path}
+                        aria-expanded={entry.kind === 'dir' ? expandedDirs.has(entry.path) : undefined}
                       >
                         <span className="tree-node-icon">
-                          {entry.kind === 'dir' ? '▸' : entry.preview === 'media' ? '◇' : entry.preview === 'text' ? '·' : '×'}
+                          {entry.kind === 'dir' ? (expandedDirs.has(entry.path) ? '▾' : '▸') : entry.preview === 'media' ? '◇' : entry.preview === 'text' ? '·' : '×'}
                         </span>
                         <span className="tree-node-name">{entry.name}</span>
                         {entry.kind === 'file' && <span className="tree-node-size">{entry.preview}</span>}
@@ -1199,7 +1220,7 @@ export default function App() {
           {selectedFile?.preview === 'unsupported' && <div className="file-view-error">该格式不在安全预览白名单内。</div>}
           {selectedFile?.preview === 'media' && activeSlug && (
             isPdf(selectedFile.path)
-              ? <iframe className="media pdf" src={api.mediaUrl(activeSlug, selectedFile.path)} />
+              ? <iframe className="media pdf" src={api.mediaUrl(activeSlug, selectedFile.path)} title={selectedFile.name} />
               : isImage(selectedFile.path)
                 ? <img className="media image" src={api.mediaUrl(activeSlug, selectedFile.path)} alt={selectedFile.name} />
                 : <div className="file-view-error">暂不支持该媒体格式。</div>

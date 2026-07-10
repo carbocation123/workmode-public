@@ -17,7 +17,7 @@ Main modules:
 - `config.py` — environment-based configuration, local data directory, model settings, release env/static path overrides.
 - `storage.py` — file-based projects, sessions, messages, and project memory. Registered project roots keep an optional parent relationship; project/session removal is soft-delete metadata and never deletes the user's project directory.
 - `context_imports.py` — expands project-local `@relative/path.md` imports.
-- `files.py` — project sandbox, text/media preview whitelist, Markdown save path.
+- `files.py` — project sandbox, stable depth-first file tree, text/media preview whitelist, and Markdown save path.
 - `project_tools.py` — model-callable work tools: project read/write/edit/list_dir/glob/grep/bash/python plus web/state-tool dispatch.
 - `web_tools.py` — bounded parallel `web_search` / `web_fetch`, HTML-to-text extraction, redirect validation, response-size limits, and SSRF defenses.
 - `work_state.py` — project/global work memory and current plan state; memory index, memory bodies, and plan summary are injected into prompt.
@@ -58,6 +58,8 @@ The frontend is a standalone React workspace with an IDE-style shell:
 5. bottom status bar.
 
 The project area is a persistent hierarchy rather than a creation-order list. A registered directory nested inside another registered project is displayed below its nearest parent. Conversation rows support rename and soft delete, while the send button changes to a stop action during generation.
+
+The project file explorer is a directory-first depth-first tree. Directory rows expand and collapse locally; each directory's descendants stay adjacent instead of being reordered by the traversal stack.
 
 The conversation timeline merges `tool_call_start` and `tool_result` events by `tool_call_id` into one compact stateful card. It follows streamed content only while the reader remains near the bottom; manual upward scrolling pauses following and exposes a `Back to latest` control.
 
@@ -207,6 +209,7 @@ Current MVP defenses:
 - optional local token;
 - narrow CORS allowlist;
 - project path sandbox for file preview/edit;
+- global framing is denied except for validated PDF/image responses; media previews use a narrow `frame-ancestors` policy for the desktop and loopback frontends;
 - project tool sandbox for model-driven file reads/writes/edits/search;
 - command tools run with project cwd, timeout, output truncation, and destructive-command blacklist;
 - web fetches reject loopback/private/link-local destinations and non-HTTP(S) schemes, revalidate every redirect, accept text-like content only, and cap response size;

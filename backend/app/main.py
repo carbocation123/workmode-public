@@ -31,7 +31,17 @@ async def local_security_boundary(request: Request, call_next):
             return JSONResponse({"detail": "Invalid X-Workmode-Token"}, status_code=401)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    is_media_preview = (
+        request.url.path.startswith("/api/work/projects/")
+        and request.url.path.endswith("/fs/media")
+    )
+    if is_media_preview:
+        response.headers["Content-Security-Policy"] = (
+            "frame-ancestors 'self' tauri://localhost http://tauri.localhost "
+            "https://tauri.localhost http://127.0.0.1:* http://localhost:*"
+        )
+    else:
+        response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
 

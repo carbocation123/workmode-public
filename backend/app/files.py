@@ -136,35 +136,40 @@ def sha256_text(text: str) -> str:
 def list_tree(slug: str, *, max_entries: int = 1000) -> list[dict[str, Any]]:
     root = project_root(slug)
     entries: list[dict[str, Any]] = []
-    stack = [root]
-    while stack and len(entries) < max_entries:
-        folder = stack.pop()
+
+    def visible_children(folder: Path) -> list[Path]:
         try:
             children = sorted(folder.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
         except OSError:
+            return []
+        return [
+            child
+            for child in children
+            if child.name not in SKIP_DIRS
+            and child.name.lower() not in SKIP_FILES
+            and not child.is_symlink()
+        ]
+
+    pending = list(reversed(visible_children(root)))
+    while pending and len(entries) < max_entries:
+        child = pending.pop()
+        try:
+            rel = child.relative_to(root).as_posix()
+            is_dir = child.is_dir()
+            stat = child.stat()
+        except OSError:
             continue
-        for child in children:
-            if len(entries) >= max_entries:
-                break
-            if child.name in SKIP_DIRS or child.name.lower() in SKIP_FILES:
-                continue
-            try:
-                rel = child.relative_to(root).as_posix()
-                is_dir = child.is_dir()
-                stat = child.stat()
-            except OSError:
-                continue
-            entries.append(
-                {
-                    "path": rel,
-                    "name": child.name,
-                    "kind": "dir" if is_dir else "file",
-                    "size": 0 if is_dir else stat.st_size,
-                    "preview": "media" if child.suffix.lower() in MEDIA_TYPES else ("text" if is_text_path(child) else "unsupported"),
-                }
-            )
-            if is_dir:
-                stack.append(child)
+        entries.append(
+            {
+                "path": rel,
+                "name": child.name,
+                "kind": "dir" if is_dir else "file",
+                "size": 0 if is_dir else stat.st_size,
+                "preview": "media" if child.suffix.lower() in MEDIA_TYPES else ("text" if is_text_path(child) else "unsupported"),
+            }
+        )
+        if is_dir:
+            pending.extend(reversed(visible_children(child)))
     return entries
 
 
