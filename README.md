@@ -2,6 +2,8 @@
 
 Workmode Public 是一个可独立安装的纯净科研工作助手。
 
+[下载最新版](https://github.com/carbocation123/workmode-public/releases/latest) · [查看源代码](https://github.com/carbocation123/workmode-public)
+
 它不加载伴侣人格或生活记录等私人模块，专注于科研项目、文档和可追踪的工作上下文。当前版本保留这些核心能力：
 
 - 项目注册与会话存储；
@@ -37,6 +39,8 @@ workmode-public/
 ```text
 workmode-public-0.2.0-windows-x86_64-setup.exe
 ```
+
+安装包可从 [GitHub Releases](https://github.com/carbocation123/workmode-public/releases/latest) 获取。
 
 目标电脑不需要安装 Node.js、Python 或 Rust。安装后从开始菜单启动；关闭窗口即停止本地后端并退出，更新在应用内“设置 → 桌面应用”完成。用户配置、项目注册、会话和工作记忆保存在 `%LOCALAPPDATA%\WorkmodePublic`，升级或卸载程序文件不会把它们混进安装目录。
 

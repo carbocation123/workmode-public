@@ -70,6 +70,15 @@ https://github.com/carbocation123/workmode-public/releases/latest/download/lates
 
 Each non-draft, non-prerelease GitHub Release must contain `latest.json` and the exact signed installer named by its `platforms.windows-x86_64.url` field.
 
+## GitHub Actions setup
+
+`.github/workflows/release-windows.yml` provides a manual `Publish Windows release` workflow. Before its first run, the repository owner must add these two Actions secrets in `Settings → Secrets and variables → Actions`:
+
+- `WORKMODE_UPDATER_PRIVATE_KEY`: the complete contents of `.release-secrets/workmode-public-updater.key`;
+- `WORKMODE_UPDATER_PASSWORD`: the complete contents of `.release-secrets/updater-password.txt`.
+
+The private key must be configured by the repository owner and must never be pasted into an issue, commit, workflow file, or chat. After the secrets exist, update the four version files, push the source commit, open `Actions → Publish Windows release → Run workflow`, and enter the same version. The workflow builds, signs, creates the `v<version>` tag and publishes all updater assets.
+
 ## Legacy portable-data migration
 
 The desktop settings page can import a 0.1.x portable folder. Migration copies only the old `data/` directory and `config/.env` into an empty desktop user-data location. It does not modify the source folder and refuses to merge over existing non-empty desktop data.

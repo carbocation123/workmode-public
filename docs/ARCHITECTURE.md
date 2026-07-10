@@ -212,7 +212,7 @@ Current MVP defenses:
 Remaining hardening before wider public release:
 
 - Windows Authenticode code signing to reduce SmartScreen friction;
-- a real HTTPS update-feed/artifact host and release automation;
+- completion of the repository-owner-only GitHub Actions signing-secret setup;
 - stricter token/bootstrap UX;
 - release sanitizer;
 - smoke tests for first-run flow;
