@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "sync-version.ps1"
+BUILD_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "build-desktop.ps1"
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "release-windows.yml"
 
 
@@ -30,6 +31,21 @@ class ReleaseVersionSyncTest(unittest.TestCase):
         self.assertNotIn("if (git status --porcelain)", workflow)
         self.assertIn("$stagedVersionFiles = @(git diff --cached --name-only)", workflow)
         self.assertIn("if ($stagedVersionFiles.Count -gt 0)", workflow)
+
+    def test_release_workflow_uses_official_rust_and_pip_caches(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("uses: actions/cache@v5", workflow)
+        self.assertIn("desktop/src-tauri/target", workflow)
+        self.assertIn("~/.cargo/registry", workflow)
+        self.assertIn("cache: pip", workflow)
+        self.assertIn("cache-dependency-path: backend/requirements.txt", workflow)
+
+    def test_release_tests_use_the_release_profile_for_tauri_build_reuse(self):
+        script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("& $cargo test --release", script)
+        self.assertIn("Rust release-profile tests completed in", script)
 
     def test_sync_updates_every_release_version_source(self):
         with tempfile.TemporaryDirectory() as tmp:
