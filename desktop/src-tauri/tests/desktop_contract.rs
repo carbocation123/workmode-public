@@ -85,6 +85,15 @@ fn selected_backend_port_can_be_bound_immediately() {
 }
 
 #[test]
+fn updater_lifecycle_commands_are_registered_for_the_frontend() {
+    let source = include_str!("../src/lib.rs");
+
+    assert!(source.contains("fn desktop_prepare_update("));
+    assert!(source.contains("fn desktop_recover_update("));
+    assert!(source.contains("desktop_prepare_update, desktop_recover_update"));
+}
+
+#[test]
 fn legacy_migration_copies_data_and_config_without_touching_source() {
     let root = temp_dir("migration");
     let legacy = root.join("workmode-public-0.1.3-win-x64");
