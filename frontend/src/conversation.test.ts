@@ -56,6 +56,22 @@ describe('buildConversationItems', () => {
     ])
   })
 
+  it('marks an unfinished persisted tool as cancelled after streaming stops', () => {
+    const items = buildConversationItems([
+      message('t1', 'tool', 'calling web_search', {
+        event: 'tool_call_start',
+        tool_call_id: 'call-stopped',
+        tool_name: 'web_search',
+        args: { query: 'paper' },
+        status: 'running'
+      })
+    ], 'cancelled')
+
+    expect(items).toEqual([
+      expect.objectContaining({ kind: 'tool', callId: 'call-stopped', status: 'cancelled' })
+    ])
+  })
+
   it('renders an orphan result without inventing a running card', () => {
     const items = buildConversationItems([
       message('t2', 'tool', 'network failed', {
