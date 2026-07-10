@@ -24,6 +24,13 @@ class ReleaseVersionSyncTest(unittest.TestCase):
             r"npm ci --prefix desktop\s+if \(\$LASTEXITCODE -ne 0\)",
         )
 
+    def test_release_workflow_only_commits_real_staged_version_changes(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertNotIn("if (git status --porcelain)", workflow)
+        self.assertIn("$stagedVersionFiles = @(git diff --cached --name-only)", workflow)
+        self.assertIn("if ($stagedVersionFiles.Count -gt 0)", workflow)
+
     def test_sync_updates_every_release_version_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

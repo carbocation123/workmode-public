@@ -24,14 +24,17 @@ jobs:
         run: |
           $version = '${{ inputs.version }}'.Trim()
           ./scripts/sync-version.ps1 -Version $version
-          if (git status --porcelain) {
+          git add VERSION `
+            frontend/package.json frontend/package-lock.json `
+            desktop/package.json desktop/package-lock.json `
+            desktop/src-tauri/tauri.conf.json `
+            desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to stage synchronized version files.' }
+          $stagedVersionFiles = @(git diff --cached --name-only)
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to inspect synchronized version files.' }
+          if ($stagedVersionFiles.Count -gt 0) {
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add VERSION `
-              frontend/package.json frontend/package-lock.json `
-              desktop/package.json desktop/package-lock.json `
-              desktop/src-tauri/tauri.conf.json `
-              desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock
             git commit -m "chore: release v$version"
             if ($LASTEXITCODE -ne 0) { throw 'Failed to commit synchronized version files.' }
             git push origin "HEAD:${{ github.ref_name }}"
