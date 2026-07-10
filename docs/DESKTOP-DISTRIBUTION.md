@@ -77,7 +77,7 @@ Each non-draft, non-prerelease GitHub Release must contain `latest.json` and the
 - `WORKMODE_UPDATER_PRIVATE_KEY`: the complete contents of `.release-secrets/workmode-public-updater.key`;
 - `WORKMODE_UPDATER_PASSWORD`: the complete contents of `.release-secrets/updater-password.txt`.
 
-The private key must be configured by the repository owner and must never be pasted into an issue, commit, workflow file, or chat. After the secrets exist, update the four version files, push the source commit, open `Actions → Publish Windows release → Run workflow`, and enter the same version. The workflow builds, signs, creates the `v<version>` tag and publishes all updater assets.
+The private key must be configured by the repository owner and must never be pasted into an issue, commit, workflow file, or chat. After the secrets exist, update the four version files, push the source commit, open `Actions → Publish Windows release → Run workflow`, and enter the same version. The workflow builds and signs the app, then creates the `v<version>` Release or safely replaces that Release's assets when rerun.
 
 ## Legacy portable-data migration
 
