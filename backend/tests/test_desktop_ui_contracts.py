@@ -20,12 +20,12 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertRegex(rule.group("body"), r"height\s*:\s*100%\s*;")
         self.assertNotRegex(rule.group("body"), r"height\s*:\s*\d+vh\s*;")
 
-    def test_desktop_icon_source_is_the_requested_origin_ring_logo(self) -> None:
+    def test_desktop_icon_source_is_the_requested_release_logo(self) -> None:
         self.assertTrue(ICON_SOURCE.is_file())
         digest = hashlib.sha256(ICON_SOURCE.read_bytes()).hexdigest()
         self.assertEqual(
             digest,
-            "babe8653fed220c5b4c51c69a45a4649be4298e40380c82d82c4e37af232ec58",
+            "4746ca99a772b049209450d7d1d7f14fa947173f6cbe677fad258aa0e7a27ecf",
         )
 
 
