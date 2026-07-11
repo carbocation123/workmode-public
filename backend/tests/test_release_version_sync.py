@@ -13,6 +13,15 @@ WORKFLOW = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "rele
 
 
 class ReleaseVersionSyncTest(unittest.TestCase):
+    def test_release_workflow_pins_the_lockfile_npm_version(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("npm install --global npm@10.9.4", workflow)
+        self.assertLess(
+            workflow.index("npm install --global npm@10.9.4"),
+            workflow.index("npm ci --prefix frontend"),
+        )
+
     def test_release_workflow_stops_immediately_when_dependency_install_fails(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
 
