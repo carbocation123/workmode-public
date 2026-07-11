@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CUSTOM_SKIN_SCHEMA,
+  applyCustomSkinToRoot,
   buildCustomSkinVariables,
   isSupportedSkinFilename,
   parseCustomSkinState,
@@ -23,6 +24,22 @@ const valid = JSON.stringify({
   }
 })
 
+const validHud = JSON.stringify({
+  schema: CUSTOM_SKIN_SCHEMA,
+  id: 'ice-hud',
+  name: 'Ice HUD',
+  version: '1.0.0',
+  baseTheme: 'neon-space-lab',
+  chrome: {
+    type: 'hud',
+    title: 'ICE LAB',
+    subtitle: 'LOCAL RESEARCH HUD',
+    missionLabel: 'ACTIVE PROJECT',
+    panelGeometry: 'continuous',
+    bubbleGeometry: 'mirrored'
+  }
+})
+
 describe('declarative custom skins', () => {
   it('accepts only JSON skin filenames before reading content', () => {
     expect(isSupportedSkinFilename('neon-ice.workmode-skin.json')).toBe(true)
@@ -36,6 +53,37 @@ describe('declarative custom skins', () => {
     expect(skin.id).toBe('ice-lab')
     expect(skin.tokens.accent).toBe('#55ddff')
     expect(skin.tokens.lineWidth).toBe(2)
+  })
+
+  it('accepts a pure declarative HUD with bounded labels and geometry presets', () => {
+    const skin = parseDeclarativeSkin(validHud)
+    expect(skin.tokens).toEqual({})
+    expect(skin.chrome).toEqual(expect.objectContaining({
+      type: 'hud',
+      title: 'ICE LAB',
+      panelGeometry: 'continuous',
+      bubbleGeometry: 'mirrored'
+    }))
+  })
+
+  it('rejects arbitrary HUD markup, CSS fields and unsupported geometry', () => {
+    const arbitraryCss = JSON.parse(validHud)
+    arbitraryCss.chrome.css = '.send-btn { display: none }'
+    expect(() => parseDeclarativeSkin(JSON.stringify(arbitraryCss))).toThrow('不支持的字段')
+
+    const arbitraryMarkup = JSON.parse(validHud)
+    arbitraryMarkup.chrome.html = '<button>fake</button>'
+    expect(() => parseDeclarativeSkin(JSON.stringify(arbitraryMarkup))).toThrow('不支持的字段')
+
+    const unknownGeometry = JSON.parse(validHud)
+    unknownGeometry.chrome.panelGeometry = 'polygon(0 0)'
+    expect(() => parseDeclarativeSkin(JSON.stringify(unknownGeometry))).toThrow('panelGeometry')
+  })
+
+  it('requires declarative HUD chrome to use the maintained Neon structural base', () => {
+    const wrongBase = JSON.parse(validHud)
+    wrongBase.baseTheme = 'paper'
+    expect(() => parseDeclarativeSkin(JSON.stringify(wrongBase))).toThrow('neon-space-lab')
   })
 
   it('rejects arbitrary CSS, scripts, assets, URLs and unknown keys', () => {
@@ -69,9 +117,32 @@ describe('declarative custom skins', () => {
     expect(Object.keys(variables).every((key) => key.startsWith('--'))).toBe(true)
   })
 
+  it('maps structural choices to inert root data attributes and clears them on disable', () => {
+    const properties = new Map<string, string>()
+    const root = {
+      dataset: {} as Record<string, string>,
+      style: {
+        setProperty: (key: string, value: string) => properties.set(key, value),
+        removeProperty: (key: string) => properties.delete(key)
+      }
+    } as unknown as HTMLElement
+    const skin = parseDeclarativeSkin(validHud)
+
+    applyCustomSkinToRoot(root, { version: 1, enabled: true, skin })
+    expect(root.dataset.customSkinChrome).toBe('hud')
+    expect(root.dataset.customSkinPanel).toBe('continuous')
+    expect(root.dataset.customSkinBubble).toBe('mirrored')
+
+    applyCustomSkinToRoot(root, null)
+    expect(root.dataset.customSkinChrome).toBeUndefined()
+    expect(root.dataset.customSkinPanel).toBeUndefined()
+    expect(root.dataset.customSkinBubble).toBeUndefined()
+  })
+
   it('repairs malformed persisted state to no custom skin', () => {
     expect(parseCustomSkinState('{broken')).toBeNull()
     expect(parseCustomSkinState(JSON.stringify({ version: 2, enabled: true, skin: {} }))).toBeNull()
     expect(parseCustomSkinState(JSON.stringify({ version: 1, enabled: true, skin: JSON.parse(valid) }))?.skin.id).toBe('ice-lab')
+    expect(parseCustomSkinState(JSON.stringify({ version: 1, enabled: true, skin: JSON.parse(validHud) }))?.skin.chrome?.type).toBe('hud')
   })
 })

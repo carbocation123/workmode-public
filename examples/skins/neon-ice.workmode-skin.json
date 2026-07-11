@@ -4,6 +4,17 @@
   "name": "Neon Ice",
   "version": "1.0.0",
   "baseTheme": "neon-space-lab",
+  "chrome": {
+    "type": "hud",
+    "title": "ICE LAB",
+    "subtitle": "LOCAL RESEARCH HUD",
+    "missionLabel": "ACTIVE PROJECT",
+    "modelLabel": "MODEL LINK",
+    "stateLabel": "CORE STATE",
+    "timeLabel": "LOCAL TIME",
+    "panelGeometry": "stepped",
+    "bubbleGeometry": "mirrored"
+  },
   "tokens": {
     "accent": "#66e8ff",
     "background": "#02070c",

@@ -3378,8 +3378,20 @@ pre {
 :root[data-custom-skin] .message .bubble,
 :root[data-custom-skin] .tool-card,
 :root[data-custom-skin] .chat-input-box {
-  border-width: var(--custom-skin-line-width, 1px);
-  border-radius: var(--custom-skin-radius, 8px);
+  border-width: var(--custom-skin-line-width, var(--neon-line-width, 1px));
+  border-radius: var(--custom-skin-radius, var(--neon-content-radius, 8px));
+}
+
+:root[data-theme="neon-space-lab"][data-custom-skin-panel="continuous"] .side-panel,
+:root[data-theme="neon-space-lab"][data-custom-skin-panel="continuous"] .ai-panel,
+:root[data-theme="neon-space-lab"][data-custom-skin-panel="continuous"] .file-view-panel {
+  --neon-panel-shape: inset(0 round var(--neon-content-radius));
+}
+
+:root[data-theme="neon-space-lab"][data-custom-skin-bubble="continuous"] .message .bubble,
+:root[data-theme="neon-space-lab"][data-custom-skin-bubble="continuous"] .message.user .bubble,
+:root[data-theme="neon-space-lab"][data-custom-skin-bubble="continuous"] .message.assistant .bubble {
+  --neon-bubble-shape: inset(0 round var(--neon-content-radius));
 }
 
 :root[data-theme="paper"] .file-view-markdown,

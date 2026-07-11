@@ -5,8 +5,14 @@ export const CUSTOM_SKIN_SCHEMA = 'workmode-skin/v1'
 export const CUSTOM_SKIN_MAX_BYTES = 32 * 1024
 
 const THEME_IDS = new Set<ThemeId>(['lab', 'origin-ring', 'neon-space-lab', 'paper', 'observatory', 'high-contrast'])
-const TOP_LEVEL_KEYS = new Set(['schema', 'id', 'name', 'version', 'baseTheme', 'tokens'])
+const TOP_LEVEL_KEYS = new Set(['schema', 'id', 'name', 'version', 'baseTheme', 'tokens', 'chrome'])
 const TOKEN_KEYS = new Set(['accent', 'background', 'surface', 'text', 'panelOpacity', 'lineWidth', 'radius', 'glow'])
+const CHROME_KEYS = new Set([
+  'type', 'title', 'subtitle', 'missionLabel', 'modelLabel', 'stateLabel', 'timeLabel',
+  'panelGeometry', 'bubbleGeometry'
+])
+const PANEL_GEOMETRIES = new Set<DeclarativeHudChrome['panelGeometry']>(['stepped', 'continuous'])
+const BUBBLE_GEOMETRIES = new Set<DeclarativeHudChrome['bubbleGeometry']>(['mirrored', 'continuous'])
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
@@ -26,6 +32,18 @@ export interface DeclarativeSkinTokens {
   glow?: number
 }
 
+export interface DeclarativeHudChrome {
+  type: 'hud'
+  title?: string
+  subtitle?: string
+  missionLabel?: string
+  modelLabel?: string
+  stateLabel?: string
+  timeLabel?: string
+  panelGeometry?: 'stepped' | 'continuous'
+  bubbleGeometry?: 'mirrored' | 'continuous'
+}
+
 export interface DeclarativeSkin {
   schema: typeof CUSTOM_SKIN_SCHEMA
   id: string
@@ -33,6 +51,7 @@ export interface DeclarativeSkin {
   version: string
   baseTheme: ThemeId
   tokens: DeclarativeSkinTokens
+  chrome?: DeclarativeHudChrome
 }
 
 export interface CustomSkinState {
@@ -71,6 +90,37 @@ function optionalNumber(value: unknown, label: string, min: number, max: number)
   return value
 }
 
+function optionalLine(value: unknown, label: string, maxLength: number) {
+  if (value === undefined) return undefined
+  const line = requiredString(value, label, maxLength)
+  if (/[\u0000-\u001f\u007f]/.test(line)) throw new Error(`${label}不能包含控制字符或换行`)
+  return line
+}
+
+function parseHudChrome(value: unknown): DeclarativeHudChrome | undefined {
+  if (value === undefined) return undefined
+  if (!isObject(value)) throw new Error('chrome 必须是对象')
+  assertKnownKeys(value, CHROME_KEYS, 'chrome')
+  if (value.type !== 'hud') throw new Error('chrome.type 目前只支持 hud')
+  if (value.panelGeometry !== undefined && !PANEL_GEOMETRIES.has(value.panelGeometry as DeclarativeHudChrome['panelGeometry'])) {
+    throw new Error('chrome.panelGeometry 只支持 stepped 或 continuous')
+  }
+  if (value.bubbleGeometry !== undefined && !BUBBLE_GEOMETRIES.has(value.bubbleGeometry as DeclarativeHudChrome['bubbleGeometry'])) {
+    throw new Error('chrome.bubbleGeometry 只支持 mirrored 或 continuous')
+  }
+  return {
+    type: 'hud',
+    title: optionalLine(value.title, 'chrome.title', 24),
+    subtitle: optionalLine(value.subtitle, 'chrome.subtitle', 32),
+    missionLabel: optionalLine(value.missionLabel, 'chrome.missionLabel', 24),
+    modelLabel: optionalLine(value.modelLabel, 'chrome.modelLabel', 20),
+    stateLabel: optionalLine(value.stateLabel, 'chrome.stateLabel', 20),
+    timeLabel: optionalLine(value.timeLabel, 'chrome.timeLabel', 20),
+    panelGeometry: value.panelGeometry as DeclarativeHudChrome['panelGeometry'],
+    bubbleGeometry: value.bubbleGeometry as DeclarativeHudChrome['bubbleGeometry']
+  }
+}
+
 export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
   let parsed: unknown
   try {
@@ -90,23 +140,28 @@ export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
   if (typeof parsed.baseTheme !== 'string' || !THEME_IDS.has(parsed.baseTheme as ThemeId)) {
     throw new Error('baseTheme 不是受支持的内置主题')
   }
-  if (!isObject(parsed.tokens)) throw new Error('tokens 必须是对象')
-  assertKnownKeys(parsed.tokens, TOKEN_KEYS, 'tokens')
+  if (parsed.tokens !== undefined && !isObject(parsed.tokens)) throw new Error('tokens 必须是对象')
+  const rawTokens = isObject(parsed.tokens) ? parsed.tokens : {}
+  assertKnownKeys(rawTokens, TOKEN_KEYS, 'tokens')
 
   const tokens: DeclarativeSkinTokens = {
-    accent: optionalColor(parsed.tokens.accent, 'accent'),
-    background: optionalColor(parsed.tokens.background, 'background'),
-    surface: optionalColor(parsed.tokens.surface, 'surface'),
-    text: optionalColor(parsed.tokens.text, 'text'),
-    panelOpacity: optionalNumber(parsed.tokens.panelOpacity, 'panelOpacity', 0, 0.8),
-    lineWidth: optionalNumber(parsed.tokens.lineWidth, 'lineWidth', 1, 4),
-    radius: optionalNumber(parsed.tokens.radius, 'radius', 0, 24),
-    glow: optionalNumber(parsed.tokens.glow, 'glow', 0, 1)
+    accent: optionalColor(rawTokens.accent, 'accent'),
+    background: optionalColor(rawTokens.background, 'background'),
+    surface: optionalColor(rawTokens.surface, 'surface'),
+    text: optionalColor(rawTokens.text, 'text'),
+    panelOpacity: optionalNumber(rawTokens.panelOpacity, 'panelOpacity', 0, 0.8),
+    lineWidth: optionalNumber(rawTokens.lineWidth, 'lineWidth', 1, 4),
+    radius: optionalNumber(rawTokens.radius, 'radius', 0, 24),
+    glow: optionalNumber(rawTokens.glow, 'glow', 0, 1)
   }
   Object.keys(tokens).forEach((key) => {
     if (tokens[key as keyof DeclarativeSkinTokens] === undefined) delete tokens[key as keyof DeclarativeSkinTokens]
   })
-  if (!Object.keys(tokens).length) throw new Error('tokens 至少需要一个视觉参数')
+  const chrome = parseHudChrome(parsed.chrome)
+  if (chrome && parsed.baseTheme !== 'neon-space-lab') {
+    throw new Error('声明式 HUD 必须使用 baseTheme neon-space-lab')
+  }
+  if (!Object.keys(tokens).length && !chrome) throw new Error('皮肤至少需要一个视觉 token 或 chrome')
 
   return {
     schema: CUSTOM_SKIN_SCHEMA,
@@ -114,7 +169,8 @@ export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
     name,
     version,
     baseTheme: parsed.baseTheme as ThemeId,
-    tokens
+    tokens,
+    chrome
   }
 }
 
@@ -202,7 +258,15 @@ const CUSTOM_PROPERTIES = [
 export function applyCustomSkinToRoot(root: HTMLElement, state: CustomSkinState | null) {
   CUSTOM_PROPERTIES.forEach((property) => root.style.removeProperty(property))
   delete root.dataset.customSkin
+  delete root.dataset.customSkinChrome
+  delete root.dataset.customSkinPanel
+  delete root.dataset.customSkinBubble
   if (!state?.enabled) return
   root.dataset.customSkin = state.skin.id
+  if (state.skin.chrome) {
+    root.dataset.customSkinChrome = state.skin.chrome.type
+    root.dataset.customSkinPanel = state.skin.chrome.panelGeometry || 'stepped'
+    root.dataset.customSkinBubble = state.skin.chrome.bubbleGeometry || 'mirrored'
+  }
   Object.entries(buildCustomSkinVariables(state.skin)).forEach(([property, value]) => root.style.setProperty(property, value))
 }

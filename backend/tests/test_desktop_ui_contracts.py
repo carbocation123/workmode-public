@@ -177,6 +177,11 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn(".settings-open .side-panel", css)
         self.assertIn("grid-column: 2 / -1", css)
         self.assertIn(".custom-skin-loader", css)
+        self.assertIn("customSkin={customSkin}", app_source)
+        self.assertIn("customSkin?.skin.chrome", app_source)
+        self.assertIn('data-custom-skin-panel="continuous"', css)
+        self.assertIn('data-custom-skin-bubble="continuous"', css)
+        self.assertIn("var(--custom-skin-line-width, var(--neon-line-width, 1px))", css)
 
 
 
