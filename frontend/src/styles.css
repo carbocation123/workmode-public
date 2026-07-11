@@ -68,6 +68,46 @@
   --theme-panel-highlight: linear-gradient(135deg, rgba(84, 185, 255, 0.035), transparent 36%);
 }
 
+:root[data-theme="neon-space-lab"] {
+  color-scheme: dark;
+  --color-surface-container-lowest: #02070c;
+  --color-surface-container-low: #061018;
+  --color-surface-container: #0a1821;
+  --color-surface-container-high: #10232d;
+  --color-surface-container-highest: #17323d;
+  --color-surface-hover: #153440;
+  --color-primary: #43e8ff;
+  --color-primary-hover: #8ff4ff;
+  --color-primary-container: rgba(67, 232, 255, 0.13);
+  --color-on-surface: #e6fbff;
+  --color-on-surface-variant: #b9dce2;
+  --color-on-surface-subtle: #81aeb8;
+  --color-on-surface-dim: #4f747d;
+  --color-divider: rgba(94, 226, 243, 0.16);
+  --color-danger: #ff5d7a;
+  --color-success: #5dffbd;
+  --color-warning: #ffc857;
+  --color-on-primary: #001015;
+  --color-surface-floating: rgba(5, 16, 24, 0.98);
+  --color-overlay: rgba(0, 4, 8, 0.9);
+  --color-shadow: rgba(0, 0, 0, 0.72);
+  --color-primary-border: rgba(67, 232, 255, 0.42);
+  --color-primary-soft: rgba(67, 232, 255, 0.08);
+  --color-primary-glow: rgba(67, 232, 255, 0.55);
+  --color-danger-border: rgba(255, 93, 122, 0.46);
+  --color-danger-soft: rgba(255, 93, 122, 0.09);
+  --color-success-border: rgba(93, 255, 189, 0.4);
+  --color-success-soft: rgba(93, 255, 189, 0.08);
+  --color-warning-border: rgba(255, 200, 87, 0.45);
+  --color-warning-soft: rgba(255, 200, 87, 0.09);
+  --theme-app-background:
+    linear-gradient(rgba(67, 232, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(67, 232, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 74% 44%, rgba(20, 179, 209, 0.1), transparent 32%),
+    #02070c;
+  --theme-panel-highlight: linear-gradient(135deg, rgba(67, 232, 255, 0.035), transparent 42%);
+}
+
 :root[data-theme="paper"] {
   color-scheme: light;
   --color-surface-container-lowest: #f3efe6;
@@ -2232,6 +2272,532 @@ pre {
 .ai-panel,
 .file-view-panel {
   background-image: var(--theme-panel-highlight);
+}
+
+/* Neon Space Lab is a structural skin. All selectors stay theme-scoped so the
+   same React components and application state remain shared with other skins. */
+:root[data-theme="neon-space-lab"] body {
+  font-family: "Rajdhani", "Segoe UI", "PingFang SC", sans-serif;
+  letter-spacing: 0.015em;
+}
+
+:root[data-theme="neon-space-lab"] .ide-shell {
+  gap: 6px;
+  padding: 6px;
+  background-size: 32px 32px, 32px 32px, auto, auto;
+  box-shadow: inset 0 0 110px rgba(0, 0, 0, 0.86);
+}
+
+:root[data-theme="neon-space-lab"] .neon-hud {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  position: relative;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 250px minmax(240px, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(67, 232, 255, 0.36);
+  background: linear-gradient(90deg, rgba(10, 28, 38, 0.96), rgba(3, 12, 19, 0.92) 48%, rgba(10, 28, 38, 0.96));
+  box-shadow: inset 0 0 24px rgba(67, 232, 255, 0.04), 0 0 18px rgba(67, 232, 255, 0.08);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0 calc(100% - 9px));
+}
+
+:root[data-theme="neon-space-lab"] .neon-hud::before,
+:root[data-theme="neon-space-lab"] .neon-hud::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+:root[data-theme="neon-space-lab"] .neon-hud::before {
+  inset: 0;
+  opacity: 0.15;
+  background: repeating-linear-gradient(180deg, transparent 0 3px, rgba(159, 244, 255, 0.12) 4px);
+}
+
+:root[data-theme="neon-space-lab"] .neon-hud::after {
+  left: 254px;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-primary), transparent 60%);
+  box-shadow: 0 0 8px var(--color-primary);
+}
+
+:root[data-theme="neon-space-lab"] .neon-brand,
+:root[data-theme="neon-space-lab"] .neon-mission,
+:root[data-theme="neon-space-lab"] .neon-telemetry {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+:root[data-theme="neon-space-lab"] .neon-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 16px;
+  border-right: 1px solid rgba(67, 232, 255, 0.22);
+}
+
+:root[data-theme="neon-space-lab"] .neon-brand-ring {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+  background: radial-gradient(circle, #e9feff 0 6%, var(--color-primary) 7% 14%, transparent 15% 34%, rgba(67, 232, 255, 0.35) 35% 43%, transparent 44%);
+  box-shadow: 0 0 8px var(--color-primary), inset 0 0 8px var(--color-primary);
+  animation: neon-core-pulse 2.8s ease-in-out infinite;
+}
+
+:root[data-theme="neon-space-lab"] .neon-brand-copy,
+:root[data-theme="neon-space-lab"] .neon-brand-copy strong,
+:root[data-theme="neon-space-lab"] .neon-brand-copy small {
+  display: block;
+  line-height: 1.08;
+}
+
+:root[data-theme="neon-space-lab"] .neon-brand-copy strong {
+  color: #e7fdff;
+  font-size: 14px;
+  letter-spacing: 0.24em;
+  text-shadow: 0 0 8px rgba(67, 232, 255, 0.5);
+}
+
+:root[data-theme="neon-space-lab"] .neon-brand-copy small,
+:root[data-theme="neon-space-lab"] .neon-mission span,
+:root[data-theme="neon-space-lab"] .neon-telemetry small {
+  color: var(--color-primary);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.13em;
+}
+
+:root[data-theme="neon-space-lab"] .neon-mission {
+  display: grid;
+  align-content: center;
+  padding: 3px 18px;
+}
+
+:root[data-theme="neon-space-lab"] .neon-mission strong,
+:root[data-theme="neon-space-lab"] .neon-mission small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-theme="neon-space-lab"] .neon-mission strong {
+  color: #e7fdff;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+}
+
+:root[data-theme="neon-space-lab"] .neon-mission small {
+  color: var(--color-on-surface-dim);
+  font-size: 8px;
+}
+
+:root[data-theme="neon-space-lab"] .neon-telemetry {
+  display: flex;
+  align-items: stretch;
+}
+
+:root[data-theme="neon-space-lab"] .neon-telemetry > span {
+  display: grid;
+  align-content: center;
+  min-width: 110px;
+  padding: 0 14px;
+  border-left: 1px solid rgba(67, 232, 255, 0.16);
+}
+
+:root[data-theme="neon-space-lab"] .neon-telemetry strong {
+  max-width: 170px;
+  overflow: hidden;
+  color: #c8f8ff;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-theme="neon-space-lab"] .neon-telemetry strong.live {
+  color: var(--color-success);
+  text-shadow: 0 0 8px rgba(93, 255, 189, 0.72);
+}
+
+:root[data-theme="neon-space-lab"] .activity-bar,
+:root[data-theme="neon-space-lab"] .side-panel,
+:root[data-theme="neon-space-lab"] .ai-panel,
+:root[data-theme="neon-space-lab"] .resize-handle,
+:root[data-theme="neon-space-lab"] .file-view-panel {
+  grid-row: 2;
+}
+
+:root[data-theme="neon-space-lab"] .activity-bar,
+:root[data-theme="neon-space-lab"] .side-panel,
+:root[data-theme="neon-space-lab"] .ai-panel,
+:root[data-theme="neon-space-lab"] .file-view-panel {
+  position: relative;
+  border: 1px solid rgba(67, 232, 255, 0.19);
+  background-color: rgba(5, 16, 24, 0.9);
+  box-shadow: inset 0 0 32px rgba(67, 232, 255, 0.025), 0 0 16px rgba(0, 0, 0, 0.5);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+}
+
+:root[data-theme="neon-space-lab"] .activity-bar {
+  padding: 11px 0;
+  background: rgba(3, 12, 18, 0.96);
+}
+
+:root[data-theme="neon-space-lab"] .activity-btn {
+  width: 46px;
+  height: 46px;
+  color: #4f818b;
+}
+
+:root[data-theme="neon-space-lab"] .activity-btn:hover,
+:root[data-theme="neon-space-lab"] .activity-btn.active {
+  color: var(--color-primary);
+  background: linear-gradient(90deg, rgba(67, 232, 255, 0.16), transparent);
+  text-shadow: 0 0 9px var(--color-primary);
+}
+
+:root[data-theme="neon-space-lab"] .activity-btn.active::before {
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 0;
+  box-shadow: 0 0 9px var(--color-primary);
+}
+
+:root[data-theme="neon-space-lab"] .side-panel-header,
+:root[data-theme="neon-space-lab"] .project-section-title,
+:root[data-theme="neon-space-lab"] .editor-tabs {
+  background: linear-gradient(90deg, rgba(67, 232, 255, 0.09), transparent 70%);
+  border-color: rgba(67, 232, 255, 0.22);
+}
+
+:root[data-theme="neon-space-lab"] .side-panel-title,
+:root[data-theme="neon-space-lab"] .project-section-title,
+:root[data-theme="neon-space-lab"] .settings-label,
+:root[data-theme="neon-space-lab"] .ai-panel-title {
+  color: #8feef9;
+  font-family: "Cascadia Code", Consolas, monospace;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 8px rgba(67, 232, 255, 0.25);
+}
+
+:root[data-theme="neon-space-lab"] .project-switcher-select,
+:root[data-theme="neon-space-lab"] .project-create-input,
+:root[data-theme="neon-space-lab"] .memory-editor,
+:root[data-theme="neon-space-lab"] .project-tree-list {
+  border-radius: 0;
+  border-color: rgba(67, 232, 255, 0.25);
+  background: rgba(1, 8, 13, 0.72);
+}
+
+:root[data-theme="neon-space-lab"] .tree-node,
+:root[data-theme="neon-space-lab"] .session-row,
+:root[data-theme="neon-space-lab"] .sessions-new-btn {
+  border-radius: 0;
+  border-left: 1px solid transparent;
+}
+
+:root[data-theme="neon-space-lab"] .tree-node:hover,
+:root[data-theme="neon-space-lab"] .session-row:hover {
+  border-left-color: rgba(67, 232, 255, 0.5);
+  background: linear-gradient(90deg, rgba(67, 232, 255, 0.1), transparent);
+}
+
+:root[data-theme="neon-space-lab"] .tree-node.selected,
+:root[data-theme="neon-space-lab"] .session-row.active {
+  border-left-color: var(--color-primary);
+  background: linear-gradient(90deg, rgba(67, 232, 255, 0.2), rgba(67, 232, 255, 0.025));
+  box-shadow: inset 4px 0 12px rgba(67, 232, 255, 0.06);
+}
+
+:root[data-theme="neon-space-lab"] .tree-node-icon {
+  color: var(--color-primary);
+  filter: drop-shadow(0 0 3px rgba(67, 232, 255, 0.55));
+}
+
+:root[data-theme="neon-space-lab"] .tree-node-kind,
+:root[data-theme="neon-space-lab"] .session-row-meta {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:root[data-theme="neon-space-lab"] .ai-panel {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 110px, rgba(67, 232, 255, 0.018) 111px 112px, transparent 113px 170px, rgba(67, 232, 255, 0.018) 171px 172px, transparent 173px),
+    rgba(3, 12, 18, 0.88);
+}
+
+:root[data-theme="neon-space-lab"] .ai-panel-header {
+  min-height: 58px;
+  padding: 6px 12px;
+  border-bottom-color: rgba(67, 232, 255, 0.22);
+  background: linear-gradient(90deg, rgba(67, 232, 255, 0.055), rgba(2, 9, 14, 0.86) 46%, rgba(67, 232, 255, 0.035));
+}
+
+:root[data-theme="neon-space-lab"] .ai-panel-meta {
+  color: #557f88;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-cluster {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  padding: 2px 5px 2px 9px;
+  border-left: 1px solid rgba(67, 232, 255, 0.24);
+  color: var(--color-on-surface);
+  text-align: right;
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-copy,
+:root[data-theme="neon-space-lab"] .neon-context-copy small,
+:root[data-theme="neon-space-lab"] .neon-context-copy strong,
+:root[data-theme="neon-space-lab"] .neon-context-copy em {
+  display: block;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-style: normal;
+  line-height: 1.15;
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-copy small {
+  color: var(--color-primary);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-copy strong {
+  font-size: 9px;
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-copy em {
+  color: var(--color-on-surface-dim);
+  font-size: 7px;
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-ring {
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 39px;
+  padding: 4px;
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(67, 232, 255, 0.2);
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-ring::before {
+  content: "";
+  grid-area: 1 / 1;
+  width: 29px;
+  height: 29px;
+  border-radius: 50%;
+  background: #061018;
+  box-shadow: inset 0 0 8px rgba(67, 232, 255, 0.1);
+}
+
+:root[data-theme="neon-space-lab"] .neon-context-ring strong {
+  grid-area: 1 / 1;
+  z-index: 1;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+}
+
+:root[data-theme="neon-space-lab"] .ai-panel-token-bar {
+  height: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(67, 232, 255, 0.06);
+}
+
+:root[data-theme="neon-space-lab"] .ai-panel-token-bar-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+:root[data-theme="neon-space-lab"] .ai-panel-messages {
+  padding-top: 24px;
+  scrollbar-color: rgba(67, 232, 255, 0.45) transparent;
+}
+
+:root[data-theme="neon-space-lab"] .message .bubble {
+  border-radius: 0;
+  backdrop-filter: blur(9px);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+:root[data-theme="neon-space-lab"] .message.user .bubble {
+  border-color: rgba(67, 232, 255, 0.48);
+  background: linear-gradient(135deg, rgba(20, 89, 106, 0.52), rgba(5, 26, 35, 0.78));
+  box-shadow: inset 0 0 20px rgba(67, 232, 255, 0.035), 0 0 18px rgba(67, 232, 255, 0.045);
+}
+
+:root[data-theme="neon-space-lab"] .message.assistant .bubble {
+  border-color: rgba(112, 172, 184, 0.2);
+  background: rgba(7, 20, 28, 0.82);
+}
+
+:root[data-theme="neon-space-lab"] .tool-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+  border-color: rgba(67, 232, 255, 0.28);
+  background: linear-gradient(90deg, rgba(7, 31, 40, 0.9), rgba(3, 15, 22, 0.86));
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+:root[data-theme="neon-space-lab"] .tool-card::before {
+  content: "TOOL TELEMETRY";
+  position: absolute;
+  right: 10px;
+  bottom: 3px;
+  color: rgba(67, 232, 255, 0.18);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  pointer-events: none;
+}
+
+:root[data-theme="neon-space-lab"] .neon-tool-scan {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  bottom: 0;
+  left: -30%;
+  width: 18%;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(67, 232, 255, 0.13), transparent);
+  transform: skewX(-18deg);
+  pointer-events: none;
+}
+
+:root[data-theme="neon-space-lab"] .tool-card.running .neon-tool-scan {
+  opacity: 1;
+  animation: neon-tool-scan 2.4s linear infinite;
+}
+
+:root[data-theme="neon-space-lab"] .tool-card-header,
+:root[data-theme="neon-space-lab"] .tool-card-details,
+:root[data-theme="neon-space-lab"] .tool-card-changed {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-theme="neon-space-lab"] .tool-card-name {
+  color: #a9f4fc;
+  letter-spacing: 0.08em;
+}
+
+:root[data-theme="neon-space-lab"] .chat-input-wrap {
+  border-top-color: rgba(67, 232, 255, 0.22);
+  background: linear-gradient(180deg, rgba(5, 18, 25, 0.9), rgba(2, 10, 15, 0.98));
+}
+
+:root[data-theme="neon-space-lab"] .chat-input-box {
+  border-radius: 0;
+  border-color: rgba(67, 232, 255, 0.28);
+  background: rgba(1, 8, 13, 0.72);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+}
+
+:root[data-theme="neon-space-lab"] .chat-input-box:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 18px rgba(67, 232, 255, 0.05), 0 0 12px rgba(67, 232, 255, 0.12);
+}
+
+:root[data-theme="neon-space-lab"] .chat-input-box .send-btn {
+  border-radius: 0;
+  background: transparent;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  box-shadow: inset 0 0 12px rgba(67, 232, 255, 0.08);
+}
+
+:root[data-theme="neon-space-lab"] .chat-input-box .send-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: 0 0 14px rgba(67, 232, 255, 0.5);
+}
+
+:root[data-theme="neon-space-lab"] .editor-tabs {
+  height: 38px;
+}
+
+:root[data-theme="neon-space-lab"] .editor-tab.active::after {
+  box-shadow: 0 0 8px var(--color-primary);
+}
+
+:root[data-theme="neon-space-lab"] .file-view {
+  background:
+    linear-gradient(rgba(67, 232, 255, 0.018) 1px, transparent 1px),
+    rgba(2, 8, 12, 0.92);
+  background-size: 100% 24px;
+}
+
+:root[data-theme="neon-space-lab"] .file-view-pre,
+:root[data-theme="neon-space-lab"] .file-editor textarea {
+  border-radius: 0;
+  border-color: rgba(67, 232, 255, 0.24);
+  background: rgba(4, 16, 23, 0.84);
+}
+
+:root[data-theme="neon-space-lab"] .media.pdf,
+:root[data-theme="neon-space-lab"] .media.image {
+  background: #0b0e12;
+}
+
+:root[data-theme="neon-space-lab"] .resize-handle {
+  border: 0;
+  background: linear-gradient(90deg, transparent, rgba(67, 232, 255, 0.22), transparent);
+}
+
+:root[data-theme="neon-space-lab"] .resize-handle:hover {
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  box-shadow: 0 0 10px rgba(67, 232, 255, 0.4);
+}
+
+:root[data-theme="neon-space-lab"] .status-bar {
+  grid-row: 3;
+  height: 27px;
+  border: 1px solid rgba(67, 232, 255, 0.2);
+  background: linear-gradient(90deg, rgba(10, 28, 38, 0.95), rgba(3, 12, 18, 0.97));
+  color: #64949d;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+
+:root[data-theme="neon-space-lab"] .status-dot.ok {
+  box-shadow: 0 0 7px var(--color-success);
+}
+
+@keyframes neon-core-pulse {
+  0%, 100% { opacity: 0.72; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes neon-tool-scan {
+  from { left: -30%; }
+  to { left: 115%; }
 }
 
 :root[data-theme="paper"] .file-view-markdown,
