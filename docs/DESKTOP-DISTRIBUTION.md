@@ -12,6 +12,8 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 安装器包含 React 前端、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。目标电脑不需要 Node.js、Python 或 Rust，默认按当前用户安装，不要求管理员权限。
 
+首次启动会显示可跳过的新手向导：模型草稿先做连接探测，成功后才落本机配置；随后用户选择教程或自己的项目，并通过六步界面高亮开始工作。引导、教程任务和成就状态保存在桌面 WebView 本地存储，不写进用户项目或模型上下文。
+
 用户状态位于 `%LOCALAPPDATA%\WorkmodePublic`，不放进安装目录：
 
 ```text
@@ -146,6 +148,7 @@ Windows Shell 可能缓存旧桌面快捷方式图标。安装新版本后若图
 - 所有版本源一致；
 - 后端、前端和 Rust/Tauri 测试通过；
 - staging 中存在教程标识、`WORKMODE.md` 和真实教学 PDF，教程进度保持初始态；
+- 首次向导可跳过、可重新播放，模型测试失败不会写入配置；教程任务与成就只由真实操作事件推进；
 - 安装器文件名、`latest.json` URL 和签名一致；
 - Release 不是 draft/prerelease，且被标记为 latest；
 - 发行产物和 Git 历史中没有 `.env`、`sk-`、私钥或密码；

@@ -59,6 +59,12 @@ class ModelSettingsUpdate(BaseModel):
     request_timeout_seconds: float | None = Field(default=None, ge=5, le=600)
 
 
+class ModelConnectionTest(BaseModel):
+    model_base_url: str | None = Field(default=None, max_length=500)
+    model_name: str | None = Field(default=None, max_length=120)
+    model_api_key: str | None = Field(default=None, max_length=10000)
+
+
 class Message(BaseModel):
     id: str
     role: Literal["user", "assistant", "system", "tool"]

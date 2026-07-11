@@ -85,6 +85,13 @@ export interface ModelSettingsUpdate {
   request_timeout_seconds?: number
 }
 
+export interface ModelConnectionResult {
+  ok: boolean
+  message: string
+  model: string
+  latency_ms: number
+}
+
 export interface CompactionResult {
   session_id: string
   project_slug: string
@@ -146,6 +153,16 @@ export const api = {
   async saveModelSettings(payload: ModelSettingsUpdate) {
     return request<{ settings: AppSettings }>('/settings/model', {
       method: 'PUT',
+      body: JSON.stringify(payload)
+    })
+  },
+  async testModelConnection(payload: {
+    model_base_url?: string
+    model_name?: string
+    model_api_key?: string
+  }) {
+    return request<ModelConnectionResult>('/settings/model/test', {
+      method: 'POST',
       body: JSON.stringify(payload)
     })
   },

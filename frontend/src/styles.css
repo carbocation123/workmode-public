@@ -1374,3 +1374,514 @@ pre {
 .status-dot.off {
   background: var(--color-danger);
 }
+
+.ai-panel-token-bar {
+  width: 100%;
+  color: inherit;
+  text-align: initial;
+}
+
+.ai-panel-token-bar:hover {
+  border-color: rgba(108, 159, 255, 0.5);
+}
+
+.context-detail-popover {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(108, 159, 255, 0.35);
+  border-radius: 8px;
+  background: var(--color-surface-container);
+}
+
+.context-detail-popover > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.context-detail-popover span {
+  color: var(--color-on-surface-dim);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.context-detail-popover strong {
+  overflow: hidden;
+  color: var(--color-on-surface);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-button-row > button {
+  flex: 1;
+}
+
+.settings-test-result,
+.onboarding-test {
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 110, 64, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 110, 64, 0.08);
+  color: var(--color-danger);
+  font-size: 11px;
+}
+
+.settings-test-result.success,
+.onboarding-test.success {
+  border-color: rgba(88, 201, 135, 0.35);
+  background: rgba(88, 201, 135, 0.08);
+  color: var(--color-success);
+}
+
+.onboarding-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(5, 8, 14, 0.84);
+  backdrop-filter: blur(12px);
+}
+
+.onboarding-dialog {
+  width: min(680px, calc(100vw - 64px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 34px;
+  border: 1px solid rgba(108, 159, 255, 0.35);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(108, 159, 255, 0.14), transparent 40%),
+    var(--color-surface-container-low);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+}
+
+.onboarding-kicker {
+  margin-bottom: 14px;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.onboarding-dialog h1 {
+  margin-bottom: 12px;
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+.onboarding-dialog > p {
+  margin-bottom: 22px;
+  color: var(--color-on-surface-subtle);
+  font-size: 14px;
+}
+
+.onboarding-feature-grid,
+.onboarding-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 20px 0 26px;
+}
+
+.onboarding-feature-grid span {
+  padding: 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: 9px;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface-subtle);
+}
+
+.onboarding-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.onboarding-field span {
+  color: var(--color-on-surface-subtle);
+  font-size: 11px;
+}
+
+.onboarding-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+  background: var(--color-surface-container);
+}
+
+.onboarding-field input:focus {
+  border-color: var(--color-primary);
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.onboarding-primary,
+.onboarding-secondary {
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+}
+
+.onboarding-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #0b1020;
+  font-weight: 700;
+}
+
+.onboarding-secondary {
+  color: var(--color-on-surface-subtle);
+  background: var(--color-surface-container);
+}
+
+.onboarding-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.onboarding-secondary:hover:not(:disabled) {
+  color: var(--color-on-surface);
+  background: var(--color-surface-hover);
+}
+
+.onboarding-choice-grid > button {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--color-divider);
+  border-radius: 12px;
+  background: var(--color-surface-container);
+  text-align: left;
+}
+
+.onboarding-choice-grid > button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.onboarding-choice-grid strong {
+  font-size: 15px;
+}
+
+.onboarding-choice-grid em {
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #0b1020;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.onboarding-choice-grid span {
+  color: var(--color-on-surface-subtle);
+  font-size: 12px;
+}
+
+.guided-tour {
+  position: fixed;
+  z-index: 110;
+  inset: 0;
+  pointer-events: none;
+}
+
+.guided-tour-spotlight {
+  position: fixed;
+  z-index: 111;
+  border: 2px solid var(--color-primary);
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(3, 6, 12, 0.78), 0 0 28px rgba(108, 159, 255, 0.45);
+  transition: inset 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+.guided-tour-card {
+  position: fixed;
+  z-index: 112;
+  left: 50%;
+  bottom: 42px;
+  width: min(460px, calc(100vw - 48px));
+  padding: 20px;
+  border: 1px solid rgba(108, 159, 255, 0.45);
+  border-radius: 14px;
+  background: var(--color-surface-container-low);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.guided-tour-count {
+  color: var(--color-primary);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
+}
+
+.guided-tour-card h2 {
+  margin: 4px 0 6px;
+  font-size: 19px;
+}
+
+.guided-tour-card p {
+  color: var(--color-on-surface-subtle);
+  font-size: 13px;
+}
+
+.tutorial-checklist,
+.tutorial-checklist-pill {
+  position: fixed;
+  z-index: 70;
+  right: 24px;
+  bottom: 40px;
+}
+
+.tutorial-checklist {
+  width: 350px;
+  overflow: hidden;
+  border: 1px solid rgba(108, 159, 255, 0.35);
+  border-radius: 14px;
+  background: rgba(21, 23, 28, 0.97);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+}
+
+.tutorial-checklist > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.tutorial-checklist > header div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-checklist > header span {
+  color: var(--color-primary);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px;
+}
+
+.tutorial-checklist > header button {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  color: var(--color-on-surface-subtle);
+}
+
+.tutorial-progress {
+  height: 3px;
+  background: var(--color-surface-container-highest);
+}
+
+.tutorial-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-success));
+  transition: width 240ms ease;
+}
+
+.tutorial-checklist ol {
+  max-height: min(55vh, 430px);
+  overflow-y: auto;
+  list-style: none;
+  padding: 6px;
+}
+
+.tutorial-checklist li button {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  width: 100%;
+  gap: 4px;
+  padding: 9px 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.tutorial-checklist li button:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.tutorial-checklist li.done {
+  opacity: 0.6;
+}
+
+.tutorial-task-check {
+  color: var(--color-primary);
+  font-size: 16px;
+}
+
+.tutorial-checklist li strong,
+.tutorial-checklist li small {
+  display: block;
+}
+
+.tutorial-checklist li strong {
+  font-size: 12px;
+}
+
+.tutorial-checklist li small {
+  margin-top: 1px;
+  color: var(--color-on-surface-dim);
+  font-size: 10px;
+}
+
+.tutorial-checklist-pill {
+  padding: 8px 12px;
+  border: 1px solid rgba(108, 159, 255, 0.4);
+  border-radius: 999px;
+  background: var(--color-surface-container);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.tutorial-finished {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  text-align: center;
+}
+
+.tutorial-finished-icon {
+  color: var(--color-success);
+  font-size: 28px;
+}
+
+.tutorial-finished p {
+  color: var(--color-on-surface-subtle);
+  font-size: 11px;
+}
+
+.tutorial-finished button {
+  padding: 7px 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: 7px;
+  background: var(--color-surface-container);
+}
+
+.achievement-toast {
+  position: fixed;
+  z-index: 130;
+  top: 22px;
+  right: 22px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  width: 310px;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(88, 201, 135, 0.45);
+  border-radius: 12px;
+  background: rgba(21, 23, 28, 0.98);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  animation: achievement-in 260ms ease-out;
+}
+
+.achievement-toast > span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(88, 201, 135, 0.12);
+  color: var(--color-success);
+  font-size: 22px;
+}
+
+.achievement-toast small,
+.achievement-toast strong,
+.achievement-toast p {
+  display: block;
+}
+
+.achievement-toast small {
+  color: var(--color-success);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.achievement-toast p {
+  color: var(--color-on-surface-subtle);
+  font-size: 10px;
+}
+
+@keyframes achievement-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.achievement-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.achievement-panel-summary {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-on-surface-subtle);
+  font-size: 11px;
+}
+
+.achievement-panel-summary strong {
+  color: var(--color-primary);
+}
+
+.achievement-grid {
+  display: grid;
+  gap: 5px;
+}
+
+.achievement-card {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--color-divider);
+  border-radius: 7px;
+  opacity: 0.45;
+}
+
+.achievement-card.unlocked {
+  border-color: rgba(88, 201, 135, 0.25);
+  background: rgba(88, 201, 135, 0.05);
+  opacity: 1;
+}
+
+.achievement-card > span {
+  display: grid;
+  place-items: center;
+  color: var(--color-success);
+  font-size: 16px;
+}
+
+.achievement-card strong,
+.achievement-card small {
+  display: block;
+}
+
+.achievement-card strong {
+  font-size: 11px;
+}
+
+.achievement-card small {
+  color: var(--color-on-surface-dim);
+  font-size: 9px;
+}

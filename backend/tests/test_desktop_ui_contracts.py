@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 STYLES = ROOT / "frontend" / "src" / "styles.css"
 APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
+ONBOARDING_SOURCE = ROOT / "frontend" / "src" / "OnboardingUI.tsx"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
 
 
@@ -48,6 +49,20 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("创建教程项目", source)
         self.assertIn("重置教程", source)
         self.assertIn("activeProject?.is_tutorial", source)
+
+    def test_first_run_guidance_and_achievements_have_replayable_ui(self) -> None:
+        source = APP_SOURCE.read_text(encoding="utf-8") + ONBOARDING_SOURCE.read_text(encoding="utf-8")
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertIn("重新播放新手引导", source)
+        self.assertIn("科研协作教程", source)
+        self.assertIn('data-guide="projects"', source)
+        self.assertIn('data-guide="files"', source)
+        self.assertIn('data-guide="chat"', source)
+        self.assertIn('data-guide="context"', source)
+        self.assertIn('data-guide="viewer"', source)
+        self.assertRegex(css, r"\.onboarding-overlay\s*\{")
+        self.assertRegex(css, r"\.achievement-toast\s*\{")
 
 
 if __name__ == "__main__":
