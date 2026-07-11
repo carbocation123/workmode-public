@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 STYLES = ROOT / "frontend" / "src" / "styles.css"
 APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
 ONBOARDING_SOURCE = ROOT / "frontend" / "src" / "OnboardingUI.tsx"
+THEME_SOURCE = ROOT / "frontend" / "src" / "theme.ts"
+THEME_PANEL_SOURCE = ROOT / "frontend" / "src" / "ThemePanel.tsx"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
@@ -93,6 +95,21 @@ class DesktopUiContractTest(unittest.TestCase):
             "https://platform.deepseek.com/*",
             "https://api-docs.deepseek.com/*",
         })
+
+    def test_skin_system_has_system_mode_accessibility_and_achievement_unlock(self) -> None:
+        app_source = APP_SOURCE.read_text(encoding="utf-8")
+        theme_source = THEME_SOURCE.read_text(encoding="utf-8")
+        panel_source = THEME_PANEL_SOURCE.read_text(encoding="utf-8")
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertIn("外观与皮肤", app_source)
+        self.assertIn("tutorial_graduate", theme_source)
+        self.assertIn("跟随系统", panel_source)
+        self.assertIn("降低动效", panel_source)
+        self.assertIn('[data-theme="paper"]', css)
+        self.assertIn('[data-theme="origin-ring"]', css)
+        self.assertIn('[data-theme="high-contrast"]', css)
+        self.assertIn('[data-reduced-motion="true"]', css)
 
 
 if __name__ == "__main__":

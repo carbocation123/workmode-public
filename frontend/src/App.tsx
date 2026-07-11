@@ -26,6 +26,7 @@ import {
 } from './conversation'
 import { directoryPaths, fileEntryVisual, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { ThemePanel } from './ThemePanel'
 import {
   AchievementPanel,
   AchievementToast,
@@ -46,6 +47,12 @@ import {
   type ProductEvent,
   type TutorialTaskId
 } from './onboarding'
+import {
+  THEME_STORAGE_KEY,
+  allowedThemeSelection,
+  applyThemeToRoot,
+  parseThemePreference
+} from './theme'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -197,6 +204,14 @@ export default function App() {
   const [desktopUpdating, setDesktopUpdating] = useState(false)
   const [desktopUpdateProgress, setDesktopUpdateProgress] = useState(0)
   const [onboardingProgress, setOnboardingProgress] = useState(() => parseProgress(localStorage.getItem(ONBOARDING_STORAGE_KEY)))
+  const [themePreference, setThemePreference] = useState(() => {
+    const parsed = parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY))
+    return {
+      ...parsed,
+      selection: allowedThemeSelection(parsed.selection, onboardingProgress.achievements)
+    }
+  })
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
   const [modelTesting, setModelTesting] = useState(false)
   const [modelTestStatus, setModelTestStatus] = useState('')
   const [modelTestOk, setModelTestOk] = useState(false)
@@ -247,6 +262,19 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(onboardingProgress))
   }, [onboardingProgress])
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (!media) return
+    const handleChange = (event: MediaQueryListEvent) => setSystemPrefersDark(event.matches)
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
+    applyThemeToRoot(document.documentElement, themePreference, systemPrefersDark)
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themePreference))
+  }, [themePreference, systemPrefersDark])
 
   useEffect(() => {
     if (!achievementToast) return
@@ -1326,6 +1354,15 @@ export default function App() {
                   {settingsSaving ? '保存中…' : '保存模型设置'}
                 </button>
               </div>
+            </section>
+            <section className="settings-section">
+              <div className="settings-label">外观与皮肤</div>
+              <ThemePanel
+                preference={themePreference}
+                achievements={onboardingProgress.achievements}
+                systemPrefersDark={systemPrefersDark}
+                onChange={setThemePreference}
+              />
             </section>
             <section className="settings-section">
               <div className="settings-label">新手引导与成就</div>
