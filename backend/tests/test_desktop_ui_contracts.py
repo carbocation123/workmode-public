@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import unittest
 from pathlib import Path
@@ -10,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 STYLES = ROOT / "frontend" / "src" / "styles.css"
 APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
 ONBOARDING_SOURCE = ROOT / "frontend" / "src" / "OnboardingUI.tsx"
+DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
+DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
 
 
@@ -63,6 +66,33 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('data-guide="viewer"', source)
         self.assertRegex(css, r"\.onboarding-overlay\s*\{")
         self.assertRegex(css, r"\.achievement-toast\s*\{")
+
+    def test_deepseek_api_application_guide_is_available_in_product_ui(self) -> None:
+        source = APP_SOURCE.read_text(encoding="utf-8") + ONBOARDING_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("如何申请 DeepSeek API", source)
+        self.assertIn("创建 API Key", source)
+        self.assertIn("充值与价格", source)
+        self.assertIn("一键填入 V4 Pro", source)
+
+    def test_project_directories_start_collapsed_with_file_type_icons(self) -> None:
+        source = APP_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("setExpandedDirs(new Set())", source)
+        self.assertIn("fileEntryVisual(entry", source)
+        self.assertIn("tree-node-kind", source)
+
+    def test_deepseek_links_use_scoped_system_browser_opener(self) -> None:
+        desktop_source = DESKTOP_SOURCE.read_text(encoding="utf-8")
+        permissions = json.loads(DESKTOP_CAPABILITIES.read_text(encoding="utf-8"))["permissions"]
+        opener = next(item for item in permissions if isinstance(item, dict) and item.get("identifier") == "opener:allow-open-url")
+        allowed_urls = {item["url"] for item in opener["allow"]}
+
+        self.assertIn("openUrl(url)", desktop_source)
+        self.assertEqual(allowed_urls, {
+            "https://platform.deepseek.com/*",
+            "https://api-docs.deepseek.com/*",
+        })
 
 
 if __name__ == "__main__":

@@ -6,6 +6,13 @@
   "permissions": [
     "core:default",
     "dialog:allow-open",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://platform.deepseek.com/*" },
+        { "url": "https://api-docs.deepseek.com/*" }
+      ]
+    },
     "process:allow-restart",
     "updater:default"
   ]
