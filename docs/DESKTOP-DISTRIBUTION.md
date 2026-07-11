@@ -16,7 +16,7 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 皮肤偏好和降低动效开关也保存在 WebView 本地存储。升级或覆盖安装不迁移、上传或写入项目；若本地值损坏或来自未来不兼容版本，前端回退到稳定的实验室主题。Origin Ring 与 Neon Space Lab 的解锁只读取本地教程毕业成就，基础亮色、暗色和高对比皮肤始终可用。Neon Space Lab 随前端源码编译进安装包，只包含项目原创 React/CSS/SVG；参考包中的可执行文件、脚本、字体、图片和配置均不进入仓库或 Release。
 
-0.6.1 起，完整设置页可导入最大 32 KB 的 `.workmode-skin.json`。文件由 WebView 原生文件选择器读取，不新增任意文件系统权限；解析后仅保存白名单视觉 token 到 `workmode-public-custom-skin-v1`。安装器和更新器不主动删除该键，损坏或不兼容状态会被忽略。任意 CSS、JavaScript、URL、图片和权限字段都不是 v1 发行格式的一部分。
+0.6.1 起，完整设置页可导入最大 32 KB 的 `.workmode-skin.json`。文件由 WebView 原生文件选择器读取，不新增任意文件系统权限；解析后仅保存白名单视觉 token、HUD 文案和结构枚举到 `workmode-public-custom-skin-v1`。结构皮肤由安装包内现有 React 组件渲染，不能携带自己的代码、HTML 或事件。安装器和更新器不主动删除该键，损坏或不兼容状态会被忽略。任意 CSS、JavaScript、URL、图片和权限字段都不是 v1 发行格式的一部分。
 
 用户状态位于 `%LOCALAPPDATA%\WorkmodePublic`，不放进安装目录：
 

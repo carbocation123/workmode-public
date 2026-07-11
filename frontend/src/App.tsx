@@ -255,7 +255,8 @@ export default function App() {
   const contextBudget = context?.budget_tokens || 0
   const contextPct = contextBudget ? Math.min(100, (Number(contextTotal) / contextBudget) * 100) : 0
   const resolvedTheme = resolveTheme(themePreference.selection, systemPrefersDark)
-  const hudLayoutActive = THEMES.find((theme) => theme.id === resolvedTheme)?.layout === 'hud'
+  const customHudActive = customSkin?.enabled && customSkin?.skin.chrome?.type === 'hud'
+  const hudLayoutActive = customHudActive || THEMES.find((theme) => theme.id === resolvedTheme)?.layout === 'hud'
   const historyIncluded = typeof context?.history_messages_included === 'number' ? context.history_messages_included : undefined
   const historyTotal = typeof context?.history_messages_total === 'number' ? context.history_messages_total : undefined
   const historyDropped = typeof context?.history_messages_dropped === 'number' ? context.history_messages_dropped : undefined
@@ -959,6 +960,7 @@ export default function App() {
       {hudLayoutActive && (
         <SkinChrome
           themeId={resolvedTheme}
+          customSkin={customSkin}
           projectName={activeProject?.name}
           projectPath={activeProject?.root_path}
           modelName={settings?.model_name}

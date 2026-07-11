@@ -72,7 +72,7 @@ npm --prefix desktop run dev
 
 内置普通皮肤在 `frontend/src/theme.ts` 注册稳定 ID，并在 `frontend/src/styles.css` 通过 `data-theme` 作用域覆盖语义化 token；需要顶部结构或其他额外外壳时，再通过 `frontend/src/SkinChrome.tsx` 注册只读运行状态组件。业务数据和交互组件不能在皮肤中复制一份。
 
-无需重新打包的本地皮肤使用 `workmode-skin/v1` JSON。开发时可从 `examples/skins/neon-ice.workmode-skin.json` 开始，在完整设置页直接导入验证。解析器位于 `frontend/src/customSkin.ts`，修改 schema 时必须同步更新其白名单、边界测试和 [CUSTOM-SKINS.md](CUSTOM-SKINS.md)；不要给该格式加入原始 CSS、JavaScript、URL、外部素材或权限字段。
+无需重新打包的本地皮肤使用 `workmode-skin/v1` JSON。开发时可从带 HUD 声明的 `examples/skins/neon-ice.workmode-skin.json` 开始，在完整设置页直接导入验证。解析器位于 `frontend/src/customSkin.ts`；结构皮肤由 `SkinChrome.tsx` 选择受维护的 React 外壳，只能通过枚举切换几何。修改 schema 时必须同步更新其白名单、边界测试和 [CUSTOM-SKINS.md](CUSTOM-SKINS.md)；不要给该格式加入原始 CSS、JavaScript、HTML、URL、外部素材或权限字段。
 
 ## 验证命令
 
