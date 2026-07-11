@@ -3379,7 +3379,28 @@ pre {
 :root[data-custom-skin] .tool-card,
 :root[data-custom-skin] .chat-input-box {
   border-width: var(--custom-skin-line-width, var(--neon-line-width, 1px));
-  border-radius: var(--custom-skin-radius, var(--neon-content-radius, 8px));
+}
+
+:root[data-custom-skin] .activity-bar,
+:root[data-custom-skin] .side-panel,
+:root[data-custom-skin] .ai-panel,
+:root[data-custom-skin] .file-view-panel,
+:root[data-custom-skin] .chat-input-box {
+  border-radius: var(--custom-skin-panel-radius, var(--custom-skin-radius, var(--neon-content-radius, 8px)));
+}
+
+:root[data-custom-skin] .message .bubble {
+  border-radius: var(--custom-skin-bubble-radius, var(--custom-skin-radius, var(--neon-content-radius, 8px)));
+}
+
+:root[data-custom-skin] .tool-card,
+:root[data-custom-skin] .project-create-submit,
+:root[data-custom-skin] .project-create-cancel,
+:root[data-custom-skin] .project-switcher-icon-btn,
+:root[data-custom-skin] .project-create-browse,
+:root[data-custom-skin] .ai-panel-compact-btn,
+:root[data-custom-skin] .chat-input-box .send-btn {
+  border-radius: var(--custom-skin-button-radius, var(--custom-skin-radius, var(--neon-content-radius, 8px)));
 }
 
 :root[data-theme="neon-space-lab"][data-custom-skin-panel="continuous"] .side-panel,
@@ -3392,6 +3413,243 @@ pre {
 :root[data-theme="neon-space-lab"][data-custom-skin-bubble="continuous"] .message.user .bubble,
 :root[data-theme="neon-space-lab"][data-custom-skin-bubble="continuous"] .message.assistant .bubble {
   --neon-bubble-shape: inset(0 round var(--neon-content-radius));
+}
+
+/* workmode-skin/v2 material engine. Presets consume only parser-generated
+   variables and inert data attributes; skin files cannot inject CSS. */
+:root[data-custom-skin-material="soft-cream"] body {
+  background:
+    radial-gradient(circle at 14% 14%, rgba(248, 217, 222, 0.78), transparent 23%),
+    radial-gradient(circle at 83% 87%, rgba(191, 224, 207, 0.66), transparent 28%),
+    linear-gradient(135deg, #f7e8cf, var(--color-surface-container-lowest) 42%, #f4e7d4);
+}
+
+:root[data-custom-skin-material="soft-cream"] .ide-shell {
+  position: relative;
+  isolation: isolate;
+  gap: 10px;
+  padding: 10px;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(248, 217, 222, 0.64), transparent 24%),
+    radial-gradient(circle at 82% 90%, rgba(191, 224, 207, 0.55), transparent 28%),
+    linear-gradient(135deg, #f7e8cf, var(--color-surface-container-lowest) 45%, #f2e4d0);
+}
+
+:root[data-custom-skin-material="soft-cream"] .ide-shell::before {
+  content: "";
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  opacity: var(--custom-skin-grain-alpha, 0.04);
+  background-image: radial-gradient(rgba(117, 91, 70, 0.78) 0.65px, transparent 0.65px);
+  background-size: 5px 5px;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+:root[data-custom-skin-material="soft-cream"] .activity-bar,
+:root[data-custom-skin-material="soft-cream"] .side-panel,
+:root[data-custom-skin-material="soft-cream"] .ai-panel,
+:root[data-custom-skin-material="soft-cream"] .file-view-panel,
+:root[data-custom-skin-material="soft-cream"] .status-bar {
+  position: relative;
+  overflow: hidden;
+  border: var(--custom-skin-line-width, 2px) solid rgba(113, 85, 64, 0.16);
+  border-radius: var(--custom-skin-panel-radius, 24px);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.7), transparent 42%),
+    var(--color-surface-container-low);
+  box-shadow:
+    0 var(--custom-skin-shadow-y, 10px) var(--custom-skin-shadow-blur, 28px) rgba(112, 82, 57, var(--custom-skin-shadow-alpha, 0.12)),
+    inset 0 2px 0 rgba(255, 255, 255, var(--custom-skin-inner-highlight-alpha, 0.72)),
+    inset 0 -3px 0 rgba(133, 99, 70, 0.055);
+}
+
+:root[data-custom-skin-material="soft-cream"] .activity-bar {
+  padding: 12px 0;
+}
+
+:root[data-custom-skin-material="soft-cream"] .resize-handle {
+  margin: 18px 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(113, 85, 64, 0.12);
+}
+
+:root[data-custom-skin-material="soft-cream"] .side-panel-header,
+:root[data-custom-skin-material="soft-cream"] .project-switcher,
+:root[data-custom-skin-material="soft-cream"] .project-section-title,
+:root[data-custom-skin-material="soft-cream"] .sessions-toolbar,
+:root[data-custom-skin-material="soft-cream"] .ai-panel-header,
+:root[data-custom-skin-material="soft-cream"] .memory-box,
+:root[data-custom-skin-material="soft-cream"] .editor-tabs,
+:root[data-custom-skin-material="soft-cream"] .chat-input-wrap {
+  border-color: rgba(111, 86, 67, 0.13);
+  background: linear-gradient(90deg, rgba(248, 217, 222, 0.22), transparent 54%, rgba(191, 224, 207, 0.16));
+}
+
+:root[data-custom-skin-material="soft-cream"] .side-panel-title,
+:root[data-custom-skin-material="soft-cream"] .project-section-title,
+:root[data-custom-skin-material="soft-cream"] .settings-label,
+:root[data-custom-skin-material="soft-cream"] .ai-panel-title,
+:root[data-custom-skin-material="soft-cream"] .file-view-markdown h1,
+:root[data-custom-skin-material="soft-cream"] .file-view-markdown h2,
+:root[data-custom-skin-material="soft-cream"] .message .bubble h1,
+:root[data-custom-skin-material="soft-cream"] .message .bubble h2,
+:root[data-custom-skin-material="soft-cream"] .message .bubble h3 {
+  color: var(--color-on-surface);
+  font-family: Georgia, "Microsoft YaHei", serif;
+  letter-spacing: 0.04em;
+}
+
+:root[data-custom-skin-material="soft-cream"] .settings-section,
+:root[data-custom-skin-material="soft-cream"] .project-create-form,
+:root[data-custom-skin-material="soft-cream"] .custom-skin-card,
+:root[data-custom-skin-material="soft-cream"] .theme-card,
+:root[data-custom-skin-material="soft-cream"] .project-tree-list,
+:root[data-custom-skin-material="soft-cream"] .memory-editor,
+:root[data-custom-skin-material="soft-cream"] .memory-box textarea,
+:root[data-custom-skin-material="soft-cream"] .file-view-markdown,
+:root[data-custom-skin-material="soft-cream"] .file-view-pre,
+:root[data-custom-skin-material="soft-cream"] .file-editor textarea {
+  border: var(--custom-skin-line-width, 2px) solid rgba(113, 85, 64, 0.12);
+  border-radius: var(--custom-skin-bubble-radius, 18px);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.58), transparent 48%),
+    var(--color-surface-container);
+  box-shadow:
+    0 5px 14px rgba(112, 82, 57, 0.075),
+    inset 0 2px 0 rgba(255, 255, 255, var(--custom-skin-inner-highlight-alpha, 0.72));
+}
+
+:root[data-custom-skin-material="soft-cream"] .tree-node,
+:root[data-custom-skin-material="soft-cream"] .session-row,
+:root[data-custom-skin-material="soft-cream"] .sessions-new-btn,
+:root[data-custom-skin-material="soft-cream"] .project-tree-row {
+  border-radius: var(--custom-skin-button-radius, 14px);
+}
+
+:root[data-custom-skin-material="soft-cream"] .tree-node:hover,
+:root[data-custom-skin-material="soft-cream"] .session-row:hover,
+:root[data-custom-skin-material="soft-cream"] .project-tree-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+:root[data-custom-skin-material="soft-cream"] .tree-node.selected,
+:root[data-custom-skin-material="soft-cream"] .session-row.active,
+:root[data-custom-skin-material="soft-cream"] .project-tree-row.active {
+  background: linear-gradient(135deg, rgba(248, 217, 222, 0.72), rgba(255, 250, 239, 0.82));
+  box-shadow: inset 4px 0 rgba(223, 128, 111, 0.48);
+}
+
+:root[data-custom-skin-material="soft-cream"] .message .bubble {
+  border-width: var(--custom-skin-line-width, 2px);
+  border-radius: var(--custom-skin-bubble-radius, 18px);
+  box-shadow:
+    0 6px 16px rgba(111, 82, 57, 0.08),
+    inset 0 2px rgba(255, 255, 255, 0.72);
+}
+
+:root[data-custom-skin-material="soft-cream"] .message.assistant .bubble {
+  border-color: rgba(111, 86, 67, 0.13);
+  border-top-left-radius: 8px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.68), rgba(255, 249, 237, 0.92));
+}
+
+:root[data-custom-skin-material="soft-cream"] .message.user .bubble {
+  border-color: rgba(156, 84, 70, 0.14);
+  border-top-right-radius: 8px;
+  background: linear-gradient(145deg, #fff1e8, #f8ddd5);
+}
+
+:root[data-custom-skin-material="soft-cream"] .tool-card {
+  border-width: var(--custom-skin-line-width, 2px);
+  border-color: rgba(108, 166, 141, 0.2);
+  border-radius: var(--custom-skin-button-radius, 14px);
+  background: linear-gradient(90deg, rgba(191, 224, 207, 0.42), rgba(255, 253, 247, 0.7));
+  box-shadow:
+    0 4px 0 rgba(160, 198, 177, 0.3),
+    0 8px 16px rgba(90, 111, 97, 0.06),
+    inset 0 2px rgba(255, 255, 255, 0.78);
+}
+
+:root[data-custom-skin-material="soft-cream"] .chat-input-box {
+  border-width: var(--custom-skin-line-width, 2px);
+  border-color: rgba(113, 85, 64, 0.15);
+  border-radius: var(--custom-skin-panel-radius, 24px);
+  background: rgba(255, 253, 247, 0.94);
+  box-shadow:
+    0 7px 0 rgba(205, 184, 157, 0.32),
+    0 15px 30px rgba(103, 75, 53, 0.1),
+    inset 0 2px rgba(255, 255, 255, 0.88);
+}
+
+:root[data-custom-skin-material="soft-cream"] .project-create-submit,
+:root[data-custom-skin-material="soft-cream"] .project-create-cancel,
+:root[data-custom-skin-material="soft-cream"] .project-switcher-icon-btn,
+:root[data-custom-skin-material="soft-cream"] .project-create-browse,
+:root[data-custom-skin-material="soft-cream"] .ai-panel-compact-btn,
+:root[data-custom-skin-material="soft-cream"] .chat-input-box .send-btn,
+:root[data-custom-skin-material="soft-cream"] .activity-btn.active {
+  border-radius: var(--custom-skin-button-radius, 14px);
+  box-shadow:
+    0 var(--custom-skin-button-depth, 3px) 0 rgba(156, 84, 70, 0.22),
+    0 8px 14px rgba(112, 82, 57, 0.1),
+    inset 0 2px rgba(255, 255, 255, 0.52);
+  transform: translateY(-1px);
+}
+
+:root[data-custom-skin-material="soft-cream"] .project-create-submit,
+:root[data-custom-skin-material="soft-cream"] .chat-input-box .send-btn,
+:root[data-custom-skin-material="soft-cream"] .activity-btn.active {
+  border-color: rgba(156, 84, 70, 0.13);
+  background: linear-gradient(145deg, #f4b4a5, var(--color-primary));
+  color: #fffdf7;
+}
+
+:root[data-custom-skin-decoration="notebook"] .project-section + .project-section {
+  border-top-style: dashed;
+  border-top-color: rgba(117, 91, 70, 0.18);
+}
+
+:root[data-custom-skin-decoration="notebook"] .ai-panel-messages-shell {
+  background-image: linear-gradient(rgba(126, 101, 80, 0.08) 1px, transparent 1px);
+  background-size: 100% 31px;
+}
+
+:root[data-custom-skin-decoration="notebook"] .ai-panel::after {
+  content: "";
+  position: absolute;
+  z-index: 9;
+  top: 7px;
+  left: 50%;
+  width: 76px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: var(--custom-skin-decoration-density, 0.3);
+  background: #f7dda0;
+  box-shadow: 0 1px 2px rgba(102, 76, 50, 0.09);
+  transform: translateX(-50%) rotate(-1deg);
+  pointer-events: none;
+}
+
+:root[data-custom-skin-decoration="notebook"] .side-panel::after {
+  content: "✿  MY LITTLE LAB";
+  position: absolute;
+  z-index: 9;
+  top: 92px;
+  right: 0;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid rgba(141, 112, 87, 0.12);
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  opacity: var(--custom-skin-decoration-density, 0.3);
+  background: #dfeeda;
+  color: #699178;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  pointer-events: none;
 }
 
 :root[data-theme="paper"] .file-view-markdown,

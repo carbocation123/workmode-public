@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CUSTOM_SKIN_SCHEMA,
+  CUSTOM_SKIN_SCHEMA_V1,
   applyCustomSkinToRoot,
   buildCustomSkinVariables,
   isSupportedSkinFilename,
@@ -40,6 +41,37 @@ const validHud = JSON.stringify({
   }
 })
 
+const validCream = JSON.stringify({
+  schema: CUSTOM_SKIN_SCHEMA,
+  id: 'cream-puff',
+  name: '奶油泡芙实验室',
+  version: '2.0.0',
+  baseTheme: 'paper',
+  tokens: {
+    accent: '#df806f',
+    background: '#f7e8cf',
+    surface: '#fff9ed',
+    text: '#5f5147',
+    lineWidth: 2
+  },
+  material: {
+    preset: 'soft-cream',
+    elevation: 0.72,
+    innerHighlight: 0.84,
+    grain: 0.18,
+    buttonDepth: 4
+  },
+  geometry: {
+    panelRadius: 24,
+    bubbleRadius: 18,
+    buttonRadius: 14
+  },
+  decoration: {
+    preset: 'notebook',
+    density: 0.32
+  }
+})
+
 describe('declarative custom skins', () => {
   it('accepts only JSON skin filenames before reading content', () => {
     expect(isSupportedSkinFilename('neon-ice.workmode-skin.json')).toBe(true)
@@ -53,6 +85,47 @@ describe('declarative custom skins', () => {
     expect(skin.id).toBe('ice-lab')
     expect(skin.tokens.accent).toBe('#55ddff')
     expect(skin.tokens.lineWidth).toBe(2)
+  })
+
+  it('keeps workmode-skin/v1 files backward compatible', () => {
+    const legacy = JSON.parse(valid)
+    legacy.schema = CUSTOM_SKIN_SCHEMA_V1
+    const skin = parseDeclarativeSkin(JSON.stringify(legacy))
+    expect(skin.schema).toBe(CUSTOM_SKIN_SCHEMA_V1)
+    expect(skin.tokens.accent).toBe('#55ddff')
+
+    legacy.material = { preset: 'soft-cream' }
+    expect(() => parseDeclarativeSkin(JSON.stringify(legacy))).toThrow('不支持的字段')
+  })
+
+  it('accepts bounded v2 material, geometry and decoration controls', () => {
+    const skin = parseDeclarativeSkin(validCream)
+    expect(skin.schema).toBe(CUSTOM_SKIN_SCHEMA)
+    expect(skin.material).toEqual(expect.objectContaining({ preset: 'soft-cream', elevation: 0.72 }))
+    expect(skin.geometry).toEqual({ panelRadius: 24, bubbleRadius: 18, buttonRadius: 14 })
+    expect(skin.decoration).toEqual({ preset: 'notebook', density: 0.32 })
+  })
+
+  it('rejects arbitrary material CSS, texture URLs, unknown presets and out-of-range values', () => {
+    const arbitraryShadow = JSON.parse(validCream)
+    arbitraryShadow.material.boxShadow = '0 0 999px red'
+    expect(() => parseDeclarativeSkin(JSON.stringify(arbitraryShadow))).toThrow('不支持的字段')
+
+    const textureUrl = JSON.parse(validCream)
+    textureUrl.material.texture = 'url(https://example.com/grain.png)'
+    expect(() => parseDeclarativeSkin(JSON.stringify(textureUrl))).toThrow('不支持的字段')
+
+    const unknownPreset = JSON.parse(validCream)
+    unknownPreset.material.preset = 'arbitrary-css'
+    expect(() => parseDeclarativeSkin(JSON.stringify(unknownPreset))).toThrow('material.preset')
+
+    const badDepth = JSON.parse(validCream)
+    badDepth.material.buttonDepth = 80
+    expect(() => parseDeclarativeSkin(JSON.stringify(badDepth))).toThrow('0-8')
+
+    const badRadius = JSON.parse(validCream)
+    badRadius.geometry.panelRadius = 200
+    expect(() => parseDeclarativeSkin(JSON.stringify(badRadius))).toThrow('0-32')
   })
 
   it('accepts a pure declarative HUD with bounded labels and geometry presets', () => {
@@ -117,6 +190,17 @@ describe('declarative custom skins', () => {
     expect(Object.keys(variables).every((key) => key.startsWith('--'))).toBe(true)
   })
 
+  it('compiles v2 material controls into finite generated CSS variables', () => {
+    const variables = buildCustomSkinVariables(parseDeclarativeSkin(validCream))
+    expect(variables['--custom-skin-panel-radius']).toBe('24px')
+    expect(variables['--custom-skin-bubble-radius']).toBe('18px')
+    expect(variables['--custom-skin-button-radius']).toBe('14px')
+    expect(variables['--custom-skin-button-depth']).toBe('4px')
+    expect(Number(variables['--custom-skin-shadow-alpha'])).toBeGreaterThan(0)
+    expect(JSON.stringify(variables)).not.toContain('url(')
+    expect(JSON.stringify(variables)).not.toContain('box-shadow')
+  })
+
   it('maps structural choices to inert root data attributes and clears them on disable', () => {
     const properties = new Map<string, string>()
     const root = {
@@ -137,6 +221,22 @@ describe('declarative custom skins', () => {
     expect(root.dataset.customSkinChrome).toBeUndefined()
     expect(root.dataset.customSkinPanel).toBeUndefined()
     expect(root.dataset.customSkinBubble).toBeUndefined()
+  })
+
+  it('maps v2 presets to inert data attributes and clears them on disable', () => {
+    const root = {
+      dataset: {} as Record<string, string>,
+      style: { setProperty: () => undefined, removeProperty: () => undefined }
+    } as unknown as HTMLElement
+    const skin = parseDeclarativeSkin(validCream)
+
+    applyCustomSkinToRoot(root, { version: 1, enabled: true, skin })
+    expect(root.dataset.customSkinMaterial).toBe('soft-cream')
+    expect(root.dataset.customSkinDecoration).toBe('notebook')
+
+    applyCustomSkinToRoot(root, null)
+    expect(root.dataset.customSkinMaterial).toBeUndefined()
+    expect(root.dataset.customSkinDecoration).toBeUndefined()
   })
 
   it('repairs malformed persisted state to no custom skin', () => {

@@ -16,6 +16,7 @@ THEME_PANEL_SOURCE = ROOT / "frontend" / "src" / "ThemePanel.tsx"
 NEON_HUD_SOURCE = ROOT / "frontend" / "src" / "NeonHud.tsx"
 SKIN_CHROME_SOURCE = ROOT / "frontend" / "src" / "SkinChrome.tsx"
 NEON_ASSET_DIR = ROOT / "frontend" / "src" / "assets" / "neon"
+CREAM_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "cream-puff.workmode-skin.json"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
@@ -182,6 +183,27 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('data-custom-skin-panel="continuous"', css)
         self.assertIn('data-custom-skin-bubble="continuous"', css)
         self.assertIn("var(--custom-skin-line-width, var(--neon-line-width, 1px))", css)
+
+    def test_v2_skin_material_engine_uses_bounded_presets(self) -> None:
+        custom_skin_source = (ROOT / "frontend" / "src" / "customSkin.ts").read_text(encoding="utf-8")
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertIn("workmode-skin/v1", custom_skin_source)
+        self.assertIn("workmode-skin/v2", custom_skin_source)
+        self.assertIn("soft-cream", custom_skin_source)
+        self.assertIn("notebook", custom_skin_source)
+        self.assertIn('data-custom-skin-material="soft-cream"', css)
+        self.assertIn('data-custom-skin-decoration="notebook"', css)
+        self.assertIn("--custom-skin-shadow-alpha", css)
+        self.assertIn("border-radius: var(--custom-skin-panel-radius", css)
+        self.assertIn("border-radius: var(--custom-skin-bubble-radius", css)
+        self.assertIn("border-radius: var(--custom-skin-button-radius", css)
+        self.assertNotIn("data:text/css", css)
+
+        example = json.loads(CREAM_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        self.assertEqual(example["schema"], "workmode-skin/v2")
+        self.assertEqual(example["material"]["preset"], "soft-cream")
+        self.assertEqual(example["decoration"]["preset"], "notebook")
 
 
 
