@@ -3,7 +3,16 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { setApiBase } from './api'
 import { initializeDesktop } from './desktop'
+import { ONBOARDING_STORAGE_KEY, parseProgress } from './onboarding'
+import { THEME_STORAGE_KEY, allowedThemeSelection, applyThemeToRoot, parseThemePreference } from './theme'
 import './styles.css'
+
+const initialTheme = parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY))
+initialTheme.selection = allowedThemeSelection(
+  initialTheme.selection,
+  parseProgress(localStorage.getItem(ONBOARDING_STORAGE_KEY)).achievements
+)
+applyThemeToRoot(document.documentElement, initialTheme, window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
 
 async function bootstrap() {
   const root = ReactDOM.createRoot(document.getElementById('root')!)
