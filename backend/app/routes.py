@@ -13,13 +13,14 @@ from fastapi.responses import StreamingResponse
 from . import files, storage, tutorial_project
 from .chat_runs import ChatAlreadyRunningError, chat_runs
 from .config import APP_VERSION, get_settings, update_env_file
-from .llm import stream_openai_compatible
+from .llm import ModelProbeError, probe_openai_compatible, stream_openai_compatible
 from .models import (
     ActiveProjectUpdate,
     ChatRequest,
     CompactRequest,
     FileWriteRequest,
     MemoryUpdate,
+    ModelConnectionTest,
     ModelSettingsUpdate,
     ProjectCreate,
     ProjectUpdate,
@@ -107,6 +108,34 @@ def update_model_settings(payload: ModelSettingsUpdate) -> dict[str, object]:
 
     update_env_file(updates)
     return {"settings": _settings_payload()}
+
+
+@router.post("/settings/model/test")
+async def test_model_connection(payload: ModelConnectionTest) -> dict[str, object]:
+    current = get_settings()
+    base_url = (
+        payload.model_base_url.strip().rstrip("/")
+        if payload.model_base_url is not None
+        else current.model_base_url
+    )
+    model_name = payload.model_name.strip() if payload.model_name is not None else current.model_name
+    draft_key = payload.model_api_key.strip() if payload.model_api_key is not None else ""
+    api_key = draft_key or current.model_api_key or ""
+    if not base_url:
+        raise HTTPException(status_code=400, detail="请先填写模型 Base URL")
+    if not model_name:
+        raise HTTPException(status_code=400, detail="请先填写模型名称")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请先填写 API Key")
+    try:
+        return await probe_openai_compatible(
+            base_url=base_url,
+            api_key=api_key,
+            model_name=model_name,
+            timeout_seconds=current.request_timeout_seconds,
+        )
+    except ModelProbeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/work/projects")

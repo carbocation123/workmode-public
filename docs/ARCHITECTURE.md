@@ -56,6 +56,8 @@ FastAPI backend
 - `work_state.py`：项目/全局结构化记忆和当前任务计划。
 - `tutorial_project.py`：官方教程标识、安装、重置、备份和新会话切换。
 
+`POST /api/settings/model/test` 接受尚未保存的 Base URL、模型名和可选 API Key，执行一个最多 8 token 的非流式 Chat Completions 探测。草稿不会写入 `.env`；前端只在探测成功后调用既有设置保存接口。后端把认证、地址/模型不存在、限流/余额、上游故障、超时和非兼容 JSON 转成面向普通用户的错误说明，不回显 API Key 或上游正文。
+
 ## 本地数据模型
 
 桌面壳显式设置 `WORKMODE_PUBLIC_DATA_DIR=%LOCALAPPDATA%\WorkmodePublic\data`，配置文件和日志位于同一应用根目录的其他子目录：
@@ -178,6 +180,14 @@ FastAPI backend
 AI 回复、压缩摘要和 Markdown 文件预览共用 `MarkdownRenderer.tsx`。渲染器启用 `remark-gfm`，把管道表格解析为语义化 HTML；table 外层滚动容器避免宽列撑破聊天布局。
 
 文件面板支持 UTF-8 文本、Markdown 预览/编辑、PDF 和常见图片。二进制格式不会作为文本读取。PDF/图片通过经过校验的媒体端点提供，而不是直接暴露任意本地路径。
+
+### 首次引导、教程任务与成就
+
+`frontend/src/onboarding.ts` 是纯状态模型：定义首次引导阶段、六项教程任务、十个成就及产品事件到任务/成就的映射；解析本地状态时只保留白名单 ID，损坏或未来版本状态回退到欢迎页。`OnboardingUI.tsx` 只负责欢迎/模型/入口向导、DOM 高亮指引、教程任务卡、成就提示和设置页成就列表。
+
+状态保存在当前桌面 WebView 的 `localStorage` 键 `workmode-public-onboarding-v1`，不进入后端数据目录、项目文件、JSONL 或模型上下文。所有解锁都来自真实前端事件：模型探测成功、项目创建、PDF 打开、消息发送、成功工具结果、Markdown 保存、上下文查看和手动压缩。React 状态更新器保持纯函数；独立 effect 负责一次性成就提示，避免 StrictMode 重复触发副作用。
+
+引导高亮通过固定 `data-guide` 锚点定位项目、文件、聊天、上下文、文件查看器和输入框。用户可以跳过并在设置中重新播放。教程重置只重置任务清单；历史成就保留。
 
 ## 桌面生命周期与更新
 

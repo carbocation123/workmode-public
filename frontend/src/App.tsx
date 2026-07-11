@@ -26,6 +26,25 @@ import {
 } from './conversation'
 import { directoryPaths, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import {
+  AchievementPanel,
+  AchievementToast,
+  FirstRunWizard,
+  GuidedTour,
+  TutorialChecklist,
+  type ModelDraft
+} from './OnboardingUI'
+import {
+  ACHIEVEMENTS,
+  ONBOARDING_STORAGE_KEY,
+  applyProductEvent,
+  parseProgress,
+  resetTutorialTasks,
+  tutorialComplete,
+  type AchievementDefinition,
+  type ProductEvent,
+  type TutorialTaskId
+} from './onboarding'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -176,6 +195,15 @@ export default function App() {
   const [desktopUpdateVersion, setDesktopUpdateVersion] = useState<string | null>(null)
   const [desktopUpdating, setDesktopUpdating] = useState(false)
   const [desktopUpdateProgress, setDesktopUpdateProgress] = useState(0)
+  const [onboardingProgress, setOnboardingProgress] = useState(() => parseProgress(localStorage.getItem(ONBOARDING_STORAGE_KEY)))
+  const [modelTesting, setModelTesting] = useState(false)
+  const [modelTestStatus, setModelTestStatus] = useState('')
+  const [modelTestOk, setModelTestOk] = useState(false)
+  const [guideAfterProjectCreate, setGuideAfterProjectCreate] = useState(false)
+  const [tutorialChecklistCollapsed, setTutorialChecklistCollapsed] = useState(false)
+  const [achievementToast, setAchievementToast] = useState<AchievementDefinition | null>(null)
+  const [showContextDetails, setShowContextDetails] = useState(false)
+  const announcedAchievementsRef = useRef(new Set(Object.keys(onboardingProgress.achievements)))
 
   const activeProject = useMemo(
     () => projects.find((item) => item.slug === activeSlug) || null,
@@ -196,6 +224,53 @@ export default function App() {
   const historyIncluded = typeof context?.history_messages_included === 'number' ? context.history_messages_included : undefined
   const historyTotal = typeof context?.history_messages_total === 'number' ? context.history_messages_total : undefined
   const historyDropped = typeof context?.history_messages_dropped === 'number' ? context.history_messages_dropped : undefined
+
+  function recordProductEvent(event: ProductEvent) {
+    setOnboardingProgress((previous) => {
+      const result = applyProductEvent(previous, event)
+      return result.progress
+    })
+  }
+
+  function setOnboardingStage(stage: typeof onboardingProgress.stage, tourStep = onboardingProgress.tourStep) {
+    setOnboardingProgress((previous) => ({ ...previous, stage, tourStep }))
+  }
+
+  function replayOnboarding() {
+    setActivePanel('project')
+    setModelTestStatus('')
+    setModelTestOk(false)
+    setOnboardingProgress((previous) => ({ ...previous, stage: 'welcome', tourStep: 0 }))
+  }
+
+  useEffect(() => {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(onboardingProgress))
+  }, [onboardingProgress])
+
+  useEffect(() => {
+    if (!achievementToast) return
+    const timer = window.setTimeout(() => setAchievementToast(null), 4200)
+    return () => window.clearTimeout(timer)
+  }, [achievementToast])
+
+  useEffect(() => {
+    const newlyUnlocked = ACHIEVEMENTS.find((achievement) => (
+      onboardingProgress.achievements[achievement.id]
+      && !announcedAchievementsRef.current.has(achievement.id)
+    ))
+    if (!newlyUnlocked) return
+    announcedAchievementsRef.current.add(newlyUnlocked.id)
+    setAchievementToast(newlyUnlocked)
+  }, [onboardingProgress.achievements])
+
+  useEffect(() => {
+    if (!activeProject?.is_tutorial || !tutorialComplete(onboardingProgress)) return
+    if (onboardingProgress.achievements.tutorial_graduate) return
+    setOnboardingProgress((previous) => {
+      const result = applyProductEvent(previous, 'tutorial_completed')
+      return { ...result.progress, stage: 'complete' }
+    })
+  }, [activeProject?.is_tutorial, onboardingProgress])
 
   async function refreshProjects() {
     const payload = await api.projects()
@@ -337,6 +412,42 @@ export default function App() {
     }
   }
 
+  async function testModelConnection(saveAfterSuccess: boolean) {
+    if (modelTesting) return
+    setModelTesting(true)
+    setModelTestStatus('正在连接模型服务…')
+    setModelTestOk(false)
+    setError('')
+    try {
+      const tested = await api.testModelConnection({
+        model_base_url: settingsDraft.model_base_url.trim(),
+        model_name: settingsDraft.model_name.trim(),
+        model_api_key: settingsDraft.model_api_key.trim() || undefined
+      })
+      if (saveAfterSuccess) {
+        const saved = await api.saveModelSettings({
+          model_base_url: settingsDraft.model_base_url.trim(),
+          model_name: settingsDraft.model_name.trim(),
+          model_api_key: settingsDraft.model_api_key.trim() || undefined,
+          context_budget_tokens: Number(settingsDraft.context_budget_tokens),
+          request_timeout_seconds: Number(settingsDraft.request_timeout_seconds)
+        })
+        setSettings(saved.settings)
+        setSettingsDraft((previous) => ({ ...previous, model_api_key: '' }))
+      }
+      setModelTestOk(true)
+      setModelTestStatus(`✓ ${tested.message} · ${tested.model} · ${tested.latency_ms} ms`)
+      setStatus('模型连接测试成功')
+      recordProductEvent('model_connected')
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message : String(exc)
+      setModelTestStatus(`连接失败：${message}`)
+      setModelTestOk(false)
+    } finally {
+      setModelTesting(false)
+    }
+  }
+
   async function checkDesktopUpdate() {
     setDesktopUpdateStatus('正在检查更新…')
     setError('')
@@ -413,9 +524,14 @@ export default function App() {
     await refreshProjects()
     setActiveSlug(created.project.slug)
     setSessionId(created.session.id)
+    recordProductEvent('project_created')
+    if (guideAfterProjectCreate) {
+      setGuideAfterProjectCreate(false)
+      setOnboardingProgress((previous) => ({ ...previous, stage: 'tour', tourStep: 0 }))
+    }
   }
 
-  async function createTutorialProject() {
+  async function createTutorialProject(startGuide = false) {
     if (pickingFolder || installingTutorial) return
     setPickingFolder(true)
     setInstallingTutorial(true)
@@ -433,6 +549,12 @@ export default function App() {
       setSelectedFile(null)
       setFileContent(null)
       setStatus('教程项目已创建；发送“开始教程”即可体验')
+      recordProductEvent('project_created')
+      setOnboardingProgress((previous) => ({
+        ...resetTutorialTasks(previous),
+        stage: startGuide ? 'tour' : previous.stage,
+        tourStep: startGuide ? 0 : previous.tourStep
+      }))
     } catch (exc) {
       setError(String(exc))
     } finally {
@@ -461,6 +583,7 @@ export default function App() {
       await loadProject(result.project.slug)
       setSessionId(result.session.id)
       setStatus(`教程已重置；恢复前备份：${result.backup_path}`)
+      setOnboardingProgress((previous) => resetTutorialTasks(previous))
     } catch (exc) {
       setError(String(exc))
     } finally {
@@ -562,6 +685,7 @@ export default function App() {
     setFileDraft('')
     setEditing(false)
     if (!activeSlug) return
+    if (isPdf(entry.path)) recordProductEvent('pdf_opened')
     if (entry.preview === 'text') {
       const content = await api.readFile(activeSlug, entry.path)
       setFileContent(content)
@@ -576,6 +700,7 @@ export default function App() {
     setFileDraft(saved.content)
     setEditing(false)
     setStatus('Markdown 已保存')
+    recordProductEvent('markdown_saved')
   }
 
   async function saveMemory() {
@@ -597,6 +722,7 @@ export default function App() {
       setContext(result.context)
       await loadMessages(sessionId)
       setStatus(`上下文已压缩：摘要 #${result.compaction.compaction_seq}，压缩 ${result.compaction.summarized_count} 条`)
+      recordProductEvent('context_compacted')
     } catch (exc) {
       setError(String(exc))
     } finally {
@@ -616,6 +742,7 @@ export default function App() {
     setInput('')
     setStreaming(true)
     setError('')
+    recordProductEvent('message_sent')
     let placeholderId = ''
     let assistantText = ''
     let segmentIndex = 0
@@ -651,6 +778,11 @@ export default function App() {
           }
           placeholderId = ''
           assistantText = ''
+        }
+        if (event.type === 'tool_result' && event.ok !== false) {
+          const toolName = String(event.name || '')
+          if (toolName === 'web_search' || toolName === 'web_fetch') recordProductEvent('web_researched')
+          if (toolName === 'project_python' || toolName === 'project_python_file' || toolName === 'project_bash') recordProductEvent('analysis_run')
         }
         if (event.type === 'tool_result') {
           const changed = Array.isArray(event.changed_paths) ? event.changed_paths : []
@@ -715,6 +847,39 @@ export default function App() {
     }
   }
 
+  function chooseOwnProjectFromOnboarding() {
+    setActivePanel('project')
+    setShowCreate(true)
+    setGuideAfterProjectCreate(true)
+    setOnboardingStage('complete', 0)
+    setStatus('请在左侧选择自己的项目文件夹；创建后会继续界面指引')
+  }
+
+  function handleTutorialTask(taskId: TutorialTaskId, prompt?: string) {
+    setActivePanel('project')
+    if (prompt) {
+      setInput(prompt)
+      setStatus('示例指令已填入输入框；检查后按 Ctrl+Enter 发送')
+      window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-guide="composer"] textarea')?.focus(), 0)
+      return
+    }
+    if (taskId === 'view_context') {
+      setShowContextDetails(true)
+      recordProductEvent('context_viewed')
+      setStatus('已打开上下文明细')
+      return
+    }
+    if (taskId === 'open_pdf') setStatus('请在左侧文件树的 papers/ 中点击 PDF 文件')
+    if (taskId === 'edit_markdown') setStatus('请从左侧打开一份 Markdown，在右侧点“编辑”并保存')
+  }
+
+  function openProjectAfterTutorial() {
+    setTutorialChecklistCollapsed(true)
+    setActivePanel('project')
+    setShowCreate(true)
+    setStatus('选择一个正式工作文件夹，开始你的项目')
+  }
+
   function startResize(event: React.MouseEvent) {
     event.preventDefault()
     const startX = event.clientX
@@ -770,7 +935,7 @@ export default function App() {
 
         {activePanel === 'project' ? (
           <div className="project-panel">
-            <section className="project-switcher">
+            <section className="project-switcher" data-guide="projects">
               <div className="project-switcher-row">
                 <label className="project-switcher-label">项目</label>
                 <span className="project-switcher-spacer" />
@@ -827,7 +992,7 @@ export default function App() {
                 <button
                   type="button"
                   className="project-create-cancel"
-                  onClick={createTutorialProject}
+                  onClick={() => createTutorialProject()}
                   disabled={pickingFolder || installingTutorial || streaming}
                 >
                   {installingTutorial ? '创建教程中…' : '创建教程项目'}
@@ -901,7 +1066,7 @@ export default function App() {
               {error && <div className="project-switcher-error">{error}</div>}
             </section>
 
-            <section className="project-section">
+            <section className="project-section" data-guide="files">
               <div className="project-section-title">文件</div>
               <div className="project-section-body project-section-body-tree">
                 {activeSlug ? (
@@ -1055,7 +1220,11 @@ export default function App() {
                 <input
                   className="project-create-input"
                   value={settingsDraft.model_base_url}
-                  onChange={(event) => setSettingsDraft({ ...settingsDraft, model_base_url: event.target.value })}
+                  onChange={(event) => {
+                    setSettingsDraft({ ...settingsDraft, model_base_url: event.target.value })
+                    setModelTestOk(false)
+                    setModelTestStatus('')
+                  }}
                   placeholder="https://api.example.com/v1"
                 />
               </label>
@@ -1064,7 +1233,11 @@ export default function App() {
                 <input
                   className="project-create-input"
                   value={settingsDraft.model_name}
-                  onChange={(event) => setSettingsDraft({ ...settingsDraft, model_name: event.target.value })}
+                  onChange={(event) => {
+                    setSettingsDraft({ ...settingsDraft, model_name: event.target.value })
+                    setModelTestOk(false)
+                    setModelTestStatus('')
+                  }}
                   placeholder="deepseek-v4-pro"
                 />
               </label>
@@ -1074,7 +1247,11 @@ export default function App() {
                   className="project-create-input"
                   type="password"
                   value={settingsDraft.model_api_key}
-                  onChange={(event) => setSettingsDraft({ ...settingsDraft, model_api_key: event.target.value })}
+                  onChange={(event) => {
+                    setSettingsDraft({ ...settingsDraft, model_api_key: event.target.value })
+                    setModelTestOk(false)
+                    setModelTestStatus('')
+                  }}
                   placeholder={settings?.model_api_key_set ? '已配置；留空则不修改' : '未配置'}
                   disabled={clearApiKey}
                 />
@@ -1114,14 +1291,40 @@ export default function App() {
               <div className="settings-hint">
                 API Key 不会回显；保存后写入本地 .env，下一轮聊天请求立即生效。
               </div>
-              <button
-                type="button"
-                className="project-create-submit"
-                onClick={saveModelSettings}
-                disabled={settingsSaving || !settingsDraft.model_base_url.trim() || !settingsDraft.model_name.trim()}
-              >
-                {settingsSaving ? '保存中…' : '保存模型设置'}
-              </button>
+              {modelTestStatus && <div className={modelTestOk ? 'settings-test-result success' : 'settings-test-result'}>{modelTestStatus}</div>}
+              <div className="settings-button-row">
+                <button
+                  type="button"
+                  className="project-create-cancel"
+                  onClick={() => testModelConnection(false)}
+                  disabled={modelTesting || !settingsDraft.model_base_url.trim() || !settingsDraft.model_name.trim()}
+                >
+                  {modelTesting ? '测试中…' : '测试连接'}
+                </button>
+                <button
+                  type="button"
+                  className="project-create-submit"
+                  onClick={saveModelSettings}
+                  disabled={settingsSaving || !settingsDraft.model_base_url.trim() || !settingsDraft.model_name.trim()}
+                >
+                  {settingsSaving ? '保存中…' : '保存模型设置'}
+                </button>
+              </div>
+            </section>
+            <section className="settings-section">
+              <div className="settings-label">新手引导与成就</div>
+              <p className="settings-hint">引导和成就只保存在本机，不上传，不影响项目文件或对话。</p>
+              <div className="settings-button-row">
+                <button type="button" className="project-create-submit" onClick={replayOnboarding}>重新播放新手引导</button>
+                <button
+                  type="button"
+                  className="project-create-cancel"
+                  onClick={() => setOnboardingProgress((previous) => resetTutorialTasks(previous))}
+                >
+                  重置教程清单
+                </button>
+              </div>
+              <AchievementPanel progress={onboardingProgress} />
             </section>
             <section className="settings-section">
               <div className="settings-label">连接</div>
@@ -1154,7 +1357,7 @@ export default function App() {
       </aside>
 
       <main className="ai-panel">
-        <header className="ai-panel-header">
+        <header className="ai-panel-header" data-guide="context">
           <div className="ai-panel-header-top">
             <span className="ai-panel-title">AI 助手</span>
             <span className="ai-panel-meta">
@@ -1174,9 +1377,14 @@ export default function App() {
             </button>
           </div>
           {context && (
-            <div
+            <button
+              type="button"
               className={`ai-panel-token-bar ${context.over_budget ? 'over-threshold' : ''}`}
               title={`估算 ${formatTokens(contextTotal)} / ${formatTokens(contextBudget)} tokens`}
+              onClick={() => {
+                setShowContextDetails((value) => !value)
+                recordProductEvent('context_viewed')
+              }}
             >
               <div className="ai-panel-token-bar-fill" style={{ width: `${contextPct.toFixed(2)}%` }} />
               <span className="ai-panel-token-bar-label">
@@ -1187,7 +1395,17 @@ export default function App() {
                 {context.has_summary ? ' · 有摘要' : ''}
                 {context.import_errors?.length ? ` · 导入警告 ${context.import_errors.length}` : ''}
               </span>
-            </div>
+            </button>
+          )}
+          {context && showContextDetails && (
+            <section className="context-detail-popover">
+              <div><span>总估算</span><strong>{formatTokens(contextTotal)} tok</strong></div>
+              <div><span>预算</span><strong>{formatTokens(contextBudget)} tok</strong></div>
+              <div><span>历史</span><strong>{formatTokens(context.history_tokens)} tok</strong></div>
+              <div><span>纳入消息</span><strong>{historyIncluded ?? context.history_message_count ?? 0}</strong></div>
+              <div><span>固定导入</span><strong>{context.imported_files?.length || 0} 个文件</strong></div>
+              <div><span>状态</span><strong>{context.over_budget ? '超出预算' : context.has_summary ? '已有摘要' : '正常'}</strong></div>
+            </section>
           )}
         </header>
 
@@ -1199,7 +1417,7 @@ export default function App() {
           </section>
         )}
 
-        <div className="ai-panel-messages-shell">
+        <div className="ai-panel-messages-shell" data-guide="chat">
           <section
             className="ai-panel-messages"
             ref={messagesViewportRef}
@@ -1233,7 +1451,7 @@ export default function App() {
           )}
         </div>
 
-        <footer className="chat-input-wrap">
+        <footer className="chat-input-wrap" data-guide="composer">
           {error && <div className="inline-error">{error}</div>}
           <div className="chat-input-box">
             <textarea
@@ -1261,7 +1479,7 @@ export default function App() {
 
       <div className="resize-handle" onMouseDown={startResize} />
 
-      <aside className="file-view-panel">
+      <aside className="file-view-panel" data-guide="viewer">
         <header className="editor-tabs">
           <div className={selectedFile ? 'editor-tab active' : 'editor-tab'}>
             <span>{selectedFile?.name || '欢迎'}</span>
@@ -1337,6 +1555,52 @@ export default function App() {
         </span>
         <span className="status-segment status-segment-meta">{status}</span>
       </footer>
+
+      <FirstRunWizard
+        stage={onboardingProgress.stage}
+        draft={{
+          model_base_url: settingsDraft.model_base_url,
+          model_name: settingsDraft.model_name,
+          model_api_key: settingsDraft.model_api_key
+        } satisfies ModelDraft}
+        savedKey={Boolean(settings?.model_api_key_set)}
+        busy={modelTesting || pickingFolder || installingTutorial}
+        connectionStatus={modelTestStatus}
+        connectionOk={modelTestOk}
+        onDraftChange={(draft) => {
+          setSettingsDraft((previous) => ({ ...previous, ...draft }))
+          setModelTestOk(false)
+          setModelTestStatus('')
+        }}
+        onNext={() => setOnboardingStage(onboardingProgress.stage === 'welcome' ? 'model' : 'choice')}
+        onBack={() => setOnboardingStage(onboardingProgress.stage === 'choice' ? 'model' : 'welcome')}
+        onSkip={() => setOnboardingStage('complete', 0)}
+        onTestAndSave={() => testModelConnection(true)}
+        onChooseTutorial={() => createTutorialProject(true)}
+        onChooseProject={chooseOwnProjectFromOnboarding}
+      />
+
+      {onboardingProgress.stage === 'tour' && (
+        <GuidedTour
+          step={onboardingProgress.tourStep}
+          onStep={(tourStep) => setOnboardingProgress((previous) => ({ ...previous, tourStep }))}
+          onDone={() => setOnboardingStage('complete', 0)}
+          onSkip={() => setOnboardingStage('complete', 0)}
+        />
+      )}
+
+      {activeProject?.is_tutorial && onboardingProgress.stage === 'complete' && (
+        <TutorialChecklist
+          progress={onboardingProgress}
+          collapsed={tutorialChecklistCollapsed}
+          onCollapsed={setTutorialChecklistCollapsed}
+          onTask={handleTutorialTask}
+          onOpenProject={openProjectAfterTutorial}
+          onResetTutorial={resetTutorialProject}
+        />
+      )}
+
+      {achievementToast && <AchievementToast achievement={achievementToast} />}
     </div>
   )
 }

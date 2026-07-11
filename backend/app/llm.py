@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -10,6 +11,65 @@ import httpx
 
 from .config import get_settings
 from .project_tools import PROJECT_TOOL_SCHEMAS, execute_project_tool, project_tool_names
+
+
+class ModelProbeError(RuntimeError):
+    pass
+
+
+async def probe_openai_compatible(
+    *,
+    base_url: str,
+    api_key: str,
+    model_name: str,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """Run one tiny, non-streaming request without persisting the draft settings."""
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model_name,
+        "messages": [{"role": "user", "content": "Reply with OK."}],
+        "stream": False,
+        "max_tokens": 8,
+    }
+    timeout = httpx.Timeout(min(timeout_seconds, 30.0), connect=min(timeout_seconds, 10.0))
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, headers=headers, json=payload)
+    except httpx.TimeoutException as exc:
+        raise ModelProbeError("模型连接超时，请检查 Base URL、网络或代理设置") from exc
+    except httpx.HTTPError as exc:
+        raise ModelProbeError(f"无法连接模型服务：{exc.__class__.__name__}") from exc
+
+    if response.status_code in {401, 403}:
+        raise ModelProbeError("API Key 无效，或当前账号没有访问该模型的权限")
+    if response.status_code == 404:
+        raise ModelProbeError("Base URL 或模型名称不存在，请检查地址是否包含正确的 /v1 路径")
+    if response.status_code == 429:
+        raise ModelProbeError("模型服务限流、余额不足或配额已用完")
+    if response.status_code >= 500:
+        raise ModelProbeError(f"模型服务暂时不可用（HTTP {response.status_code}）")
+    if response.status_code >= 400:
+        raise ModelProbeError(f"模型服务拒绝请求（HTTP {response.status_code}）")
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise ModelProbeError("服务返回的不是 OpenAI-compatible JSON") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("choices"), list):
+        raise ModelProbeError("服务响应缺少 choices，可能不兼容 OpenAI Chat Completions API")
+
+    return {
+        "ok": True,
+        "message": "模型连接成功",
+        "model": str(data.get("model") or model_name),
+        "latency_ms": max(1, round((time.perf_counter() - started) * 1000)),
+    }
 
 
 async def stream_openai_compatible(
