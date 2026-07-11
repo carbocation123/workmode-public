@@ -24,11 +24,12 @@ import {
   isNearBottom,
   type ToolConversationItem
 } from './conversation'
-import { directoryPaths, visibleFileEntries } from './fileTree'
+import { directoryPaths, fileEntryVisual, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import {
   AchievementPanel,
   AchievementToast,
+  DeepSeekSetupGuide,
   FirstRunWizard,
   GuidedTour,
   TutorialChecklist,
@@ -287,7 +288,7 @@ export default function App() {
     ])
     setSessions(sessionPayload.sessions)
     setEntries(treePayload.entries)
-    setExpandedDirs(directoryPaths(treePayload.entries))
+    setExpandedDirs(new Set())
     setMemoryDraft(memoryPayload.project)
     if (sessionPayload.sessions[0]) {
       setSessionId(sessionPayload.sessions[0].id)
@@ -1071,23 +1072,26 @@ export default function App() {
               <div className="project-section-body project-section-body-tree">
                 {activeSlug ? (
                   <div className="file-explorer-tree">
-                    {visibleEntries.map((entry) => (
-                      <button
-                        type="button"
-                        key={entry.path}
-                        className={selectedFile?.path === entry.path ? 'tree-node selected' : 'tree-node'}
-                        style={{ paddingLeft: 6 + fileDepth(entry.path) * 12 }}
-                        onClick={() => openFile(entry).catch((exc) => setError(String(exc)))}
-                        title={entry.path}
-                        aria-expanded={entry.kind === 'dir' ? expandedDirs.has(entry.path) : undefined}
-                      >
-                        <span className="tree-node-icon">
-                          {entry.kind === 'dir' ? (expandedDirs.has(entry.path) ? '▾' : '▸') : entry.preview === 'media' ? '◇' : entry.preview === 'text' ? '·' : '×'}
-                        </span>
-                        <span className="tree-node-name">{entry.name}</span>
-                        {entry.kind === 'file' && <span className="tree-node-size">{entry.preview}</span>}
-                      </button>
-                    ))}
+                    {visibleEntries.map((entry) => {
+                      const expanded = entry.kind === 'dir' && expandedDirs.has(entry.path)
+                      const visual = fileEntryVisual(entry, expanded)
+                      return (
+                        <button
+                          type="button"
+                          key={entry.path}
+                          className={selectedFile?.path === entry.path ? 'tree-node selected' : 'tree-node'}
+                          style={{ paddingLeft: 6 + fileDepth(entry.path) * 12 }}
+                          onClick={() => openFile(entry).catch((exc) => setError(String(exc)))}
+                          title={`${entry.path} · ${visual.label}`}
+                          aria-expanded={entry.kind === 'dir' ? expanded : undefined}
+                        >
+                          <span className="tree-node-chevron" aria-hidden>{entry.kind === 'dir' ? (expanded ? '▾' : '▸') : ''}</span>
+                          <span className="tree-node-icon" aria-hidden>{visual.icon}</span>
+                          <span className="tree-node-name">{entry.name}</span>
+                          <span className="tree-node-kind">{visual.label}</span>
+                        </button>
+                      )
+                    })}
                     {entries.length === 0 && <div className="file-explorer-empty">暂无可显示文件</div>}
                   </div>
                 ) : (
@@ -1215,6 +1219,18 @@ export default function App() {
             )}
             <section className="settings-section">
               <div className="settings-label">模型 API</div>
+              <DeepSeekSetupGuide
+                draft={{
+                  model_base_url: settingsDraft.model_base_url,
+                  model_name: settingsDraft.model_name,
+                  model_api_key: settingsDraft.model_api_key
+                }}
+                onDraftChange={(draft) => {
+                  setSettingsDraft((previous) => ({ ...previous, ...draft }))
+                  setModelTestOk(false)
+                  setModelTestStatus('')
+                }}
+              />
               <label className="settings-field">
                 <span>Base URL</span>
                 <input

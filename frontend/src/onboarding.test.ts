@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACHIEVEMENTS,
+  DEEPSEEK_SETUP,
   EMPTY_PROGRESS,
+  applyDeepSeekPreset,
   applyProductEvent,
   parseProgress
 } from './onboarding'
@@ -40,5 +42,23 @@ describe('onboarding progress', () => {
     expect(parsed.achievements.unknown).toBeUndefined()
     expect(parsed.tutorialTasks).toEqual(['open_pdf'])
     expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(9)
+  })
+
+  it('provides current official DeepSeek setup links and safe presets', () => {
+    expect(DEEPSEEK_SETUP.signInUrl).toBe('https://platform.deepseek.com/sign_in')
+    expect(DEEPSEEK_SETUP.apiKeysUrl).toBe('https://platform.deepseek.com/api_keys')
+    expect(DEEPSEEK_SETUP.topUpUrl).toBe('https://platform.deepseek.com/top_up')
+    expect(DEEPSEEK_SETUP.baseUrl).toBe('https://api.deepseek.com')
+    expect(DEEPSEEK_SETUP.models).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash'])
+
+    expect(applyDeepSeekPreset({
+      model_base_url: 'https://old.example/v1',
+      model_name: 'old-model',
+      model_api_key: 'keep-this-local-key'
+    }, 'deepseek-v4-pro')).toEqual({
+      model_base_url: 'https://api.deepseek.com',
+      model_name: 'deepseek-v4-pro',
+      model_api_key: 'keep-this-local-key'
+    })
   })
 })

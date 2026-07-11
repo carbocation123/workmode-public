@@ -1,6 +1,6 @@
 [package]
 name = "workmode-public"
-version = "0.4.0"
+version = "0.4.1"
 description = "Local-first research work assistant"
 authors = ["Jason Yang"]
 edition = "2021"
@@ -20,6 +20,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"

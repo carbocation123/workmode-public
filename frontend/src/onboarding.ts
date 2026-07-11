@@ -46,6 +46,32 @@ export interface OnboardingProgress {
   achievements: Record<string, string>
 }
 
+export type DeepSeekModel = 'deepseek-v4-pro' | 'deepseek-v4-flash'
+
+export interface ModelPresetDraft {
+  model_base_url: string
+  model_name: string
+  model_api_key: string
+}
+
+export const DEEPSEEK_SETUP = {
+  signInUrl: 'https://platform.deepseek.com/sign_in',
+  apiKeysUrl: 'https://platform.deepseek.com/api_keys',
+  topUpUrl: 'https://platform.deepseek.com/top_up',
+  docsUrl: 'https://api-docs.deepseek.com/',
+  pricingUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
+  baseUrl: 'https://api.deepseek.com',
+  models: ['deepseek-v4-pro', 'deepseek-v4-flash'] as DeepSeekModel[]
+}
+
+export function applyDeepSeekPreset<T extends ModelPresetDraft>(draft: T, model: DeepSeekModel): T {
+  return {
+    ...draft,
+    model_base_url: DEEPSEEK_SETUP.baseUrl,
+    model_name: model
+  }
+}
+
 export const ACHIEVEMENTS: AchievementDefinition[] = [
   { id: 'engine_online', icon: '◉', title: '引擎点亮', description: '成功连接第一个模型 API', event: 'model_connected' },
   { id: 'project_home', icon: '▣', title: '建立基地', description: '创建或打开第一个科研项目', event: 'project_created' },

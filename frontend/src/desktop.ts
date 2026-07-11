@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type DownloadEvent } from '@tauri-apps/plugin-updater'
 import { runDesktopUpdateFlow } from './desktopUpdateFlow'
@@ -35,6 +36,14 @@ export async function initializeDesktop(): Promise<DesktopInfo | null> {
 
 export function getDesktopInfo() {
   return desktopInfo
+}
+
+export async function openExternalUrl(url: string) {
+  if (isDesktopApp()) {
+    await openUrl(url)
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 export async function checkForDesktopUpdate(): Promise<DesktopUpdateInfo | null> {

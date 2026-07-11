@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
+import { openExternalUrl } from './desktop'
 
 import {
   ACHIEVEMENTS,
+  DEEPSEEK_SETUP,
   TUTORIAL_TASKS,
+  applyDeepSeekPreset,
   type AchievementDefinition,
+  type DeepSeekModel,
   type OnboardingProgress,
   type OnboardingStage,
   type TutorialTaskId
@@ -13,6 +17,55 @@ export interface ModelDraft {
   model_base_url: string
   model_name: string
   model_api_key: string
+}
+
+interface DeepSeekSetupGuideProps {
+  draft: ModelDraft
+  defaultOpen?: boolean
+  onDraftChange: (draft: ModelDraft) => void
+}
+
+export function DeepSeekSetupGuide({ draft, defaultOpen = false, onDraftChange }: DeepSeekSetupGuideProps) {
+  const [guideOpen, setGuideOpen] = useState(defaultOpen)
+
+  function applyPreset(model: DeepSeekModel) {
+    onDraftChange(applyDeepSeekPreset(draft, model))
+  }
+
+  function externalLink(url: string) {
+    void openExternalUrl(url)
+  }
+
+  return (
+    <details className="deepseek-setup-guide" open={guideOpen} onToggle={(event) => setGuideOpen(event.currentTarget.open)}>
+      <summary>如何申请 DeepSeek API</summary>
+      <div className="deepseek-setup-content">
+        <ol>
+          <li>
+            <strong>注册或登录 DeepSeek 开放平台</strong>
+            <span>这是模型 API 的官方管理后台。</span>
+            <button type="button" className="deepseek-link" onClick={() => externalLink(DEEPSEEK_SETUP.signInUrl)}>打开 DeepSeek 开放平台 ↗</button>
+          </li>
+          <li>
+            <strong>充值 API 余额</strong>
+            <span>调用按 token 扣费，价格可能调整，请以官方页面为准。</span>
+            <button type="button" className="deepseek-link" onClick={() => externalLink(DEEPSEEK_SETUP.topUpUrl)}>充值与价格 ↗</button>
+          </li>
+          <li>
+            <strong>创建 API Key</strong>
+            <span>创建后复制到下方输入框。不要把 Key 发进聊天、项目文件或截图。</span>
+            <button type="button" className="deepseek-link" onClick={() => externalLink(DEEPSEEK_SETUP.apiKeysUrl)}>创建 API Key ↗</button>
+          </li>
+        </ol>
+        <div className="deepseek-preset-actions">
+          <button type="button" onClick={() => applyPreset('deepseek-v4-pro')}>一键填入 V4 Pro</button>
+          <button type="button" onClick={() => applyPreset('deepseek-v4-flash')}>一键填入 V4 Flash</button>
+          <button type="button" className="deepseek-link" onClick={() => externalLink(DEEPSEEK_SETUP.docsUrl)}>官方 API 文档 ↗</button>
+        </div>
+        <p>推荐科研主任务使用 V4 Pro；更看重速度和成本时使用 V4 Flash。预设只填写官方 Base URL 和模型名，不会读取、上传或覆盖 API Key。</p>
+      </div>
+    </details>
+  )
 }
 
 interface WizardProps {
@@ -55,6 +108,7 @@ export function FirstRunWizard(props: WizardProps) {
           <>
             <h1>连接你的模型 API</h1>
             <p>连接测试不会保存草稿；测试成功后才会把配置写入本机。</p>
+            <DeepSeekSetupGuide draft={props.draft} defaultOpen onDraftChange={props.onDraftChange} />
             <label className="onboarding-field">
               <span>Base URL</span>
               <input value={props.draft.model_base_url} onChange={(event) => props.onDraftChange({ ...props.draft, model_base_url: event.target.value })} placeholder="https://api.example.com/v1" />

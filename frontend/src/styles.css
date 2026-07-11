@@ -456,10 +456,20 @@ pre {
 }
 
 .tree-node-icon {
-  width: 12px;
+  display: grid;
+  place-items: center;
+  width: 18px;
   color: var(--color-on-surface-subtle);
   flex-shrink: 0;
+  font-size: 13px;
+}
+
+.tree-node-chevron {
+  width: 10px;
+  color: var(--color-on-surface-dim);
+  flex-shrink: 0;
   font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
 }
 
 .tree-node-name,
@@ -470,11 +480,18 @@ pre {
   text-overflow: ellipsis;
 }
 
-.tree-node-size {
+.tree-node-size,
+.tree-node-kind {
   font-size: 10px;
   color: var(--color-on-surface-dim);
   font-family: "JetBrains Mono", Consolas, monospace;
   flex-shrink: 0;
+}
+
+.tree-node-kind {
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sessions-toolbar {
@@ -1441,6 +1458,89 @@ pre {
   border-color: rgba(88, 201, 135, 0.35);
   background: rgba(88, 201, 135, 0.08);
   color: var(--color-success);
+}
+
+.deepseek-setup-guide {
+  margin: 0 0 14px;
+  border: 1px solid rgba(108, 159, 255, 0.28);
+  border-radius: 9px;
+  background: rgba(108, 159, 255, 0.05);
+}
+
+.deepseek-setup-guide summary {
+  padding: 10px 12px;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.deepseek-setup-content {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.deepseek-setup-content ol {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.deepseek-setup-content li {
+  padding-left: 3px;
+}
+
+.deepseek-setup-content li strong,
+.deepseek-setup-content li span {
+  display: block;
+}
+
+.deepseek-setup-content li strong {
+  font-size: 12px;
+}
+
+.deepseek-setup-content li span,
+.deepseek-setup-content > p {
+  color: var(--color-on-surface-dim);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.deepseek-link {
+  width: fit-content;
+  padding: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.deepseek-link:hover {
+  text-decoration: underline;
+}
+
+.deepseek-preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.deepseek-preset-actions button {
+  padding: 6px 9px;
+  border: 1px solid rgba(108, 159, 255, 0.35);
+  border-radius: 6px;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+  font-size: 10px;
+}
+
+.deepseek-preset-actions button:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
 }
 
 .onboarding-overlay {
