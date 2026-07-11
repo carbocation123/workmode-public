@@ -14,7 +14,7 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 首次启动会显示可跳过的新手向导：模型草稿先做连接探测，成功后才落本机配置；DeepSeek 新用户可从向导打开官方注册、充值和 API Key 页面，并一键填入官方 V4 Pro/Flash 配置；随后用户选择教程或自己的项目，并通过六步界面高亮开始工作。外部链接由 Tauri Opener 在系统浏览器打开，capability 仅允许 DeepSeek 官方平台和文档域名。引导、教程任务和成就状态保存在桌面 WebView 本地存储，不写进用户项目或模型上下文。
 
-皮肤偏好和降低动效开关也保存在 WebView 本地存储。升级或覆盖安装不迁移、上传或写入项目；若本地值损坏或来自未来不兼容版本，前端回退到稳定的实验室主题。Origin Ring 的解锁只读取本地教程毕业成就，基础亮色、暗色和高对比皮肤始终可用。
+皮肤偏好和降低动效开关也保存在 WebView 本地存储。升级或覆盖安装不迁移、上传或写入项目；若本地值损坏或来自未来不兼容版本，前端回退到稳定的实验室主题。Origin Ring 与 Neon Space Lab 的解锁只读取本地教程毕业成就，基础亮色、暗色和高对比皮肤始终可用。Neon Space Lab 随前端源码编译进安装包，只包含项目原创 React/CSS；参考用 Rainmeter 包中的可执行文件、脚本、字体、图片和配置均不进入仓库或 Release。
 
 用户状态位于 `%LOCALAPPDATA%\WorkmodePublic`，不放进安装目录：
 

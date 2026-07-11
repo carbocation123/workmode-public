@@ -13,6 +13,8 @@ APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
 ONBOARDING_SOURCE = ROOT / "frontend" / "src" / "OnboardingUI.tsx"
 THEME_SOURCE = ROOT / "frontend" / "src" / "theme.ts"
 THEME_PANEL_SOURCE = ROOT / "frontend" / "src" / "ThemePanel.tsx"
+NEON_HUD_SOURCE = ROOT / "frontend" / "src" / "NeonHud.tsx"
+SKIN_CHROME_SOURCE = ROOT / "frontend" / "src" / "SkinChrome.tsx"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
@@ -110,6 +112,26 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('[data-theme="origin-ring"]', css)
         self.assertIn('[data-theme="high-contrast"]', css)
         self.assertIn('[data-reduced-motion="true"]', css)
+
+    def test_neon_space_lab_skin_binds_real_workmode_status(self) -> None:
+        app_source = APP_SOURCE.read_text(encoding="utf-8")
+        theme_source = THEME_SOURCE.read_text(encoding="utf-8")
+        hud_source = NEON_HUD_SOURCE.read_text(encoding="utf-8")
+        chrome_source = SKIN_CHROME_SOURCE.read_text(encoding="utf-8")
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertIn("neon-space-lab", theme_source)
+        self.assertIn("<SkinChrome", app_source)
+        self.assertIn("<NeonHud", chrome_source)
+        self.assertIn("SKIN_CHROME_REGISTRY", chrome_source)
+        self.assertIn("SkinRuntimeProps", chrome_source)
+        self.assertIn("layout: 'hud'", theme_source)
+        self.assertIn("contextPct", app_source)
+        self.assertIn("neon-context-ring", app_source)
+        self.assertIn("MODEL LINK", hud_source)
+        self.assertIn("ACTIVE MISSION", hud_source)
+        self.assertIn('data-theme="neon-space-lab"', css)
+        self.assertIn(".neon-tool-scan", css)
 
 
 if __name__ == "__main__":

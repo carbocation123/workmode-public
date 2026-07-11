@@ -26,6 +26,7 @@ import {
 } from './conversation'
 import { directoryPaths, fileEntryVisual, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { SkinChrome } from './SkinChrome'
 import { ThemePanel } from './ThemePanel'
 import {
   AchievementPanel,
@@ -49,9 +50,11 @@ import {
 } from './onboarding'
 import {
   THEME_STORAGE_KEY,
+  THEMES,
   allowedThemeSelection,
   applyThemeToRoot,
-  parseThemePreference
+  parseThemePreference,
+  resolveTheme
 } from './theme'
 
 type ActivePanel = 'project' | 'settings'
@@ -101,6 +104,7 @@ function ToolMessage({ item }: { item: ToolConversationItem }) {
   return (
     <article className="message tool">
       <div className={`tool-card ${item.status}`}>
+        <span className="neon-tool-scan" aria-hidden />
         <div className="tool-card-header">
           <span className="tool-card-dot" />
           <span className="tool-card-name">{item.toolName}</span>
@@ -237,6 +241,8 @@ export default function App() {
   const contextTotal = context?.total_tokens_estimate || context?.estimated_prompt_tokens || context?.prompt_tokens_estimate || 0
   const contextBudget = context?.budget_tokens || 0
   const contextPct = contextBudget ? Math.min(100, (Number(contextTotal) / contextBudget) * 100) : 0
+  const resolvedTheme = resolveTheme(themePreference.selection, systemPrefersDark)
+  const hudLayoutActive = THEMES.find((theme) => theme.id === resolvedTheme)?.layout === 'hud'
   const historyIncluded = typeof context?.history_messages_included === 'number' ? context.history_messages_included : undefined
   const historyTotal = typeof context?.history_messages_total === 'number' ? context.history_messages_total : undefined
   const historyDropped = typeof context?.history_messages_dropped === 'number' ? context.history_messages_dropped : undefined
@@ -931,9 +937,19 @@ export default function App() {
       className="ide-shell"
       style={{
         gridTemplateColumns: `48px 280px minmax(420px, 1fr) 6px ${rightWidth}px`,
-        gridTemplateRows: '1fr 24px'
+        gridTemplateRows: hudLayoutActive ? '48px minmax(0, 1fr) 27px' : '1fr 24px'
       }}
     >
+      {hudLayoutActive && (
+        <SkinChrome
+          themeId={resolvedTheme}
+          projectName={activeProject?.name}
+          projectPath={activeProject?.root_path}
+          modelName={settings?.model_name}
+          streaming={streaming}
+          status={status}
+        />
+      )}
       <nav className="activity-bar" aria-label="主活动栏">
         <div className="activity-bar-top">
           <button
@@ -1112,6 +1128,7 @@ export default function App() {
                           onClick={() => openFile(entry).catch((exc) => setError(String(exc)))}
                           title={`${entry.path} · ${visual.label}`}
                           aria-expanded={entry.kind === 'dir' ? expanded : undefined}
+                          data-file-kind={visual.label}
                         >
                           <span className="tree-node-chevron" aria-hidden>{entry.kind === 'dir' ? (expanded ? '▾' : '▸') : ''}</span>
                           <span className="tree-node-icon" aria-hidden>{visual.icon}</span>
@@ -1416,6 +1433,29 @@ export default function App() {
             <span className="ai-panel-meta">
               {activeProject ? `${activeProject.name} · ${activeProject.root_path}` : '打开一个项目文件夹开始'}
             </span>
+            {hudLayoutActive && (
+              <button
+                type="button"
+                className="neon-context-cluster"
+                title={`上下文估算 ${formatTokens(contextTotal)} / ${formatTokens(contextBudget)} tokens`}
+                onClick={() => {
+                  setShowContextDetails((value) => !value)
+                  recordProductEvent('context_viewed')
+                }}
+              >
+                <span className="neon-context-copy">
+                  <small>CONTEXT CAPACITY</small>
+                  <strong>{formatTokens(contextTotal)} / {formatTokens(contextBudget)} TOK</strong>
+                  <em>HISTORY {historyIncluded ?? 0} / {historyTotal ?? 0}</em>
+                </span>
+                <span
+                  className="neon-context-ring"
+                  style={{ background: `conic-gradient(var(--color-primary) 0 ${contextPct}%, rgba(67, 232, 255, .08) ${contextPct}% 100%)` }}
+                >
+                  <strong>{Math.round(contextPct)}%</strong>
+                </span>
+              </button>
+            )}
             <button
               type="button"
               className="ai-panel-compact-btn"

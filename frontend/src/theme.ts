@@ -1,6 +1,6 @@
 export const THEME_STORAGE_KEY = 'workmode-public-theme-v1'
 
-export type ThemeId = 'lab' | 'origin-ring' | 'paper' | 'observatory' | 'high-contrast'
+export type ThemeId = 'lab' | 'origin-ring' | 'neon-space-lab' | 'paper' | 'observatory' | 'high-contrast'
 export type ThemeSelection = 'system' | ThemeId
 
 export interface ThemeDefinition {
@@ -9,6 +9,7 @@ export interface ThemeDefinition {
   description: string
   icon: string
   swatches: [string, string, string]
+  layout?: 'standard' | 'hud'
   unlockAchievement?: string
   unlockHint?: string
 }
@@ -33,6 +34,16 @@ export const THEMES: ThemeDefinition[] = [
     description: '深蓝环形微光与科研仪器质感',
     icon: '◎',
     swatches: ['#040817', '#0d1933', '#54b9ff'],
+    unlockAchievement: 'tutorial_graduate',
+    unlockHint: '完成科研协作教程后解锁'
+  },
+  {
+    id: 'neon-space-lab',
+    name: 'Neon Space Lab',
+    description: '完整舰桥 HUD、遥测仪表与青蓝扫描光',
+    icon: '⌬',
+    swatches: ['#02060b', '#071c2a', '#43e8ff'],
+    layout: 'hud',
     unlockAchievement: 'tutorial_graduate',
     unlockHint: '完成科研协作教程后解锁'
   },

@@ -23,15 +23,19 @@ describe('theme preferences', () => {
 
   it('keeps accessibility themes available and unlocks Origin Ring after tutorial graduation', () => {
     const origin = THEMES.find((theme) => theme.id === 'origin-ring')!
+    const neonSpace = THEMES.find((theme) => theme.id === 'neon-space-lab')!
     const paper = THEMES.find((theme) => theme.id === 'paper')!
     const contrast = THEMES.find((theme) => theme.id === 'high-contrast')!
 
     expect(themeIsUnlocked(origin, {})).toBe(false)
+    expect(themeIsUnlocked(neonSpace, {})).toBe(false)
     expect(themeIsUnlocked(origin, { tutorial_graduate: '2026-07-11T00:00:00Z' })).toBe(true)
+    expect(themeIsUnlocked(neonSpace, { tutorial_graduate: '2026-07-11T00:00:00Z' })).toBe(true)
     expect(themeIsUnlocked(paper, {})).toBe(true)
     expect(themeIsUnlocked(contrast, {})).toBe(true)
     expect(allowedThemeSelection('origin-ring', {})).toBe('lab')
     expect(allowedThemeSelection('origin-ring', { tutorial_graduate: '2026-07-11T00:00:00Z' })).toBe('origin-ring')
+    expect(allowedThemeSelection('neon-space-lab', { tutorial_graduate: '2026-07-11T00:00:00Z' })).toBe('neon-space-lab')
   })
 
   it('preserves valid local preferences including reduced motion', () => {
