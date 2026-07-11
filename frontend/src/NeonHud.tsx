@@ -15,6 +15,8 @@ export function NeonHud({ projectName, projectPath, modelName, streaming, status
 
   return (
     <header className="neon-hud" aria-label="Neon Space Lab 舰桥状态栏">
+      <span className="neon-hud-rail rail-primary" aria-hidden />
+      <span className="neon-hud-rail rail-secondary" aria-hidden />
       <div className="neon-brand">
         <span className="neon-brand-ring" aria-hidden />
         <span className="neon-brand-copy"><strong>WORKMODE</strong><small>NEON SPACE LAB</small></span>

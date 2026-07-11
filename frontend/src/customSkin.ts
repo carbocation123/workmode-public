@@ -1,0 +1,208 @@
+import type { ThemeId } from './theme'
+
+export const CUSTOM_SKIN_STORAGE_KEY = 'workmode-public-custom-skin-v1'
+export const CUSTOM_SKIN_SCHEMA = 'workmode-skin/v1'
+export const CUSTOM_SKIN_MAX_BYTES = 32 * 1024
+
+const THEME_IDS = new Set<ThemeId>(['lab', 'origin-ring', 'neon-space-lab', 'paper', 'observatory', 'high-contrast'])
+const TOP_LEVEL_KEYS = new Set(['schema', 'id', 'name', 'version', 'baseTheme', 'tokens'])
+const TOKEN_KEYS = new Set(['accent', 'background', 'surface', 'text', 'panelOpacity', 'lineWidth', 'radius', 'glow'])
+const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/
+const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
+
+export function isSupportedSkinFilename(name: string) {
+  return name.toLowerCase().endsWith('.json')
+}
+
+export interface DeclarativeSkinTokens {
+  accent?: string
+  background?: string
+  surface?: string
+  text?: string
+  panelOpacity?: number
+  lineWidth?: number
+  radius?: number
+  glow?: number
+}
+
+export interface DeclarativeSkin {
+  schema: typeof CUSTOM_SKIN_SCHEMA
+  id: string
+  name: string
+  version: string
+  baseTheme: ThemeId
+  tokens: DeclarativeSkinTokens
+}
+
+export interface CustomSkinState {
+  version: 1
+  enabled: boolean
+  skin: DeclarativeSkin
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function assertKnownKeys(value: Record<string, unknown>, allowed: Set<string>, label: string) {
+  const unknown = Object.keys(value).filter((key) => !allowed.has(key))
+  if (unknown.length) throw new Error(`${label}包含不支持的字段：${unknown.join(', ')}`)
+}
+
+function requiredString(value: unknown, label: string, maxLength: number) {
+  if (typeof value !== 'string' || !value.trim() || value.length > maxLength) {
+    throw new Error(`${label}必须是 1-${maxLength} 个字符的字符串`)
+  }
+  return value.trim()
+}
+
+function optionalColor(value: unknown, label: string) {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || !COLOR_PATTERN.test(value)) throw new Error(`${label}必须是 #RRGGBB 颜色`)
+  return value.toLowerCase()
+}
+
+function optionalNumber(value: unknown, label: string, min: number, max: number) {
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`${label}必须在 ${min}-${max} 之间`)
+  }
+  return value
+}
+
+export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error('皮肤文件不是有效 JSON')
+  }
+  if (!isObject(parsed)) throw new Error('皮肤文件顶层必须是对象')
+  assertKnownKeys(parsed, TOP_LEVEL_KEYS, '皮肤文件')
+  if (parsed.schema !== CUSTOM_SKIN_SCHEMA) throw new Error(`schema 必须是 ${CUSTOM_SKIN_SCHEMA}`)
+
+  const id = requiredString(parsed.id, 'id', 40)
+  if (!ID_PATTERN.test(id)) throw new Error('id 只能包含小写字母、数字和连字符')
+  const name = requiredString(parsed.name, 'name', 48)
+  const version = requiredString(parsed.version, 'version', 32)
+  if (!VERSION_PATTERN.test(version)) throw new Error('version 必须是 SemVer，例如 1.0.0')
+  if (typeof parsed.baseTheme !== 'string' || !THEME_IDS.has(parsed.baseTheme as ThemeId)) {
+    throw new Error('baseTheme 不是受支持的内置主题')
+  }
+  if (!isObject(parsed.tokens)) throw new Error('tokens 必须是对象')
+  assertKnownKeys(parsed.tokens, TOKEN_KEYS, 'tokens')
+
+  const tokens: DeclarativeSkinTokens = {
+    accent: optionalColor(parsed.tokens.accent, 'accent'),
+    background: optionalColor(parsed.tokens.background, 'background'),
+    surface: optionalColor(parsed.tokens.surface, 'surface'),
+    text: optionalColor(parsed.tokens.text, 'text'),
+    panelOpacity: optionalNumber(parsed.tokens.panelOpacity, 'panelOpacity', 0, 0.8),
+    lineWidth: optionalNumber(parsed.tokens.lineWidth, 'lineWidth', 1, 4),
+    radius: optionalNumber(parsed.tokens.radius, 'radius', 0, 24),
+    glow: optionalNumber(parsed.tokens.glow, 'glow', 0, 1)
+  }
+  Object.keys(tokens).forEach((key) => {
+    if (tokens[key as keyof DeclarativeSkinTokens] === undefined) delete tokens[key as keyof DeclarativeSkinTokens]
+  })
+  if (!Object.keys(tokens).length) throw new Error('tokens 至少需要一个视觉参数')
+
+  return {
+    schema: CUSTOM_SKIN_SCHEMA,
+    id,
+    name,
+    version,
+    baseTheme: parsed.baseTheme as ThemeId,
+    tokens
+  }
+}
+
+export function parseCustomSkinState(raw: string | null): CustomSkinState | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!isObject(parsed) || parsed.version !== 1 || typeof parsed.enabled !== 'boolean') return null
+    return {
+      version: 1,
+      enabled: parsed.enabled,
+      skin: parseDeclarativeSkin(JSON.stringify(parsed.skin))
+    }
+  } catch {
+    return null
+  }
+}
+
+function hexRgb(color: string) {
+  return {
+    r: Number.parseInt(color.slice(1, 3), 16),
+    g: Number.parseInt(color.slice(3, 5), 16),
+    b: Number.parseInt(color.slice(5, 7), 16)
+  }
+}
+
+function rgba(color: string, alpha: number) {
+  const { r, g, b } = hexRgb(color)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+export function buildCustomSkinVariables(skin: DeclarativeSkin): Record<string, string> {
+  const variables: Record<string, string> = {}
+  const accent = skin.tokens.accent || '#43e8ff'
+  const surface = skin.tokens.surface || '#07111a'
+  const glow = skin.tokens.glow ?? 0.45
+
+  if (skin.tokens.accent) {
+    variables['--color-primary'] = accent
+    variables['--color-primary-hover'] = accent
+    variables['--color-primary-container'] = rgba(accent, 0.14)
+    variables['--color-primary-border'] = rgba(accent, 0.48)
+    variables['--color-primary-soft'] = rgba(accent, 0.08)
+    variables['--color-primary-glow'] = rgba(accent, glow)
+    variables['--neon-hologram-edge'] = rgba(accent, 0.88)
+    variables['--neon-panel-edge'] = rgba(accent, 0.72)
+  }
+  if (skin.tokens.background) {
+    variables['--color-surface-container-lowest'] = skin.tokens.background
+    variables['--theme-app-background'] = skin.tokens.background
+  }
+  if (skin.tokens.surface) {
+    variables['--color-surface-container-low'] = surface
+    variables['--color-surface-container'] = surface
+    variables['--color-surface-container-high'] = surface
+  }
+  if (skin.tokens.text) {
+    variables['--color-on-surface'] = skin.tokens.text
+    variables['--color-on-surface-variant'] = skin.tokens.text
+  }
+  if (skin.tokens.panelOpacity !== undefined) {
+    variables['--neon-panel-glass'] = rgba(surface, skin.tokens.panelOpacity)
+  }
+  if (skin.tokens.lineWidth !== undefined) {
+    variables['--neon-line-width'] = `${skin.tokens.lineWidth}px`
+    variables['--custom-skin-line-width'] = `${skin.tokens.lineWidth}px`
+  }
+  if (skin.tokens.radius !== undefined) {
+    variables['--neon-content-radius'] = `${skin.tokens.radius}px`
+    variables['--custom-skin-radius'] = `${skin.tokens.radius}px`
+  }
+  variables['--custom-skin-glow'] = String(glow)
+  return variables
+}
+
+const CUSTOM_PROPERTIES = [
+  '--color-primary', '--color-primary-hover', '--color-primary-container', '--color-primary-border',
+  '--color-primary-soft', '--color-primary-glow', '--color-surface-container-lowest',
+  '--color-surface-container-low', '--color-surface-container', '--color-surface-container-high',
+  '--color-on-surface', '--color-on-surface-variant', '--theme-app-background', '--neon-hologram-edge',
+  '--neon-panel-edge', '--neon-panel-glass', '--neon-line-width', '--neon-content-radius',
+  '--custom-skin-line-width', '--custom-skin-radius', '--custom-skin-glow'
+]
+
+export function applyCustomSkinToRoot(root: HTMLElement, state: CustomSkinState | null) {
+  CUSTOM_PROPERTIES.forEach((property) => root.style.removeProperty(property))
+  delete root.dataset.customSkin
+  if (!state?.enabled) return
+  root.dataset.customSkin = state.skin.id
+  Object.entries(buildCustomSkinVariables(state.skin)).forEach(([property, value]) => root.style.setProperty(property, value))
+}

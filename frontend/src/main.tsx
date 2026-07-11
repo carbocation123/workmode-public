@@ -3,16 +3,23 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { setApiBase } from './api'
 import { initializeDesktop } from './desktop'
+import { CUSTOM_SKIN_STORAGE_KEY, applyCustomSkinToRoot, parseCustomSkinState } from './customSkin'
 import { ONBOARDING_STORAGE_KEY, parseProgress } from './onboarding'
 import { THEME_STORAGE_KEY, allowedThemeSelection, applyThemeToRoot, parseThemePreference } from './theme'
 import './styles.css'
 
+let initialCustomSkin = parseCustomSkinState(localStorage.getItem(CUSTOM_SKIN_STORAGE_KEY))
 const initialTheme = parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY))
+if (initialCustomSkin?.enabled) initialTheme.selection = initialCustomSkin.skin.baseTheme
 initialTheme.selection = allowedThemeSelection(
   initialTheme.selection,
   parseProgress(localStorage.getItem(ONBOARDING_STORAGE_KEY)).achievements
 )
+if (initialCustomSkin?.enabled && initialTheme.selection !== initialCustomSkin.skin.baseTheme) {
+  initialCustomSkin = { ...initialCustomSkin, enabled: false }
+}
 applyThemeToRoot(document.documentElement, initialTheme, window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
+applyCustomSkinToRoot(document.documentElement, initialCustomSkin)
 
 async function bootstrap() {
   const root = ReactDOM.createRoot(document.getElementById('root')!)
