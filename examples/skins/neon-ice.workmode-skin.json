@@ -1,0 +1,17 @@
+{
+  "schema": "workmode-skin/v1",
+  "id": "neon-ice",
+  "name": "Neon Ice",
+  "version": "1.0.0",
+  "baseTheme": "neon-space-lab",
+  "tokens": {
+    "accent": "#66e8ff",
+    "background": "#02070c",
+    "surface": "#07111a",
+    "text": "#e6fbff",
+    "panelOpacity": 0.12,
+    "lineWidth": 2,
+    "radius": 4,
+    "glow": 0.45
+  }
+}

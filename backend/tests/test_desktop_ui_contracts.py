@@ -15,6 +15,7 @@ THEME_SOURCE = ROOT / "frontend" / "src" / "theme.ts"
 THEME_PANEL_SOURCE = ROOT / "frontend" / "src" / "ThemePanel.tsx"
 NEON_HUD_SOURCE = ROOT / "frontend" / "src" / "NeonHud.tsx"
 SKIN_CHROME_SOURCE = ROOT / "frontend" / "src" / "SkinChrome.tsx"
+NEON_ASSET_DIR = ROOT / "frontend" / "src" / "assets" / "neon"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
@@ -132,6 +133,51 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("ACTIVE MISSION", hud_source)
         self.assertIn('data-theme="neon-space-lab"', css)
         self.assertIn(".neon-tool-scan", css)
+
+    def test_neon_space_lab_hud_uses_original_holographic_material_assets(self) -> None:
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertTrue((NEON_ASSET_DIR / "glass-reflection.svg").is_file())
+        self.assertTrue((NEON_ASSET_DIR / "surface-noise.svg").is_file())
+        self.assertIn("--neon-material-glass", css)
+        self.assertIn("--neon-hologram-edge", css)
+        self.assertIn(".neon-hud-rail", css)
+        self.assertNotIn("neon-corner-fastener", css)
+        self.assertNotIn(".run/", css)
+        self.assertNotIn("rainmeter", css.lower())
+
+    def test_neon_space_lab_workspace_shares_holographic_material_tokens(self) -> None:
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertIn("--neon-panel-glass", css)
+        self.assertIn("--neon-panel-edge", css)
+        self.assertIn("--neon-panel-highlight", css)
+        self.assertIn("--neon-line-width: 2px", css)
+        self.assertIn("--neon-content-radius: 4px", css)
+        self.assertIn("background-color: var(--neon-panel-glass)", css)
+        self.assertIn('data-theme="neon-space-lab"] .ai-panel-messages-shell', css)
+        self.assertIn('data-theme="neon-space-lab"] .chat-input-box', css)
+        self.assertIn('data-theme="neon-space-lab"] .file-view-panel', css)
+        self.assertIn("--neon-bubble-shape", css)
+        self.assertIn("clip-path: var(--neon-bubble-shape)", css)
+        self.assertIn("--neon-panel-shape", css)
+        self.assertIn("clip-path: var(--neon-panel-shape)", css)
+
+    def test_settings_use_full_workspace_and_safe_declarative_skin_import(self) -> None:
+        app_source = APP_SOURCE.read_text(encoding="utf-8")
+        theme_panel = THEME_PANEL_SOURCE.read_text(encoding="utf-8")
+        css = STYLES.read_text(encoding="utf-8")
+
+        self.assertIn("settings-open", app_source)
+        self.assertIn("settings-section-model", app_source)
+        self.assertIn("customSkin={customSkin}", app_source)
+        self.assertIn("parseDeclarativeSkin", theme_panel)
+        self.assertIn("CUSTOM_SKIN_MAX_BYTES", theme_panel)
+        self.assertIn('accept=".json,.workmode-skin.json,application/json"', theme_panel)
+        self.assertIn(".settings-open .side-panel", css)
+        self.assertIn("grid-column: 2 / -1", css)
+        self.assertIn(".custom-skin-loader", css)
+
 
 
 if __name__ == "__main__":

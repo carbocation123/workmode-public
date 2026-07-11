@@ -26,6 +26,11 @@ import {
 } from './conversation'
 import { directoryPaths, fileEntryVisual, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import {
+  CUSTOM_SKIN_STORAGE_KEY,
+  applyCustomSkinToRoot,
+  parseCustomSkinState
+} from './customSkin'
 import { SkinChrome } from './SkinChrome'
 import { ThemePanel } from './ThemePanel'
 import {
@@ -208,11 +213,19 @@ export default function App() {
   const [desktopUpdating, setDesktopUpdating] = useState(false)
   const [desktopUpdateProgress, setDesktopUpdateProgress] = useState(0)
   const [onboardingProgress, setOnboardingProgress] = useState(() => parseProgress(localStorage.getItem(ONBOARDING_STORAGE_KEY)))
+  const [customSkin, setCustomSkin] = useState(() => {
+    const parsed = parseCustomSkinState(localStorage.getItem(CUSTOM_SKIN_STORAGE_KEY))
+    if (parsed?.enabled && allowedThemeSelection(parsed.skin.baseTheme, onboardingProgress.achievements) !== parsed.skin.baseTheme) {
+      return { ...parsed, enabled: false }
+    }
+    return parsed
+  })
   const [themePreference, setThemePreference] = useState(() => {
     const parsed = parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY))
+    const selection = customSkin?.enabled ? customSkin.skin.baseTheme : parsed.selection
     return {
       ...parsed,
-      selection: allowedThemeSelection(parsed.selection, onboardingProgress.achievements)
+      selection: allowedThemeSelection(selection, onboardingProgress.achievements)
     }
   })
   const [systemPrefersDark, setSystemPrefersDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
@@ -279,8 +292,11 @@ export default function App() {
 
   useEffect(() => {
     applyThemeToRoot(document.documentElement, themePreference, systemPrefersDark)
+    applyCustomSkinToRoot(document.documentElement, customSkin)
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themePreference))
-  }, [themePreference, systemPrefersDark])
+    if (customSkin) localStorage.setItem(CUSTOM_SKIN_STORAGE_KEY, JSON.stringify(customSkin))
+    else localStorage.removeItem(CUSTOM_SKIN_STORAGE_KEY)
+  }, [themePreference, systemPrefersDark, customSkin])
 
   useEffect(() => {
     if (!achievementToast) return
@@ -934,10 +950,10 @@ export default function App() {
 
   return (
     <div
-      className="ide-shell"
+      className={`ide-shell${activePanel === 'settings' ? ' settings-open' : ''}${hudLayoutActive ? ' hud-layout' : ''}`}
       style={{
         gridTemplateColumns: `48px 280px minmax(420px, 1fr) 6px ${rightWidth}px`,
-        gridTemplateRows: hudLayoutActive ? '48px minmax(0, 1fr) 27px' : '1fr 24px'
+        gridTemplateRows: hudLayoutActive ? '58px minmax(0, 1fr) 27px' : '1fr 24px'
       }}
     >
       {hudLayoutActive && (
@@ -1217,7 +1233,7 @@ export default function App() {
         ) : (
           <div className="settings-panel">
             {desktopInfo && (
-              <section className="settings-section desktop-settings-section">
+              <section className="settings-section desktop-settings-section settings-section-desktop">
                 <div className="settings-label">桌面应用</div>
                 <div className="desktop-version-row">
                   <span>当前版本</span>
@@ -1262,7 +1278,7 @@ export default function App() {
                 <div className="settings-hint">关闭应用窗口会同时停止本地后端；最小化后可从托盘重新显示，也可从托盘停止并退出。</div>
               </section>
             )}
-            <section className="settings-section">
+            <section className="settings-section settings-section-model">
               <div className="settings-label">模型 API</div>
               <DeepSeekSetupGuide
                 draft={{
@@ -1372,16 +1388,18 @@ export default function App() {
                 </button>
               </div>
             </section>
-            <section className="settings-section">
+            <section className="settings-section settings-section-theme">
               <div className="settings-label">外观与皮肤</div>
               <ThemePanel
                 preference={themePreference}
                 achievements={onboardingProgress.achievements}
                 systemPrefersDark={systemPrefersDark}
                 onChange={setThemePreference}
+                customSkin={customSkin}
+                onCustomSkinChange={setCustomSkin}
               />
             </section>
-            <section className="settings-section">
+            <section className="settings-section settings-section-onboarding">
               <div className="settings-label">新手引导与成就</div>
               <p className="settings-hint">引导和成就只保存在本机，不上传，不影响项目文件或对话。</p>
               <div className="settings-button-row">
@@ -1396,7 +1414,7 @@ export default function App() {
               </div>
               <AchievementPanel progress={onboardingProgress} />
             </section>
-            <section className="settings-section">
+            <section className="settings-section settings-section-connection">
               <div className="settings-label">连接</div>
               <div className="settings-api">{API_BASE}</div>
               <input
@@ -1407,7 +1425,7 @@ export default function App() {
               />
               <button type="button" className="project-create-submit" onClick={applyToken}>保存 token</button>
             </section>
-            <section className="settings-section">
+            <section className="settings-section settings-section-memory">
               <div className="settings-label">项目工作记忆</div>
               <p className="settings-hint">支持独占一行 <code>@相对路径.md</code> 固定注入上下文。</p>
               <textarea
