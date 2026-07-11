@@ -1,11 +1,16 @@
 import type { ThemeId } from './theme'
 
 export const CUSTOM_SKIN_STORAGE_KEY = 'workmode-public-custom-skin-v1'
-export const CUSTOM_SKIN_SCHEMA = 'workmode-skin/v1'
+export const CUSTOM_SKIN_SCHEMA_V1 = 'workmode-skin/v1'
+export const CUSTOM_SKIN_SCHEMA = 'workmode-skin/v2'
 export const CUSTOM_SKIN_MAX_BYTES = 32 * 1024
 
 const THEME_IDS = new Set<ThemeId>(['lab', 'origin-ring', 'neon-space-lab', 'paper', 'observatory', 'high-contrast'])
-const TOP_LEVEL_KEYS = new Set(['schema', 'id', 'name', 'version', 'baseTheme', 'tokens', 'chrome'])
+const V1_TOP_LEVEL_KEYS = new Set(['schema', 'id', 'name', 'version', 'baseTheme', 'tokens', 'chrome'])
+const V2_TOP_LEVEL_KEYS = new Set([
+  'schema', 'id', 'name', 'version', 'baseTheme', 'tokens', 'chrome',
+  'material', 'geometry', 'decoration'
+])
 const TOKEN_KEYS = new Set(['accent', 'background', 'surface', 'text', 'panelOpacity', 'lineWidth', 'radius', 'glow'])
 const CHROME_KEYS = new Set([
   'type', 'title', 'subtitle', 'missionLabel', 'modelLabel', 'stateLabel', 'timeLabel',
@@ -13,6 +18,11 @@ const CHROME_KEYS = new Set([
 ])
 const PANEL_GEOMETRIES = new Set<DeclarativeHudChrome['panelGeometry']>(['stepped', 'continuous'])
 const BUBBLE_GEOMETRIES = new Set<DeclarativeHudChrome['bubbleGeometry']>(['mirrored', 'continuous'])
+const MATERIAL_KEYS = new Set(['preset', 'elevation', 'innerHighlight', 'grain', 'buttonDepth'])
+const GEOMETRY_KEYS = new Set(['panelRadius', 'bubbleRadius', 'buttonRadius'])
+const DECORATION_KEYS = new Set(['preset', 'density'])
+const MATERIAL_PRESETS = new Set<DeclarativeSkinMaterial['preset']>(['soft-cream'])
+const DECORATION_PRESETS = new Set<DeclarativeSkinDecoration['preset']>(['none', 'notebook'])
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
@@ -44,14 +54,38 @@ export interface DeclarativeHudChrome {
   bubbleGeometry?: 'mirrored' | 'continuous'
 }
 
+export interface DeclarativeSkinMaterial {
+  preset: 'soft-cream'
+  elevation?: number
+  innerHighlight?: number
+  grain?: number
+  buttonDepth?: number
+}
+
+export interface DeclarativeSkinGeometry {
+  panelRadius?: number
+  bubbleRadius?: number
+  buttonRadius?: number
+}
+
+export interface DeclarativeSkinDecoration {
+  preset: 'none' | 'notebook'
+  density?: number
+}
+
+export type DeclarativeSkinSchema = typeof CUSTOM_SKIN_SCHEMA_V1 | typeof CUSTOM_SKIN_SCHEMA
+
 export interface DeclarativeSkin {
-  schema: typeof CUSTOM_SKIN_SCHEMA
+  schema: DeclarativeSkinSchema
   id: string
   name: string
   version: string
   baseTheme: ThemeId
   tokens: DeclarativeSkinTokens
   chrome?: DeclarativeHudChrome
+  material?: DeclarativeSkinMaterial
+  geometry?: DeclarativeSkinGeometry
+  decoration?: DeclarativeSkinDecoration
 }
 
 export interface CustomSkinState {
@@ -121,6 +155,51 @@ function parseHudChrome(value: unknown): DeclarativeHudChrome | undefined {
   }
 }
 
+function parseMaterial(value: unknown): DeclarativeSkinMaterial | undefined {
+  if (value === undefined) return undefined
+  if (!isObject(value)) throw new Error('material 必须是对象')
+  assertKnownKeys(value, MATERIAL_KEYS, 'material')
+  if (typeof value.preset !== 'string' || !MATERIAL_PRESETS.has(value.preset as DeclarativeSkinMaterial['preset'])) {
+    throw new Error('material.preset 不是受支持的材质预设')
+  }
+  return {
+    preset: value.preset as DeclarativeSkinMaterial['preset'],
+    elevation: optionalNumber(value.elevation, 'material.elevation', 0, 1),
+    innerHighlight: optionalNumber(value.innerHighlight, 'material.innerHighlight', 0, 1),
+    grain: optionalNumber(value.grain, 'material.grain', 0, 1),
+    buttonDepth: optionalNumber(value.buttonDepth, 'material.buttonDepth', 0, 8)
+  }
+}
+
+function parseGeometry(value: unknown): DeclarativeSkinGeometry | undefined {
+  if (value === undefined) return undefined
+  if (!isObject(value)) throw new Error('geometry 必须是对象')
+  assertKnownKeys(value, GEOMETRY_KEYS, 'geometry')
+  const geometry: DeclarativeSkinGeometry = {
+    panelRadius: optionalNumber(value.panelRadius, 'geometry.panelRadius', 0, 32),
+    bubbleRadius: optionalNumber(value.bubbleRadius, 'geometry.bubbleRadius', 0, 32),
+    buttonRadius: optionalNumber(value.buttonRadius, 'geometry.buttonRadius', 0, 24)
+  }
+  Object.keys(geometry).forEach((key) => {
+    if (geometry[key as keyof DeclarativeSkinGeometry] === undefined) delete geometry[key as keyof DeclarativeSkinGeometry]
+  })
+  if (!Object.keys(geometry).length) throw new Error('geometry 至少需要一个几何参数')
+  return geometry
+}
+
+function parseDecoration(value: unknown): DeclarativeSkinDecoration | undefined {
+  if (value === undefined) return undefined
+  if (!isObject(value)) throw new Error('decoration 必须是对象')
+  assertKnownKeys(value, DECORATION_KEYS, 'decoration')
+  if (typeof value.preset !== 'string' || !DECORATION_PRESETS.has(value.preset as DeclarativeSkinDecoration['preset'])) {
+    throw new Error('decoration.preset 不是受支持的装饰预设')
+  }
+  return {
+    preset: value.preset as DeclarativeSkinDecoration['preset'],
+    density: optionalNumber(value.density, 'decoration.density', 0, 1)
+  }
+}
+
 export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
   let parsed: unknown
   try {
@@ -129,8 +208,11 @@ export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
     throw new Error('皮肤文件不是有效 JSON')
   }
   if (!isObject(parsed)) throw new Error('皮肤文件顶层必须是对象')
-  assertKnownKeys(parsed, TOP_LEVEL_KEYS, '皮肤文件')
-  if (parsed.schema !== CUSTOM_SKIN_SCHEMA) throw new Error(`schema 必须是 ${CUSTOM_SKIN_SCHEMA}`)
+  if (parsed.schema !== CUSTOM_SKIN_SCHEMA_V1 && parsed.schema !== CUSTOM_SKIN_SCHEMA) {
+    throw new Error(`schema 必须是 ${CUSTOM_SKIN_SCHEMA_V1} 或 ${CUSTOM_SKIN_SCHEMA}`)
+  }
+  const schema = parsed.schema as DeclarativeSkinSchema
+  assertKnownKeys(parsed, schema === CUSTOM_SKIN_SCHEMA_V1 ? V1_TOP_LEVEL_KEYS : V2_TOP_LEVEL_KEYS, '皮肤文件')
 
   const id = requiredString(parsed.id, 'id', 40)
   if (!ID_PATTERN.test(id)) throw new Error('id 只能包含小写字母、数字和连字符')
@@ -161,16 +243,24 @@ export function parseDeclarativeSkin(raw: string): DeclarativeSkin {
   if (chrome && parsed.baseTheme !== 'neon-space-lab') {
     throw new Error('声明式 HUD 必须使用 baseTheme neon-space-lab')
   }
-  if (!Object.keys(tokens).length && !chrome) throw new Error('皮肤至少需要一个视觉 token 或 chrome')
+  const material = schema === CUSTOM_SKIN_SCHEMA ? parseMaterial(parsed.material) : undefined
+  const geometry = schema === CUSTOM_SKIN_SCHEMA ? parseGeometry(parsed.geometry) : undefined
+  const decoration = schema === CUSTOM_SKIN_SCHEMA ? parseDecoration(parsed.decoration) : undefined
+  if (!Object.keys(tokens).length && !chrome && !material && !geometry && !decoration) {
+    throw new Error('皮肤至少需要一个视觉 token、chrome、material、geometry 或 decoration')
+  }
 
   return {
-    schema: CUSTOM_SKIN_SCHEMA,
+    schema,
     id,
     name,
     version,
     baseTheme: parsed.baseTheme as ThemeId,
     tokens,
-    chrome
+    chrome,
+    material,
+    geometry,
+    decoration
   }
 }
 
@@ -242,6 +332,29 @@ export function buildCustomSkinVariables(skin: DeclarativeSkin): Record<string, 
     variables['--neon-content-radius'] = `${skin.tokens.radius}px`
     variables['--custom-skin-radius'] = `${skin.tokens.radius}px`
   }
+  if (skin.material) {
+    const elevation = skin.material.elevation ?? 0.65
+    const innerHighlight = skin.material.innerHighlight ?? 0.75
+    const grain = skin.material.grain ?? 0.12
+    variables['--custom-skin-shadow-y'] = `${Math.round(4 + elevation * 10)}px`
+    variables['--custom-skin-shadow-blur'] = `${Math.round(12 + elevation * 28)}px`
+    variables['--custom-skin-shadow-alpha'] = (0.04 + elevation * 0.12).toFixed(3)
+    variables['--custom-skin-inner-highlight-alpha'] = (innerHighlight * 0.9).toFixed(3)
+    variables['--custom-skin-grain-alpha'] = (grain * 0.3).toFixed(3)
+    variables['--custom-skin-button-depth'] = `${skin.material.buttonDepth ?? 3}px`
+  }
+  if (skin.geometry?.panelRadius !== undefined) {
+    variables['--custom-skin-panel-radius'] = `${skin.geometry.panelRadius}px`
+  }
+  if (skin.geometry?.bubbleRadius !== undefined) {
+    variables['--custom-skin-bubble-radius'] = `${skin.geometry.bubbleRadius}px`
+  }
+  if (skin.geometry?.buttonRadius !== undefined) {
+    variables['--custom-skin-button-radius'] = `${skin.geometry.buttonRadius}px`
+  }
+  if (skin.decoration) {
+    variables['--custom-skin-decoration-density'] = String(skin.decoration.density ?? 0.3)
+  }
   variables['--custom-skin-glow'] = String(glow)
   return variables
 }
@@ -252,7 +365,11 @@ const CUSTOM_PROPERTIES = [
   '--color-surface-container-low', '--color-surface-container', '--color-surface-container-high',
   '--color-on-surface', '--color-on-surface-variant', '--theme-app-background', '--neon-hologram-edge',
   '--neon-panel-edge', '--neon-panel-glass', '--neon-line-width', '--neon-content-radius',
-  '--custom-skin-line-width', '--custom-skin-radius', '--custom-skin-glow'
+  '--custom-skin-line-width', '--custom-skin-radius', '--custom-skin-glow',
+  '--custom-skin-shadow-y', '--custom-skin-shadow-blur', '--custom-skin-shadow-alpha',
+  '--custom-skin-inner-highlight-alpha', '--custom-skin-grain-alpha', '--custom-skin-button-depth',
+  '--custom-skin-panel-radius', '--custom-skin-bubble-radius', '--custom-skin-button-radius',
+  '--custom-skin-decoration-density'
 ]
 
 export function applyCustomSkinToRoot(root: HTMLElement, state: CustomSkinState | null) {
@@ -261,6 +378,8 @@ export function applyCustomSkinToRoot(root: HTMLElement, state: CustomSkinState 
   delete root.dataset.customSkinChrome
   delete root.dataset.customSkinPanel
   delete root.dataset.customSkinBubble
+  delete root.dataset.customSkinMaterial
+  delete root.dataset.customSkinDecoration
   if (!state?.enabled) return
   root.dataset.customSkin = state.skin.id
   if (state.skin.chrome) {
@@ -268,5 +387,7 @@ export function applyCustomSkinToRoot(root: HTMLElement, state: CustomSkinState 
     root.dataset.customSkinPanel = state.skin.chrome.panelGeometry || 'stepped'
     root.dataset.customSkinBubble = state.skin.chrome.bubbleGeometry || 'mirrored'
   }
+  if (state.skin.material) root.dataset.customSkinMaterial = state.skin.material.preset
+  if (state.skin.decoration) root.dataset.customSkinDecoration = state.skin.decoration.preset
   Object.entries(buildCustomSkinVariables(state.skin)).forEach(([property, value]) => root.style.setProperty(property, value))
 }

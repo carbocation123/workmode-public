@@ -105,7 +105,7 @@ export function ThemePanel({
         <div className="custom-skin-loader-head">
           <div>
             <strong>本地声明式皮肤</strong>
-            <small>支持白名单视觉参数和 HUD 结构预设，不加载 CSS、脚本、网络资源或工具权限。</small>
+            <small>支持白名单视觉参数、材质和 HUD 结构预设，不加载 CSS、脚本、网络资源或工具权限。</small>
           </div>
           <button type="button" className="project-create-submit" onClick={() => fileInputRef.current?.click()}>导入皮肤</button>
           <input
@@ -121,7 +121,7 @@ export function ThemePanel({
             <span className="theme-card-icon">◈</span>
             <span className="custom-skin-card-copy">
               <strong>{customSkin.skin.name}</strong>
-              <small>{customSkin.skin.id} · v{customSkin.skin.version} · 基于 {THEMES.find((theme) => theme.id === customSkin.skin.baseTheme)?.name}{customSkin.skin.chrome ? ' · HUD' : ''}</small>
+              <small>{customSkin.skin.id} · v{customSkin.skin.version} · 基于 {THEMES.find((theme) => theme.id === customSkin.skin.baseTheme)?.name}{customSkin.skin.chrome ? ' · HUD' : ''}{customSkin.skin.material ? ` · ${customSkin.skin.material.preset}` : ''}</small>
             </span>
             <span className="custom-skin-state">{customSkin.enabled ? '已启用' : '已停用'}</span>
             <button
