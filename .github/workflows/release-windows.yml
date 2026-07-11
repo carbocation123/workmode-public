@@ -51,6 +51,14 @@ jobs:
             frontend/package-lock.json
             desktop/package-lock.json
 
+      - name: Pin npm for lockfile reproducibility
+        shell: pwsh
+        run: |
+          npm install --global npm@10.9.4
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to pin npm 10.9.4.' }
+          npm --version
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to verify npm.' }
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
