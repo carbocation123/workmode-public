@@ -1,6 +1,9 @@
 name: Publish Windows release
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
@@ -22,7 +25,16 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = '${{ inputs.version }}'.Trim()
+          $eventName = '${{ github.event_name }}'
+          if ($eventName -eq 'push') {
+            $tag = '${{ github.ref_name }}'.Trim()
+            if ($tag -notmatch '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+              throw "Release tag is not a supported SemVer tag: $tag"
+            }
+            $version = $tag.Substring(1)
+          } else {
+            $version = '${{ inputs.version }}'.Trim()
+          }
           ./scripts/sync-version.ps1 -Version $version
           git add VERSION `
             frontend/package.json frontend/package-lock.json `
@@ -33,6 +45,9 @@ jobs:
           $stagedVersionFiles = @(git diff --cached --name-only)
           if ($LASTEXITCODE -ne 0) { throw 'Failed to inspect synchronized version files.' }
           if ($stagedVersionFiles.Count -gt 0) {
+            if ($eventName -eq 'push') {
+              throw 'Tag release version does not match committed version files.'
+            }
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git commit -m "chore: release v$version"
@@ -40,6 +55,7 @@ jobs:
             git push origin "HEAD:${{ github.ref_name }}"
             if ($LASTEXITCODE -ne 0) { throw 'Failed to push synchronized version files.' }
           }
+          "version=$version" >> $env:GITHUB_OUTPUT
           "sha=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
 
       - name: Set up Node.js
@@ -117,7 +133,7 @@ jobs:
       - name: Build signed desktop release
         shell: pwsh
         run: |
-          $version = '${{ inputs.version }}'.Trim()
+          $version = '${{ steps.version.outputs.version }}'.Trim()
           ./scripts/build-desktop.ps1 `
             -Version $version `
             -UpdateEndpoint 'https://github.com/carbocation123/workmode-public/releases/latest/download/latest.json' `
@@ -129,7 +145,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $version = '${{ inputs.version }}'.Trim()
+          $version = '${{ steps.version.outputs.version }}'.Trim()
           $tag = "v$version"
           $files = Get-ChildItem "release/desktop-$version" -File | ForEach-Object { $_.FullName }
           gh release view $tag --repo '${{ github.repository }}' *> $null

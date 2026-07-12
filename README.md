@@ -176,7 +176,7 @@ docs/                架构、开发、发行与产品路线图
 - [桌面发行与自动更新](docs/DESKTOP-DISTRIBUTION.md)
 - [产品路线图](docs/PRODUCT-ROADMAP.md)
 
-GitHub Actions 是正式 Windows Release 的唯一主发行路径；发布环境固定使用 Node.js 22 与 npm 10.9.4，并通过 lockfile 做干净安装。早期 0.1.x 便携包构建器已经退役。旧版数据导入能力继续保留，用于非破坏性迁移。
+GitHub Actions 是正式 Windows Release 的唯一主发行路径；推送与版本文件一致的 `v<version>` 标签会自动云构建并发布，也保留网页手动输入版本号的入口。发布环境固定使用 Node.js 22 与 npm 10.9.4，并通过 lockfile 做干净安装。早期 0.1.x 便携包构建器已经退役。旧版数据导入能力继续保留，用于非破坏性迁移。
 
 ## 当前边界
 

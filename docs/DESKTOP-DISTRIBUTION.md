@@ -48,13 +48,20 @@ logs\
 
 ## GitHub Actions 正式发行
 
-正式 Release 使用 `.github/workflows/release-windows.yml` 的手动工作流：
+正式 Release 使用 `.github/workflows/release-windows.yml`。推荐在版本文件已经同步并通过本地测试后推送 SemVer 标签，GitHub 会自动云构建：
+
+```powershell
+git tag v0.7.0
+git push origin v0.7.0
+```
+
+也保留网页手动入口：
 
 ```text
 Actions → Publish Windows release → Run workflow
 ```
 
-输入新的 SemVer 版本号后，工作流会：
+标签触发时，标签版本必须与提交中的全部版本文件一致，否则立即失败且不会重写标签；网页手动触发时可输入新的 SemVer 版本号并由工作流同步版本。随后工作流会：
 
 1. 用 `scripts/sync-version.ps1` 同步 `VERSION`、前端、桌面、Tauri 和 Cargo 版本；
 2. 在需要时以 `github-actions[bot]` 提交并推送版本变更；

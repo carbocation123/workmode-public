@@ -41,6 +41,16 @@ class ReleaseVersionSyncTest(unittest.TestCase):
         self.assertIn("$stagedVersionFiles = @(git diff --cached --name-only)", workflow)
         self.assertIn("if ($stagedVersionFiles.Count -gt 0)", workflow)
 
+    def test_release_workflow_can_publish_from_a_semver_tag_without_rewriting_it(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("push:", workflow)
+        self.assertIn("tags:", workflow)
+        self.assertIn("- 'v*.*.*'", workflow)
+        self.assertIn("github.event_name", workflow)
+        self.assertIn("Tag release version does not match committed version files", workflow)
+        self.assertIn("steps.version.outputs.version", workflow)
+
     def test_release_workflow_uses_official_rust_and_pip_caches(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
 
