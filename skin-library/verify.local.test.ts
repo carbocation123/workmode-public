@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { parseSkinPackageBytes } from '../frontend/src/skinPackage'
 
 const packages = [
-  ['amethyst-observatory.workmode-skin', 'amethyst-observatory', '3.1.0'],
-  ['cream-puff.workmode-skin', 'cream-puff-v3', '3.2.3'],
-  ['cryo-gem-tech.workmode-skin', 'cryo-gem-tech', '3.1.0'],
-  ['green-phosphor.workmode-skin', 'green-phosphor-terminal', '4.0.2'],
-  ['midnight-console.workmode-skin', 'midnight-console', '3.1.0'],
-  ['neon-ice.workmode-skin', 'neon-ice-v3', '3.1.0'],
-  ['pixel-night-shift.workmode-skin', 'pixel-night-shift', '3.1.2']
+  ['amethyst-observatory.workmode-skin', 'amethyst-observatory', '3.2.1'],
+  ['cream-puff.workmode-skin', 'cream-puff-v3', '3.3.2'],
+  ['cryo-gem-tech.workmode-skin', 'cryo-gem-tech', '3.2.2'],
+  ['green-phosphor.workmode-skin', 'green-phosphor-terminal', '4.1.1'],
+  ['midnight-console.workmode-skin', 'midnight-console', '3.2.2'],
+  ['neon-ice.workmode-skin', 'neon-ice-v3', '3.2.1'],
+  ['pixel-night-shift.workmode-skin', 'pixel-night-shift', '3.2.1']
 ] as const
 
 describe('locally signed reward skin packages', () => {

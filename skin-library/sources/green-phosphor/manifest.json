@@ -2,7 +2,7 @@
   "schema": "workmode-skin/v3",
   "id": "green-phosphor-terminal",
   "name": "绿磷终端 · 官方",
-  "version": "4.0.2",
+  "version": "4.1.1",
   "foundation": "dark",
   "palette": {
     "accent": "#53ff71",

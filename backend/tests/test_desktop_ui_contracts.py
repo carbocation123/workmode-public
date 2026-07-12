@@ -373,6 +373,8 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.tool-card', visual)
         self.assertIn('.file-view-markdown', visual)
         self.assertIn('backdrop-filter: blur(16px)', visual)
+        self.assertIn('.message .bubble code,', visual)
+        self.assertIn('color: #e8f7ff', visual)
 
     def test_midnight_console_has_independent_city_terminal_language(self) -> None:
         layout = (SKIN_SOURCE_DIR / "midnight-console" / "layout.css").read_text(encoding="utf-8")
@@ -390,6 +392,22 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.tool-card', visual)
         self.assertIn('.chat-input-wrap', visual)
         self.assertIn('.file-view-markdown', visual)
+        self.assertIn('.message .bubble code,', visual)
+        self.assertIn('color: #f5e9d3', visual)
+
+    def test_green_phosphor_reserves_space_for_terminal_file_and_session_ids(self) -> None:
+        visual = (SKIN_SOURCE_DIR / "green-phosphor" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('.tree-node-icon {', visual)
+        self.assertIn('flex: 0 0 24px', visual)
+        self.assertIn('.session-row-icon {', visual)
+        self.assertIn('gap: 8px', visual)
+
+    def test_cream_puff_hides_fallback_glyphs_behind_enamel_badges(self) -> None:
+        visual = (SKIN_SOURCE_DIR / "cream-puff" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn(':is(.activity-icon, .tree-node-icon, .session-row-icon) {', visual)
+        self.assertIn('font-size: 0 !important', visual)
 
     def test_amethyst_observatory_has_independent_arcane_archive(self) -> None:
         layout = (SKIN_SOURCE_DIR / "amethyst-observatory" / "layout.css").read_text(encoding="utf-8")
@@ -414,7 +432,7 @@ class DesktopUiContractTest(unittest.TestCase):
         manifest = json.loads((PIXEL_SKIN_DIR / "manifest.json").read_text(encoding="utf-8"))
 
         self.assertEqual(manifest["id"], "pixel-night-shift")
-        self.assertEqual(manifest["version"], "3.1.2")
+        self.assertEqual(manifest["version"], "3.2.1")
         self.assertEqual(manifest["components"]["chrome"], "console")
         self.assertIn('grid-template-rows: 58px minmax(0, 1fr) 28px', layout)
         self.assertIn('--pixel-magenta: #ff4fa3', visual)
@@ -429,9 +447,66 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('margin-left: auto', visual)
         self.assertIn('top: 50%', visual)
         self.assertIn('transform: translateY(-50%)', visual)
+        self.assertIn('.activity-icon[data-skin-icon="project"]::before', visual)
+        self.assertIn('.activity-icon[data-skin-icon="settings"]::before', visual)
+        self.assertIn('.tree-node-icon[data-skin-icon="folder"]::before', visual)
+        self.assertIn('.tree-node-icon[data-skin-icon="markdown"]::before', visual)
+        self.assertIn('button[title="打开文件夹"]::before', visual)
+        self.assertIn('button[title="刷新"]::before', visual)
+        self.assertIn('/* Opposed refresh arrows */', visual)
+        self.assertIn('/* Pixel waste-bin */', visual)
+        self.assertIn('button[title="重命名"]::before', visual)
+        self.assertIn('image-rendering: pixelated', visual)
         self.assertIn('.tool-card', visual)
         self.assertIn('.file-view-markdown', visual)
-        self.assertIn('image-rendering: pixelated', visual)
+
+    def test_every_reward_skin_has_theme_specific_navigation_file_and_control_icons(self) -> None:
+        expected_versions = {
+            "amethyst-observatory": "3.2.1",
+            "cream-puff": "3.3.2",
+            "cryo-gem-tech": "3.2.2",
+            "green-phosphor": "4.1.1",
+            "midnight-console": "3.2.2",
+            "neon-ice": "3.2.1",
+            "pixel-night-shift": "3.2.1",
+        }
+        required_selectors = (
+            '.activity-icon[data-skin-icon="project"]::before',
+            '.activity-icon[data-skin-icon="settings"]::before',
+            '.tree-node-icon[data-skin-icon="folder"]::before',
+            '.tree-node-icon[data-skin-icon="markdown"]::before',
+            'button[title="打开文件夹"]::before',
+            'button[title="刷新"]::before',
+            'button[title="重命名"]::before',
+        )
+
+        for directory, version in expected_versions.items():
+            with self.subTest(skin=directory):
+                source = SKIN_SOURCE_DIR / directory
+                manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+                visual = (source / "visual.css").read_text(encoding="utf-8")
+                self.assertEqual(manifest["version"], version)
+                for selector in required_selectors:
+                    self.assertIn(selector, visual)
+
+    def test_every_reward_skin_reserves_file_and_session_icon_slots(self) -> None:
+        for source in sorted(SKIN_SOURCE_DIR.iterdir()):
+            if not source.is_dir():
+                continue
+            with self.subTest(skin=source.name):
+                visual = (source / "visual.css").read_text(encoding="utf-8")
+                self.assertRegex(
+                    visual,
+                    r'(?s)\.tree-node-icon\s*\{[^}]*flex:\s*0 0 24px;',
+                )
+                self.assertRegex(
+                    visual,
+                    r'(?s)\.session-row-icon\s*\{[^}]*flex:\s*0 0 24px;',
+                )
+                self.assertRegex(
+                    visual,
+                    r'(?s)\.tree-node,\s*\n[^{}]*\.session-row\s*\{[^}]*gap:\s*8px;',
+                )
 
     def test_v2_skin_material_engine_uses_bounded_presets(self) -> None:
         custom_skin_source = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")

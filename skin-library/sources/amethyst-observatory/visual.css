@@ -523,3 +523,87 @@
   0%, 100% { transform: rotate(0); opacity: .75; }
   50% { transform: rotate(8deg); opacity: 1; }
 }
+
+/* Observatory sigils: navigation, archives and controls share one engraved
+   brass/amethyst language instead of falling back to generic glyphs. */
+:root[data-custom-skin="amethyst-observatory"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1;
+}
+
+:root[data-custom-skin="amethyst-observatory"] .activity-icon[data-skin-icon="project"]::before,
+:root[data-custom-skin="amethyst-observatory"] .activity-icon[data-skin-icon="settings"]::before {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--amethyst-gold);
+  border-radius: 50%;
+  color: #ead9ff;
+  background: radial-gradient(circle, #5c2782 0 22%, #1a0c27 24% 58%, #8a63ab 60% 64%, #110817 66%);
+  box-shadow: 0 0 9px rgba(167, 102, 232, .34), inset 0 0 0 2px #100719;
+  font-size: 13px !important;
+}
+:root[data-custom-skin="amethyst-observatory"] .activity-icon[data-skin-icon="project"]::before { content: "✦" !important; }
+:root[data-custom-skin="amethyst-observatory"] .activity-icon[data-skin-icon="settings"]::before { content: "☾" !important; color: var(--amethyst-gold); }
+
+:root[data-custom-skin="amethyst-observatory"] .tree-node,
+:root[data-custom-skin="amethyst-observatory"] .session-row {
+  gap: 8px;
+}
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon {
+  width: 24px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="amethyst-observatory"] .session-row-icon {
+  width: 24px;
+  height: 20px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon::before,
+:root[data-custom-skin="amethyst-observatory"] .session-row-icon::before {
+  width: 19px;
+  height: 19px;
+  border: 1px solid #705189;
+  color: #cfb5e8;
+  background: radial-gradient(circle at 50% 44%, #3b1c50, #160a21 72%);
+  box-shadow: inset 0 0 0 1px rgba(197, 164, 96, .18);
+  font-size: 10px !important;
+}
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="folder"]::before { content: "◇" !important; color: var(--amethyst-gold); }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="folder-open"]::before { content: "◆" !important; color: var(--amethyst-gold); }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "✎" !important; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "▤" !important; color: #d595a9; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="image"]::before { content: "✧" !important; color: #e4c97b; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="code"]::before { content: "⌘" !important; color: #9db5e9; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="data"]::before { content: "∷" !important; color: #9dc9bd; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="archive"]::before { content: "▣" !important; color: #c5a460; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="text"]::before { content: "≡" !important; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="media"]::before { content: "▷" !important; color: #a7d1c8; }
+:root[data-custom-skin="amethyst-observatory"] .tree-node-icon[data-skin-icon="file"]::before { content: "·" !important; }
+:root[data-custom-skin="amethyst-observatory"] .session-row-icon[data-skin-icon="session"]::before { content: "◌" !important; color: var(--amethyst-gold); }
+
+:root[data-custom-skin="amethyst-observatory"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse) {
+  font-size: 0 !important;
+}
+:root[data-custom-skin="amethyst-observatory"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse)::before {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #71518a;
+  border-radius: 50%;
+  color: #e3d3ed;
+  background: #21102e;
+  font-family: Georgia, serif;
+  font-size: 12px;
+  line-height: 1;
+}
+:root[data-custom-skin="amethyst-observatory"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="amethyst-observatory"] button[title="选择文件夹"]::before { content: "+"; color: var(--amethyst-gold); }
+:root[data-custom-skin="amethyst-observatory"] button[title="刷新"]::before { content: "↻"; color: #b891dd; }
+:root[data-custom-skin="amethyst-observatory"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="amethyst-observatory"] button[title="删除会话"]::before { content: "×"; color: #d88ba6; }
+:root[data-custom-skin="amethyst-observatory"] button[title="重命名"]::before { content: "✎"; color: var(--amethyst-gold); }

@@ -575,3 +575,88 @@
   border-radius: 999px;
   background: #257b8d;
 }
+
+/* Holographic glyph deck: thin luminous symbols on transparent glass. */
+:root[data-custom-skin="neon-ice-v3"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  line-height: 1;
+}
+:root[data-custom-skin="neon-ice-v3"] .activity-icon[data-skin-icon="project"]::before,
+:root[data-custom-skin="neon-ice-v3"] .activity-icon[data-skin-icon="settings"]::before {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--neon-ice);
+  border-radius: 8px;
+  color: var(--neon-bright);
+  background: linear-gradient(145deg, rgba(102, 232, 255, .18), rgba(3, 16, 25, .5));
+  box-shadow: 0 0 12px rgba(102, 232, 255, .34), inset 0 0 8px rgba(102, 232, 255, .12);
+  font-size: 12px !important;
+  text-shadow: 0 0 7px currentColor;
+}
+:root[data-custom-skin="neon-ice-v3"] .activity-icon[data-skin-icon="project"]::before { content: "▦" !important; }
+:root[data-custom-skin="neon-ice-v3"] .activity-icon[data-skin-icon="settings"]::before { content: "≋" !important; color: var(--neon-violet); }
+
+:root[data-custom-skin="neon-ice-v3"] .tree-node,
+:root[data-custom-skin="neon-ice-v3"] .session-row {
+  gap: 8px;
+}
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon {
+  width: 24px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="neon-ice-v3"] .session-row-icon {
+  width: 24px;
+  height: 20px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon::before,
+:root[data-custom-skin="neon-ice-v3"] .session-row-icon::before {
+  width: 20px;
+  height: 18px;
+  border: 2px solid rgba(102, 232, 255, .5);
+  border-radius: 5px;
+  color: var(--neon-bright);
+  background: rgba(5, 24, 35, .68);
+  box-shadow: 0 0 7px rgba(102, 232, 255, .2), inset 0 0 5px rgba(102, 232, 255, .1);
+  font-size: 7px !important;
+  text-shadow: 0 0 5px currentColor;
+}
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="folder"]::before { content: "▱" !important; color: var(--neon-ice); }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="folder-open"]::before { content: "▰" !important; color: #b7f7ff; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "MD" !important; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "P" !important; color: #ff91b3; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="image"]::before { content: "▧" !important; color: #ffe58c; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="code"]::before { content: "<>" !important; color: var(--neon-violet); }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="data"]::before { content: "∿" !important; color: #72ffd2; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="archive"]::before { content: "▣" !important; color: #c3a5ff; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="text"]::before { content: "≡" !important; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="media"]::before { content: "▷" !important; color: #72ffd2; }
+:root[data-custom-skin="neon-ice-v3"] .tree-node-icon[data-skin-icon="file"]::before { content: "·" !important; }
+:root[data-custom-skin="neon-ice-v3"] .session-row-icon[data-skin-icon="session"]::before { content: "COM" !important; font-size: 6px !important; color: var(--neon-violet); }
+
+:root[data-custom-skin="neon-ice-v3"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse) { font-size: 0 !important; }
+:root[data-custom-skin="neon-ice-v3"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse)::before {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(102, 232, 255, .5);
+  border-radius: 6px;
+  color: var(--neon-ice);
+  background: rgba(4, 20, 29, .66);
+  box-shadow: 0 0 8px rgba(102, 232, 255, .22), inset 0 0 5px rgba(102, 232, 255, .1);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1;
+  text-shadow: 0 0 6px currentColor;
+}
+:root[data-custom-skin="neon-ice-v3"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="neon-ice-v3"] button[title="选择文件夹"]::before { content: "+"; }
+:root[data-custom-skin="neon-ice-v3"] button[title="刷新"]::before { content: "↻"; color: var(--neon-violet); }
+:root[data-custom-skin="neon-ice-v3"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="neon-ice-v3"] button[title="删除会话"]::before { content: "×"; color: #ff7f9f; }
+:root[data-custom-skin="neon-ice-v3"] button[title="重命名"]::before { content: "✎"; color: #ffe58c; }

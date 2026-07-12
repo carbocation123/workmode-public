@@ -2,7 +2,7 @@
   "schema": "workmode-skin/v3",
   "id": "midnight-console",
   "name": "午夜控制台",
-  "version": "3.1.0",
+  "version": "3.2.2",
   "foundation": "dark",
   "palette": {
     "accent": "#36e4ff",

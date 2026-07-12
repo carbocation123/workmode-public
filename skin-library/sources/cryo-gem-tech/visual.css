@@ -528,3 +528,102 @@
   0%, 100% { filter: brightness(.95); }
   50% { filter: brightness(1.18); }
 }
+
+/* Faceted instrument modules replace the shared gem placeholder. */
+:root[data-custom-skin="cryo-gem-tech"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  line-height: 1;
+}
+:root[data-custom-skin="cryo-gem-tech"] .activity-icon[data-skin-icon="project"]::before,
+:root[data-custom-skin="cryo-gem-tech"] .activity-icon[data-skin-icon="settings"]::before {
+  width: 26px;
+  height: 26px;
+  border: 2px solid #78dfff;
+  color: #e9fbff;
+  background: linear-gradient(135deg, #203b63, #071529 48%, #2577ad);
+  box-shadow: 0 0 10px rgba(84, 220, 255, .48), inset 0 0 0 2px #061020;
+  clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%);
+  font-size: 12px !important;
+}
+:root[data-custom-skin="cryo-gem-tech"] .activity-icon[data-skin-icon="project"]::before { content: "◇" !important; color: var(--cryo-cyan); }
+:root[data-custom-skin="cryo-gem-tech"] .activity-icon[data-skin-icon="settings"]::before { content: "≡" !important; color: #aebcff; }
+
+:root[data-custom-skin="cryo-gem-tech"] .tree-node,
+:root[data-custom-skin="cryo-gem-tech"] .session-row {
+  gap: 8px;
+}
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon {
+  width: 24px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="cryo-gem-tech"] .session-row-icon {
+  width: 24px;
+  height: 20px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon::before,
+:root[data-custom-skin="cryo-gem-tech"] .session-row-icon::before {
+  width: 21px;
+  height: 18px;
+  border: 2px solid #6e88ab;
+  color: #d8eaff;
+  background: linear-gradient(145deg, #162b4a, #091326);
+  box-shadow: 0 0 6px rgba(64, 149, 237, .25), inset 2px 0 rgba(255, 255, 255, .12);
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  font-size: 7px !important;
+}
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="folder"]::before { content: "CR" !important; color: var(--cryo-cyan); }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="folder-open"]::before { content: "OP" !important; color: #fff; background: #17436b; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "MD" !important; color: #8ce7ff; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "PDF" !important; font-size: 6px !important; color: #ff9eb5; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="image"]::before { content: "IMG" !important; font-size: 6px !important; color: #e9c979; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="code"]::before { content: "<>" !important; color: #aebcff; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="data"]::before { content: "DAT" !important; font-size: 6px !important; color: #75e3cf; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="archive"]::before { content: "ARC" !important; font-size: 6px !important; color: #bca6ff; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="text"]::before { content: "TXT" !important; font-size: 6px !important; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="media"]::before { content: "▶" !important; color: #75e3cf; }
+:root[data-custom-skin="cryo-gem-tech"] .tree-node-icon[data-skin-icon="file"]::before { content: "F" !important; }
+:root[data-custom-skin="cryo-gem-tech"] .session-row-icon[data-skin-icon="session"]::before { content: "LOG" !important; font-size: 6px !important; color: var(--cryo-cyan); }
+
+:root[data-custom-skin="cryo-gem-tech"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse) { font-size: 0 !important; }
+:root[data-custom-skin="cryo-gem-tech"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse)::before {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 18px;
+  border: 2px solid #6f8fb5;
+  color: var(--cryo-cyan);
+  background: linear-gradient(145deg, #172d4d, #081426);
+  box-shadow: inset 2px 0 rgba(255, 255, 255, .12);
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1;
+}
+:root[data-custom-skin="cryo-gem-tech"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="cryo-gem-tech"] button[title="选择文件夹"]::before { content: "+"; }
+:root[data-custom-skin="cryo-gem-tech"] button[title="刷新"]::before { content: "↻"; color: #aebcff; }
+:root[data-custom-skin="cryo-gem-tech"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="cryo-gem-tech"] button[title="删除会话"]::before { content: "×"; color: #ff8da8; }
+:root[data-custom-skin="cryo-gem-tech"] button[title="重命名"]::before { content: "✎"; color: #e9c979; }
+
+/* Inline code lives inside the pale analysis sheet. Give it an explicit
+   instrument-screen foreground instead of inheriting the application's dark
+   code token, which made paths look blank. */
+:root[data-custom-skin="cryo-gem-tech"] .message .bubble code,
+:root[data-custom-skin="cryo-gem-tech"] .file-view-markdown code {
+  color: #e8f7ff;
+  border: 1px solid #4c8fc4;
+  border-radius: 3px;
+  background: #112943;
+}
+:root[data-custom-skin="cryo-gem-tech"] .message .bubble pre code,
+:root[data-custom-skin="cryo-gem-tech"] .file-view-markdown pre code {
+  color: inherit;
+  border: 0;
+  background: transparent;
+}

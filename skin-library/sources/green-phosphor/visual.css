@@ -551,3 +551,81 @@
 :root[data-custom-skin="green-phosphor-terminal"] *::-webkit-scrollbar-thumb:hover {
   background: var(--phosphor);
 }
+
+/* Terminal device identifiers: longer command mnemonics replace the generic
+   one-letter preset while preserving the monochrome phosphor grammar. */
+:root[data-custom-skin="green-phosphor-terminal"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  border: 2px solid var(--phosphor-dim);
+  color: var(--phosphor);
+  background: #000900;
+  box-shadow: inset 2px 0 #05240c, 2px 2px 0 #000;
+  font-family: var(--skin-font-code), monospace;
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(83, 255, 113, .55);
+}
+:root[data-custom-skin="green-phosphor-terminal"] .activity-icon[data-skin-icon="project"]::before,
+:root[data-custom-skin="green-phosphor-terminal"] .activity-icon[data-skin-icon="settings"]::before {
+  width: 30px;
+  height: 22px;
+  font-size: 6px !important;
+}
+:root[data-custom-skin="green-phosphor-terminal"] .activity-icon[data-skin-icon="project"]::before { content: "PRJ" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .activity-icon[data-skin-icon="settings"]::before { content: "CFG" !important; }
+
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon::before,
+:root[data-custom-skin="green-phosphor-terminal"] .session-row-icon::before {
+  width: 22px;
+  height: 16px;
+  font-size: 6px !important;
+}
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node,
+:root[data-custom-skin="green-phosphor-terminal"] .session-row {
+  gap: 8px;
+}
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon {
+  width: 24px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="green-phosphor-terminal"] .session-row-icon {
+  width: 24px;
+  height: 18px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="folder"]::before { content: "DIR" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="folder-open"]::before { content: "D+" !important; background: #06200b; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "MD" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "PDF" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="image"]::before { content: "IMG" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="code"]::before { content: "SRC" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="data"]::before { content: "DAT" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="archive"]::before { content: "ARC" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="text"]::before { content: "TXT" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="media"]::before { content: "MED" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .tree-node-icon[data-skin-icon="file"]::before { content: "FIL" !important; }
+:root[data-custom-skin="green-phosphor-terminal"] .session-row-icon[data-skin-icon="session"]::before { content: "SES" !important; }
+
+:root[data-custom-skin="green-phosphor-terminal"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse) { font-size: 0 !important; }
+:root[data-custom-skin="green-phosphor-terminal"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse)::before {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  border: 2px solid var(--phosphor-dim);
+  color: var(--phosphor);
+  background: #000900;
+  box-shadow: inset 2px 0 #05240c;
+  font-family: var(--skin-font-code), monospace;
+  font-size: 6px;
+  line-height: 1;
+  text-shadow: 0 0 5px rgba(83, 255, 113, .5);
+}
+:root[data-custom-skin="green-phosphor-terminal"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="green-phosphor-terminal"] button[title="选择文件夹"]::before { content: "ADD"; }
+:root[data-custom-skin="green-phosphor-terminal"] button[title="刷新"]::before { content: "RLD"; }
+:root[data-custom-skin="green-phosphor-terminal"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="green-phosphor-terminal"] button[title="删除会话"]::before { content: "DEL"; color: #7de58e; }
+:root[data-custom-skin="green-phosphor-terminal"] button[title="重命名"]::before { content: "REN"; }

@@ -504,3 +504,104 @@
 }
 
 :root[data-custom-skin="midnight-console"] * { scrollbar-color: #536174 #0c1422; }
+
+/* Bureau hardware labels: case drawers, tape cartridges and console keys. */
+:root[data-custom-skin="midnight-console"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  line-height: 1;
+}
+:root[data-custom-skin="midnight-console"] .activity-icon[data-skin-icon="project"]::before,
+:root[data-custom-skin="midnight-console"] .activity-icon[data-skin-icon="settings"]::before {
+  width: 29px;
+  height: 24px;
+  border: 2px solid #0b1220;
+  border-radius: 3px;
+  outline: 1px solid #657488;
+  color: var(--midnight-cream);
+  background: linear-gradient(#31445a 0 5px, #162437 5px);
+  box-shadow: 3px 3px 0 #080f1a, inset 0 -2px #0c1625;
+  font-size: 6px !important;
+  letter-spacing: .04em;
+}
+:root[data-custom-skin="midnight-console"] .activity-icon[data-skin-icon="project"]::before { content: "CASE" !important; color: var(--midnight-coral); }
+:root[data-custom-skin="midnight-console"] .activity-icon[data-skin-icon="settings"]::before { content: "TUNE" !important; color: var(--midnight-teal); }
+
+:root[data-custom-skin="midnight-console"] .tree-node,
+:root[data-custom-skin="midnight-console"] .session-row {
+  gap: 8px;
+}
+:root[data-custom-skin="midnight-console"] .tree-node-icon {
+  width: 24px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="midnight-console"] .session-row-icon {
+  width: 24px;
+  height: 19px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="midnight-console"] .tree-node-icon::before,
+:root[data-custom-skin="midnight-console"] .session-row-icon::before {
+  width: 22px;
+  height: 17px;
+  border: 2px solid #536174;
+  border-radius: 2px;
+  color: var(--midnight-cream-2);
+  background: linear-gradient(#26394c 0 4px, #101b2b 4px);
+  box-shadow: 2px 2px 0 #080f1a, inset 0 -2px #070e18;
+  font-size: 6px !important;
+  letter-spacing: .02em;
+}
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="folder"]::before { content: "BOX" !important; color: var(--midnight-gold); }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="folder-open"]::before { content: "OPEN" !important; font-size: 5px !important; color: #f2d98e; }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "MD" !important; color: var(--midnight-coral); }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "PDF" !important; color: #f08f92; }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="image"]::before { content: "PIC" !important; color: var(--midnight-gold); }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="code"]::before { content: "SRC" !important; color: #8aaeff; }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="data"]::before { content: "DAT" !important; color: var(--midnight-teal); }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="archive"]::before { content: "ARC" !important; color: #b79bd7; }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="text"]::before { content: "TXT" !important; }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="media"]::before { content: "PLAY" !important; font-size: 5px !important; color: var(--midnight-teal); }
+:root[data-custom-skin="midnight-console"] .tree-node-icon[data-skin-icon="file"]::before { content: "FILE" !important; font-size: 5px !important; }
+:root[data-custom-skin="midnight-console"] .session-row-icon[data-skin-icon="session"]::before { content: "CALL" !important; font-size: 5px !important; color: var(--midnight-coral); }
+
+:root[data-custom-skin="midnight-console"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse) { font-size: 0 !important; }
+:root[data-custom-skin="midnight-console"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse)::before {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  border: 2px solid #536174;
+  border-radius: 2px;
+  color: var(--midnight-cream-2);
+  background: linear-gradient(#314459 0 4px, #111d2d 4px);
+  box-shadow: 2px 2px 0 #080f1a;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 5px;
+  line-height: 1;
+}
+:root[data-custom-skin="midnight-console"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="midnight-console"] button[title="选择文件夹"]::before { content: "ADD"; color: var(--midnight-gold); }
+:root[data-custom-skin="midnight-console"] button[title="刷新"]::before { content: "SYNC"; color: var(--midnight-teal); }
+:root[data-custom-skin="midnight-console"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="midnight-console"] button[title="删除会话"]::before { content: "DEL"; color: var(--midnight-coral); }
+:root[data-custom-skin="midnight-console"] button[title="重命名"]::before { content: "EDIT"; color: var(--midnight-gold); }
+
+/* Paper messages need a dedicated legible inline-code label. The shared dark
+   code chip otherwise renders dark text on a dark rectangle. */
+:root[data-custom-skin="midnight-console"] .message .bubble code,
+:root[data-custom-skin="midnight-console"] .file-view-markdown code {
+  color: #f5e9d3;
+  border: 1px solid #4f7779;
+  border-radius: 2px;
+  background: #10272d;
+}
+:root[data-custom-skin="midnight-console"] .message .bubble pre code,
+:root[data-custom-skin="midnight-console"] .file-view-markdown pre code {
+  color: inherit;
+  border: 0;
+  background: transparent;
+}

@@ -215,6 +215,249 @@
   background: var(--pixel-yellow);
 }
 
+/* Night-shift pixel pictograms. These override the generic pixel preset with
+   a compact bar-console vocabulary while keeping the React labels accessible. */
+:root[data-custom-skin="pixel-night-shift"] :is(.activity-icon, .tree-node-icon, .session-row-icon) {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--pixel-cyan);
+  image-rendering: pixelated;
+}
+
+:root[data-custom-skin="pixel-night-shift"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  box-sizing: border-box;
+  font-family: var(--skin-font-code), monospace;
+  font-weight: 400;
+  image-rendering: pixelated;
+}
+
+:root[data-custom-skin="pixel-night-shift"] .activity-icon[data-skin-icon="project"]::before {
+  content: "" !important;
+  display: block !important;
+  width: 20px;
+  height: 18px;
+  background:
+    linear-gradient(var(--pixel-yellow) 0 0) 2px 0 / 8px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 2px / 20px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 16px / 20px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 4px / 2px 12px no-repeat,
+    linear-gradient(currentColor 0 0) 18px 4px / 2px 12px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 4px 6px / 12px 2px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 4px 10px / 7px 2px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 13px 10px / 3px 2px no-repeat;
+  filter: drop-shadow(2px 2px 0 #08040d);
+}
+
+:root[data-custom-skin="pixel-night-shift"] .activity-icon[data-skin-icon="settings"]::before {
+  content: "" !important;
+  display: block !important;
+  width: 20px;
+  height: 18px;
+  background:
+    linear-gradient(currentColor 0 0) 2px 0 / 2px 18px no-repeat,
+    linear-gradient(currentColor 0 0) 9px 0 / 2px 18px no-repeat,
+    linear-gradient(currentColor 0 0) 16px 0 / 2px 18px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 0 4px / 6px 4px no-repeat,
+    linear-gradient(var(--pixel-yellow) 0 0) 7px 11px / 6px 4px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 14px 2px / 6px 4px no-repeat;
+  filter: drop-shadow(2px 2px 0 #08040d);
+}
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon {
+  width: 24px;
+  height: 18px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="pixel-night-shift"] .session-row-icon {
+  width: 24px;
+  height: 18px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node,
+:root[data-custom-skin="pixel-night-shift"] .session-row {
+  gap: 8px;
+}
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="folder"]::before,
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="folder-open"]::before {
+  content: "" !important;
+  display: block !important;
+  width: 18px;
+  height: 16px;
+  background:
+    linear-gradient(var(--pixel-yellow) 0 0) 0 0 / 8px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 2px / 18px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 14px / 18px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 4px / 2px 10px no-repeat,
+    linear-gradient(currentColor 0 0) 16px 4px / 2px 10px no-repeat,
+    linear-gradient(#1d1027 0 0) 2px 4px / 14px 10px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 4px 7px / 10px 2px no-repeat;
+  filter: drop-shadow(2px 2px 0 #08040d);
+}
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="folder-open"]::before {
+  background:
+    linear-gradient(var(--pixel-yellow) 0 0) 0 0 / 8px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 2px / 18px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 2px 13px / 14px 2px no-repeat,
+    linear-gradient(currentColor 0 0) 0 5px / 2px 8px no-repeat,
+    linear-gradient(currentColor 0 0) 16px 5px / 2px 8px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 2px 5px / 14px 2px no-repeat,
+    linear-gradient(#1d1027 0 0) 2px 7px / 14px 6px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 5px 9px / 8px 2px no-repeat;
+}
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="markdown"] { color: var(--pixel-magenta); }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="pdf"] { color: #ff7d87; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="image"] { color: var(--pixel-yellow); }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="code"] { color: var(--pixel-cyan); }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="data"] { color: #8da6ff; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="archive"] { color: #d58dff; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="text"] { color: #d9c7e2; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="media"] { color: #6ff1a8; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="file"] { color: var(--pixel-dim); }
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon:is(
+  [data-skin-icon="markdown"],
+  [data-skin-icon="pdf"],
+  [data-skin-icon="image"],
+  [data-skin-icon="code"],
+  [data-skin-icon="data"],
+  [data-skin-icon="archive"],
+  [data-skin-icon="text"],
+  [data-skin-icon="media"],
+  [data-skin-icon="file"]
+)::before {
+  display: grid !important;
+  place-items: center;
+  width: 18px;
+  height: 16px;
+  border: 2px solid currentColor;
+  color: currentColor;
+  background:
+    linear-gradient(currentColor 0 0) right 2px top 2px / 2px 2px no-repeat,
+    #160d20;
+  box-shadow: 2px 2px 0 #08040d, inset 2px 0 rgba(255, 255, 255, .08);
+  font-size: 7px !important;
+  line-height: 1;
+}
+
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "MD" !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "PDF" !important; font-size: 6px !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="image"]::before { content: "PIC" !important; font-size: 6px !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="code"]::before { content: "<>" !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="data"]::before { content: "DAT" !important; font-size: 6px !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="archive"]::before { content: "ZIP" !important; font-size: 6px !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="text"]::before { content: "TXT" !important; font-size: 6px !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="media"]::before { content: "▶" !important; }
+:root[data-custom-skin="pixel-night-shift"] .tree-node-icon[data-skin-icon="file"]::before { content: "F" !important; }
+
+:root[data-custom-skin="pixel-night-shift"] .session-row-icon[data-skin-icon="session"]::before {
+  content: "MSG" !important;
+  display: grid !important;
+  place-items: center;
+  width: 20px;
+  height: 16px;
+  border: 2px solid var(--pixel-magenta);
+  color: var(--pixel-yellow);
+  background: #26112f;
+  box-shadow: 2px 2px 0 #08040d, inset 2px 0 #5b2b68;
+  font-family: var(--skin-font-code), monospace;
+  font-size: 6px !important;
+}
+
+:root[data-custom-skin="pixel-night-shift"] :is(
+  .project-switcher-icon-btn,
+  .session-action-btn,
+  .project-create-browse
+) {
+  position: relative;
+  font-size: 0 !important;
+}
+
+:root[data-custom-skin="pixel-night-shift"] :is(
+  .project-switcher-icon-btn,
+  .session-action-btn,
+  .project-create-browse
+)::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+  image-rendering: pixelated;
+}
+
+:root[data-custom-skin="pixel-night-shift"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="pixel-night-shift"] button[title="选择文件夹"]::before {
+  background:
+    linear-gradient(currentColor 0 0) 6px 1px / 2px 12px no-repeat,
+    linear-gradient(currentColor 0 0) 1px 6px / 12px 2px no-repeat,
+    linear-gradient(var(--pixel-yellow) 0 0) 1px 1px / 3px 2px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 10px 10px / 3px 2px no-repeat;
+}
+
+:root[data-custom-skin="pixel-night-shift"] button[title="刷新"]::before {
+  /* Opposed refresh arrows */
+  background:
+    linear-gradient(var(--pixel-cyan) 0 0) 3px 1px / 8px 2px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 11px 3px / 2px 5px no-repeat,
+    linear-gradient(var(--pixel-yellow) 0 0) 9px 1px / 4px 2px no-repeat,
+    linear-gradient(var(--pixel-yellow) 0 0) 11px 1px / 2px 4px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 3px 11px / 8px 2px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 1px 6px / 2px 5px no-repeat,
+    linear-gradient(var(--pixel-yellow) 0 0) 1px 10px / 4px 2px no-repeat,
+    linear-gradient(var(--pixel-yellow) 0 0) 1px 9px / 2px 4px no-repeat;
+}
+
+:root[data-custom-skin="pixel-night-shift"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="pixel-night-shift"] button[title="删除会话"]::before {
+  /* Pixel waste-bin */
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  background:
+    linear-gradient(var(--pixel-yellow) 0 0) 4px 0 / 6px 2px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 2px 2px / 10px 2px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 3px 5px / 2px 7px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 9px 5px / 2px 7px no-repeat,
+    linear-gradient(var(--pixel-cyan) 0 0) 3px 11px / 8px 2px no-repeat,
+    linear-gradient(var(--pixel-magenta) 0 0) 6px 6px / 2px 4px no-repeat;
+  box-shadow: none;
+}
+
+:root[data-custom-skin="pixel-night-shift"] button[title="重命名"]::before {
+  width: 2px;
+  height: 2px;
+  margin: 9px 0 0 1px;
+  background: var(--pixel-yellow);
+  box-shadow:
+    2px -2px var(--pixel-yellow), 4px -4px var(--pixel-yellow), 6px -6px var(--pixel-yellow),
+    8px -8px var(--pixel-magenta), 10px -10px var(--pixel-magenta),
+    0 2px var(--pixel-cyan), 2px 2px var(--pixel-cyan), 4px 2px var(--pixel-cyan);
+}
+
+:root[data-custom-skin="pixel-night-shift"] .sessions-new-btn::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 14px;
+  margin-right: 6px;
+  border: 2px solid var(--pixel-magenta);
+  color: var(--pixel-yellow);
+  background: #25102e;
+  box-shadow: 2px 2px 0 #08040d;
+  font-family: var(--skin-font-code), monospace;
+  font-size: 10px;
+  vertical-align: -2px;
+}
+
 :root[data-custom-skin="pixel-night-shift"] .side-panel-header,
 :root[data-custom-skin="pixel-night-shift"] .editor-tabs {
   min-height: 46px;

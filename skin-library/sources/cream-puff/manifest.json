@@ -2,7 +2,7 @@
   "schema": "workmode-skin/v3",
   "id": "cream-puff-v3",
   "name": "奶油泡芙实验室 · 官方",
-  "version": "3.2.3",
+  "version": "3.3.2",
   "foundation": "light",
   "palette": {
     "accent": "#df806f", "accentAlt": "#8fb8a2", "background": "#f7e8cf", "surface": "#fff9ed",

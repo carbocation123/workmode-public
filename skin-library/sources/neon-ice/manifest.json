@@ -2,7 +2,7 @@
   "schema": "workmode-skin/v3",
   "id": "neon-ice-v3",
   "name": "Neon Ice · 官方",
-  "version": "3.1.0",
+  "version": "3.2.1",
   "foundation": "dark",
   "palette": {
     "accent": "#66e8ff", "accentAlt": "#8f9cff", "background": "#02070c", "surface": "#07111a",

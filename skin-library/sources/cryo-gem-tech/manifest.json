@@ -2,7 +2,7 @@
   "schema": "workmode-skin/v3",
   "id": "cryo-gem-tech",
   "name": "霜核机能台",
-  "version": "3.1.0",
+  "version": "3.2.2",
   "foundation": "dark",
   "palette": {
     "accent": "#7edcff",

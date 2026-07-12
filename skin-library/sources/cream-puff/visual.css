@@ -878,3 +878,94 @@
     display: none;
   }
 }
+
+/* Cream enamel badges: soft, thick and deliberately non-Emoji so every
+   machine renders the same research-garden controls. */
+:root[data-custom-skin="cream-puff-v3"] :is(.activity-icon, .tree-node-icon, .session-row-icon) {
+  font-size: 0 !important;
+}
+:root[data-custom-skin="cream-puff-v3"] :is(.activity-icon, .tree-node-icon, .session-row-icon)::before {
+  display: grid !important;
+  place-items: center;
+  box-sizing: border-box;
+  font-family: "Trebuchet MS", "Microsoft YaHei UI", sans-serif;
+  font-weight: 800;
+  line-height: 1;
+}
+
+:root[data-custom-skin="cream-puff-v3"] .activity-icon[data-skin-icon="project"]::before,
+:root[data-custom-skin="cream-puff-v3"] .activity-icon[data-skin-icon="settings"]::before {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(155, 99, 79, .18);
+  border-radius: 10px;
+  color: var(--cocoa);
+  background: linear-gradient(145deg, #fffdf8, #f5d5c7);
+  box-shadow: 0 4px 0 #e5b9aa, inset 0 2px #fff;
+  font-size: 15px !important;
+}
+:root[data-custom-skin="cream-puff-v3"] .activity-icon[data-skin-icon="project"]::before { content: "⌂" !important; color: var(--peach-deep); }
+:root[data-custom-skin="cream-puff-v3"] .activity-icon[data-skin-icon="settings"]::before { content: "≋" !important; color: var(--mint-deep); }
+
+:root[data-custom-skin="cream-puff-v3"] .tree-node,
+:root[data-custom-skin="cream-puff-v3"] .session-row {
+  gap: 8px;
+}
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon {
+  width: 24px;
+  flex: 0 0 24px;
+}
+:root[data-custom-skin="cream-puff-v3"] .session-row-icon {
+  width: 24px;
+  height: 21px;
+  flex: 0 0 24px;
+}
+
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon::before,
+:root[data-custom-skin="cream-puff-v3"] .session-row-icon::before {
+  width: 21px;
+  height: 19px;
+  border: 2px solid rgba(123, 93, 76, .14);
+  border-radius: 7px;
+  color: var(--cocoa-soft);
+  background: #fffaf0;
+  box-shadow: 0 3px 0 #e6d6bf, inset 0 1px #fff;
+  font-size: 8px !important;
+}
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="folder"]::before { content: "▰" !important; color: #c88a55; background: #fff1c9; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="folder-open"]::before { content: "▱" !important; color: #b97545; background: #ffe9b5; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="markdown"]::before { content: "MD" !important; color: var(--peach-deep); background: #ffe6df; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="pdf"]::before { content: "P" !important; color: #c76565; background: #fce1e1; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="image"]::before { content: "▧" !important; color: var(--blue-deep); background: #e7f2f8; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="code"]::before { content: "<>" !important; color: #7c7bb0; background: #eeeaf8; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="data"]::before { content: "▥" !important; color: var(--mint-deep); background: #e5f3ea; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="archive"]::before { content: "▣" !important; color: #a88355; background: #f7ead2; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="text"]::before { content: "≡" !important; color: var(--cocoa-soft); }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="media"]::before { content: "▷" !important; color: var(--mint-deep); background: #e2f2eb; }
+:root[data-custom-skin="cream-puff-v3"] .tree-node-icon[data-skin-icon="file"]::before { content: "·" !important; }
+:root[data-custom-skin="cream-puff-v3"] .session-row-icon[data-skin-icon="session"]::before { content: "♡" !important; color: var(--peach-deep); background: #fff0ed; }
+
+:root[data-custom-skin="cream-puff-v3"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse) {
+  font-size: 0 !important;
+}
+:root[data-custom-skin="cream-puff-v3"] :is(.project-switcher-icon-btn, .session-action-btn, .project-create-browse)::before {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(128, 91, 71, .14);
+  border-radius: 8px;
+  color: var(--cocoa-soft);
+  background: #fffaf0;
+  box-shadow: 0 3px 0 #e5d4bc, inset 0 1px #fff;
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+:root[data-custom-skin="cream-puff-v3"] button[title="打开文件夹"]::before,
+:root[data-custom-skin="cream-puff-v3"] button[title="选择文件夹"]::before { content: "+"; color: var(--peach-deep); background: #ffe7df; }
+:root[data-custom-skin="cream-puff-v3"] button[title="刷新"]::before { content: "↻"; color: var(--mint-deep); background: #e5f3ea; }
+:root[data-custom-skin="cream-puff-v3"] button[title^="移除当前项目"]::before,
+:root[data-custom-skin="cream-puff-v3"] button[title="删除会话"]::before { content: "×"; color: #c76565; background: #fce5e3; }
+:root[data-custom-skin="cream-puff-v3"] button[title="重命名"]::before { content: "✎"; color: var(--blue-deep); background: #e9f1f6; }
