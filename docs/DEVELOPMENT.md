@@ -61,6 +61,15 @@ npm ci --prefix frontend
 npm --prefix frontend run dev
 ```
 
+正式 CI 固定 npm 10.9.4。修改前端依赖后必须用同版本更新并验证 lockfile，不能只依赖已有 `node_modules`：
+
+```powershell
+Push-Location frontend
+npx --yes npm@10.9.4 install --package-lock-only --ignore-scripts --no-audit --no-fund
+npx --yes npm@10.9.4 ci --ignore-scripts --no-audit --no-fund
+Pop-Location
+```
+
 打开 `http://127.0.0.1:5173`。桌面开发使用：
 
 ```powershell
