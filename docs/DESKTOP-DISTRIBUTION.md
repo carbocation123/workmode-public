@@ -73,6 +73,13 @@ Actions → Publish Windows release → Run workflow
 8. 生成 Tauri 更新签名、`latest.json` 和 `SHA256SUMS.txt`；
 9. 创建 `v<version>` Release，或安全覆盖同版本 Release 的产物。
 
+发行工作流固定使用 npm 10.9.4。提交版本锁文件前，应使用相同版本至少执行一次干净安装，避免较新 npm 生成的可选 peer 依赖记录无法被云端 `npm ci` 接受：
+
+```powershell
+npx --yes npm@10.9.4 ci --prefix frontend
+npx --yes npm@10.9.4 ci --prefix desktop
+```
+
 应用内更新端点固定为：
 
 ```text
