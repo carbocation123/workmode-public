@@ -51,8 +51,8 @@ logs\
 正式 Release 使用 `.github/workflows/release-windows.yml`。推荐在版本文件已经同步并通过本地测试后推送 SemVer 标签，GitHub 会自动云构建：
 
 ```powershell
-git tag v0.7.0
-git push origin v0.7.0
+git tag v0.7.1
+git push origin v0.7.1
 ```
 
 也保留网页手动入口：
