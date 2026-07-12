@@ -1,13 +1,26 @@
 param(
-  [string[]]$SkinId
+  [string[]]$SkinId,
+  [string]$SourceRoot,
+  [string]$PackageRoot
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $Root = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
-$SourceRoot = Join-Path $Root "skin-library\sources"
-$PackageRoot = Join-Path $Root "skin-library\packages"
+$PrivateLibraryRoot = Join-Path $Root "local-reference\reward-skin-library"
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+  $SourceRoot = Join-Path $PrivateLibraryRoot "sources"
+} elseif (-not [System.IO.Path]::IsPathRooted($SourceRoot)) {
+  $SourceRoot = Join-Path $Root $SourceRoot
+}
+if ([string]::IsNullOrWhiteSpace($PackageRoot)) {
+  $PackageRoot = Join-Path $PrivateLibraryRoot "packages"
+} elseif (-not [System.IO.Path]::IsPathRooted($PackageRoot)) {
+  $PackageRoot = Join-Path $Root $PackageRoot
+}
+$SourceRoot = [System.IO.Path]::GetFullPath($SourceRoot)
+$PackageRoot = [System.IO.Path]::GetFullPath($PackageRoot)
 $Signer = Join-Path $Root "scripts\official-skin.mjs"
 
 function Assert-Inside {
@@ -21,7 +34,7 @@ function Assert-Inside {
 }
 
 if (-not (Test-Path -LiteralPath $SourceRoot -PathType Container)) {
-  throw "Skin source directory is missing: $SourceRoot"
+  throw "Private skin source directory is missing: $SourceRoot. Restore the ignored local reward library or pass -SourceRoot explicitly."
 }
 if (-not (Test-Path -LiteralPath $Signer -PathType Leaf)) {
   throw "Skin signer is missing: $Signer"
@@ -92,4 +105,3 @@ foreach ($source in $sources) {
 Get-ChildItem -LiteralPath $PackageRoot -File -Filter "*.workmode-skin" |
   Sort-Object Name |
   Select-Object Name, Length, LastWriteTime
-

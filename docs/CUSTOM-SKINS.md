@@ -71,7 +71,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-skin-library.p
 
 初始化命令会在缺失时创建私钥，并把对应公钥写入应用信任表。私钥必须另做离线备份；丢失后只能发布新公钥和新 `keyId`，不能恢复旧签名身份。
 
-七套奖励皮肤源文件统一位于 `skin-library/sources/`：紫晶星象塔、奶油泡芙、霜核机能台、绿磷终端、午夜控制台、Neon Ice 和酒保行动·像素夜班。签名包统一输出到被 Git 忽略的 `skin-library/packages/`，只用于本地测试和手动奖励发放，不进入 GitHub Release、安装包或 GitHub Actions 构建产物。
+奖励皮肤源码、设计样稿、字体、旧 recipe、本地验签清单和签名包统一位于维护机被 Git 忽略的 `local-reference/reward-skin-library/`，不进入 GitHub、安装包、Release 或 GitHub Actions 构建产物。`build-skin-library.ps1` 默认读取该目录，也支持显式 `-SourceRoot` 与 `-PackageRoot`；公开克隆只包含皮肤协议、运行时、安全测试和签名工具，不需要私有库即可构建。
 
 皮肤可独立于应用升级。保持同一 manifest `id`、递增皮肤 `version` 并重新签名后，用户再次导入会覆盖该 ID 的 manifest、签名收据、CSS 和资源；不需要重新安装 Workmode。只有新增核心语义槽位、修改包协议或信任公钥时才需要发布应用版本。
 

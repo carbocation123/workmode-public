@@ -20,7 +20,7 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 0.7.0 是一次主动断开的皮肤协议升级。WebView 文件选择器只接受 `.workmode-skin`，应用在解析 manifest 和 CSS 之前校验内置 Ed25519 公钥、完整文件集合、大小和 SHA-256；只有官方签名包才写入 `workmode-public-official-skins-v1` 本地库与同名 IndexedDB。旧 `.workmode-skin.json`、未签名包、`workmode-public-custom-skin-v1` 和 `workmode-public-skins-v3` 不迁移。签名包可以包含布局/视觉 CSS 与本地字体图片，因此按受信任的官方界面代码处理；它仍不能携带 JavaScript、HTML 或新增 Tauri 权限。
 
-应用在皮肤加载阶段写入 boot guard，稳定三秒后清除；异常退出后下次启动自动停用该皮肤。运行时资源错误也会回退基础主题。`Ctrl+Alt+Shift+R` 仅清除皮肤选择并刷新应用，不删除用户数据。Release 构建脚本完全不读取 `skin-library/` 或 `.release-secrets/official-skin-ed25519.pem`；GitHub Actions 只上传 `release/desktop-<version>/` 根目录中的应用产物。
+应用在皮肤加载阶段写入 boot guard，稳定三秒后清除；异常退出后下次启动自动停用该皮肤。运行时资源错误也会回退基础主题。`Ctrl+Alt+Shift+R` 仅清除皮肤选择并刷新应用，不删除用户数据。奖励皮肤维护库位于被 Git 忽略的 `local-reference/reward-skin-library/`；Release 构建脚本完全不读取 `local-reference/` 或 `.release-secrets/official-skin-ed25519.pem`，GitHub Actions 只上传 `release/desktop-<version>/` 根目录中的应用产物。
 
 设置页“快速反馈 Bug”使用安装包内置的公众号二维码，并允许用户复制脱敏诊断模板或通过系统默认邮件客户端写信给 `yantianxue_skye@qq.com`。打开反馈弹窗不会上传数据；Tauri Opener 仅放行 `mailto:*`，邮件发送必须由用户在邮件客户端中确认。模板不读取项目名、路径、会话正文或 API Key。
 

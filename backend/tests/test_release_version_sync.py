@@ -85,6 +85,7 @@ class ReleaseVersionSyncTest(unittest.TestCase):
         self.assertIn('Get-ChildItem "release/desktop-$version" -File', workflow)
         self.assertNotIn('-Recurse', workflow)
         self.assertNotIn('skin-library', workflow)
+        self.assertNotIn('local-reference', workflow)
 
     def test_sync_updates_every_release_version_source(self):
         with tempfile.TemporaryDirectory() as tmp:

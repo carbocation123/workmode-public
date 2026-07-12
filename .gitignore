@@ -13,7 +13,6 @@ frontend/dist/
 /.run/
 /local-reference/*
 !/local-reference/README.md
-/skin-library/packages/
 /release/
 /backups/
 desktop/node_modules/

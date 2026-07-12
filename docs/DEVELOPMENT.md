@@ -81,13 +81,13 @@ npm --prefix desktop run dev
 
 内置普通皮肤在 `frontend/src/theme.ts` 注册稳定 ID，并在 `frontend/src/styles.css` 通过 `data-theme` 作用域覆盖语义化 token；需要顶部结构或其他额外外壳时，再通过 `frontend/src/SkinChrome.tsx` 注册只读运行状态组件。业务数据和交互组件不能在皮肤中复制一份。
 
-0.7.0 起用户入口只接受官方 Ed25519 签名的 `.workmode-skin`。七套奖励皮肤源码统一放在 `skin-library/sources/<skin-id>/`，至少包含 `manifest.json`、`layout.css` 和 `visual.css`；字体、图片和图标必须同时提交许可证。`layout.css` 只能围绕应用维护的 `data-skin-slot` 排列真实内容，`visual.css` 负责外观。不得加入 JavaScript、HTML、远程资源、伪造业务内容或权限声明。
+0.7.0 起用户入口只接受官方 Ed25519 签名的 `.workmode-skin`。公开仓库只维护皮肤协议、导入器、运行时、安全回退和签名工具，不存放奖励皮肤源码或样稿。维护机的私有库位于被 Git 忽略的 `local-reference/reward-skin-library/`；每套源码至少包含 `manifest.json`、`layout.css` 和 `visual.css`，字体、图片和图标必须附带许可证。`layout.css` 只能围绕应用维护的 `data-skin-slot` 排列真实内容，`visual.css` 负责外观。不得加入 JavaScript、HTML、远程资源、伪造业务内容或权限声明。
 
-协议、信任表、本地库、包解析、IndexedDB 和运行时分别位于 `skinProtocol.ts`、`officialSkinKeys.ts`、`skinLibrary.ts`、`skinPackage.ts`、`skinAssetStore.ts` 与 `skinAssetRuntime.ts`。修改导入或执行边界时，先更新未知签名、篡改、路径越界、CSS 注入清理、boot guard 和紧急恢复测试，再同步 [CUSTOM-SKINS.md](CUSTOM-SKINS.md)。旧 `examples/skins/*.json` 仅保留为内部 recipe/解析回归样例，不是可导入或可分发皮肤。
+协议、信任表、本地库、包解析、IndexedDB 和运行时分别位于 `skinProtocol.ts`、`officialSkinKeys.ts`、`skinLibrary.ts`、`skinPackage.ts`、`skinAssetStore.ts` 与 `skinAssetRuntime.ts`。修改导入或执行边界时，先更新测试中程序化构造的最小包、未知签名、篡改、路径越界、CSS 注入清理、boot guard 和紧急恢复测试，再同步 [CUSTOM-SKINS.md](CUSTOM-SKINS.md)。旧声明式 JSON recipe 已移出公开仓库，不是导入或分发入口。
 
-签包只在受信任维护机执行：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-skin-library.ps1`。脚本会净化每套源目录，只复制协议文件、manifest 声明素材和许可证，再把签名包写入被 Git 忽略的 `skin-library/packages/`。私钥只能位于被 Git 忽略的 `.release-secrets/official-skin-ed25519.pem`；公钥可进入源码。每次签包后必须运行真实包验签测试。桌面发行脚本与 GitHub Actions 不读取或上传皮肤包。
+签包只在受信任维护机执行：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-skin-library.ps1`。脚本默认读取 `local-reference/reward-skin-library/sources/` 并输出到同级 `packages/`，也可以显式指定 `-SourceRoot` 与 `-PackageRoot`。脚本会净化每套源目录，只复制协议文件、manifest 声明素材和许可证。私钥只能位于被 Git 忽略的 `.release-secrets/official-skin-ed25519.pem`；公钥可进入源码。每次签包后必须运行本地真实包验签测试。桌面发行脚本与 GitHub Actions 不读取或上传私有皮肤库。
 
-静态视觉探索统一放在 `design/skin-lab/`。这里的 HTML 只用于设计比较和回归，不是可导入皮肤；确认可产品化后，把样稿迁移为独立的官方 `layout.css`/`visual.css` 并完成真实界面回归。第三方皮肤解包、游戏截图、真实论文和许可证未确认素材只放在 ignored 的 `local-reference/`，任何构建、测试和运行时代码都不得引用它。
+静态视觉探索与奖励皮肤回归样稿统一放在私有库的 `design-lab/`，不是可导入皮肤。第三方皮肤解包、游戏截图、真实论文和许可证未确认素材同样只放在 ignored 的 `local-reference/`；公开构建、测试和运行时代码不得依赖这些文件。奖励皮肤专属测试可在本地库存在时运行，在公开克隆中应明确跳过。
 
 ## 验证命令
 
@@ -142,11 +142,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1 -ValidateOnly
 本地目录职责：
 
 - `.run/`：随时可重建的运行态、烟测副本、临时发行配置和项目自带开发工具；
-- `design/skin-lab/`：可以提交的自制静态设计样稿；
-- `local-reference/`：Git 忽略的本地档案，包含第三方参考、真实文献和旧实验记录，不属于可随手删除的缓存；
-- `skin-library/sources/`：七套可审核、可继续修改的奖励皮肤源码；
-- `skin-library/packages/`：被 Git 忽略的本地签名包，只用于测试和手动发放；
-- `examples/skins/`：旧声明式协议与 recipe 回归样例，不作为 0.7.0 用户导入入口。
+- `local-reference/`：Git 忽略的本地档案，包含奖励皮肤维护库、静态样稿、第三方参考、真实文献和旧实验记录，不属于可随手删除的缓存；
+- `local-reference/reward-skin-library/`：奖励皮肤源码、设计稿、旧 recipe、本地验签清单和手动发放包；该目录不进入 GitHub。
 
 删除文件前先确认没有代码、配置、测试、文档或发行流程引用。用户项目、session、JSONL、工作记忆和迁移备份不属于可清理构建产物。
 

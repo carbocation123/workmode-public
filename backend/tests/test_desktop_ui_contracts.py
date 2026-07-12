@@ -15,9 +15,13 @@ SKIN_LIBRARY_SOURCE = ROOT / "frontend" / "src" / "skinLibrary.ts"
 SKIN_PACKAGE_SOURCE = ROOT / "frontend" / "src" / "skinPackage.ts"
 OFFICIAL_SKIN_KEYS_SOURCE = ROOT / "frontend" / "src" / "officialSkinKeys.ts"
 OFFICIAL_SKIN_SIGNER = ROOT / "scripts" / "official-skin.mjs"
-SKIN_LIBRARY_DIR = ROOT / "skin-library"
-SKIN_SOURCE_DIR = SKIN_LIBRARY_DIR / "sources"
+OFFICIAL_SKIN_BUILDER = ROOT / "scripts" / "build-skin-library.ps1"
+PRIVATE_REWARD_SKIN_ROOT = ROOT / "local-reference" / "reward-skin-library"
+SKIN_SOURCE_DIR = PRIVATE_REWARD_SKIN_ROOT / "sources"
 PIXEL_SKIN_DIR = SKIN_SOURCE_DIR / "pixel-night-shift"
+LEGACY_SKIN_EXAMPLE_DIR = PRIVATE_REWARD_SKIN_ROOT / "legacy-examples"
+PRIVATE_REWARD_SKINS_AVAILABLE = SKIN_SOURCE_DIR.is_dir()
+PRIVATE_LEGACY_EXAMPLES_AVAILABLE = LEGACY_SKIN_EXAMPLE_DIR.is_dir()
 APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
 BUG_REPORT_SOURCE = ROOT / "frontend" / "src" / "bugReport.ts"
 BUG_REPORT_DIALOG_SOURCE = ROOT / "frontend" / "src" / "BugReportDialog.tsx"
@@ -29,18 +33,26 @@ NEON_HUD_SOURCE = ROOT / "frontend" / "src" / "NeonHud.tsx"
 SKIN_CHROME_SOURCE = ROOT / "frontend" / "src" / "SkinChrome.tsx"
 PRESET_CHROME_SOURCE = ROOT / "frontend" / "src" / "PresetChrome.tsx"
 NEON_ASSET_DIR = ROOT / "frontend" / "src" / "assets" / "neon"
-CREAM_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "cream-puff.workmode-skin.json"
-GREEN_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "green-phosphor.workmode-skin.json"
-AMETHYST_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "amethyst-observatory.workmode-skin.json"
-CONSOLE_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "midnight-console.workmode-skin.json"
-GEM_TECH_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "cryo-gem-tech.workmode-skin.json"
+CREAM_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "cream-puff.workmode-skin.json"
+GREEN_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "green-phosphor.workmode-skin.json"
+AMETHYST_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "amethyst-observatory.workmode-skin.json"
+CONSOLE_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "midnight-console.workmode-skin.json"
+GEM_TECH_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "cryo-gem-tech.workmode-skin.json"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 TAURI_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.conf.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
+FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 
 
 class DesktopUiContractTest(unittest.TestCase):
+    def test_frontend_build_toolchain_is_not_a_runtime_dependency(self) -> None:
+        package = json.loads(FRONTEND_PACKAGE.read_text(encoding="utf-8"))
+
+        for dependency in ("@vitejs/plugin-react", "typescript", "vite"):
+            self.assertNotIn(dependency, package["dependencies"])
+            self.assertIn(dependency, package["devDependencies"])
+
     def test_pdf_preview_fills_the_available_file_panel_height(self) -> None:
         css = STYLES.read_text(encoding="utf-8")
         rule = re.search(r"\.media\.pdf\s*\{(?P<body>[^}]*)\}", css)
@@ -252,9 +264,18 @@ class DesktopUiContractTest(unittest.TestCase):
         ):
             source = app + PRESET_CHROME_SOURCE.read_text(encoding="utf-8") + NEON_HUD_SOURCE.read_text(encoding="utf-8")
             self.assertIn(f'data-skin-slot="{slot}"', source)
-        self.assertTrue((SKIN_LIBRARY_DIR / "README.md").is_file())
-        self.assertTrue((SKIN_SOURCE_DIR / "green-phosphor" / "manifest.json").is_file())
+        builder = OFFICIAL_SKIN_BUILDER.read_text(encoding="utf-8")
+        self.assertIn("local-reference\\reward-skin-library", builder)
+        self.assertIn("[string]$SourceRoot", builder)
+        self.assertIn("[string]$PackageRoot", builder)
+        self.assertNotIn('"skin-library\\sources"', builder)
 
+    def test_reward_skin_maintenance_assets_stay_out_of_public_source_tree(self) -> None:
+        self.assertFalse((ROOT / "skin-library" / "sources").exists())
+        self.assertFalse((ROOT / "design" / "skin-lab").exists())
+        self.assertFalse((ROOT / "examples" / "skins").exists())
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_green_phosphor_keeps_terminal_content_readable_and_role_aligned(self) -> None:
         layout = (SKIN_SOURCE_DIR / "green-phosphor" / "layout.css").read_text(encoding="utf-8")
         visual = (SKIN_SOURCE_DIR / "green-phosphor" / "visual.css").read_text(encoding="utf-8")
@@ -284,6 +305,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('minmax(340px, 400px);', layout)
         self.assertNotIn('minmax(340px, 400px) !important', layout)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_cream_puff_has_independent_soft_layout_without_demo_copy(self) -> None:
         layout = (SKIN_SOURCE_DIR / "cream-puff" / "layout.css").read_text(encoding="utf-8")
         visual = (SKIN_SOURCE_DIR / "cream-puff" / "visual.css").read_text(encoding="utf-8")
@@ -334,6 +356,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('box-shadow:', visual)
         self.assertNotIn('MY LITTLE LAB', visual.upper())
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_neon_ice_has_independent_glass_hud_and_draggable_viewer(self) -> None:
         layout = (SKIN_SOURCE_DIR / "neon-ice" / "layout.css").read_text(encoding="utf-8")
         visual = (SKIN_SOURCE_DIR / "neon-ice" / "visual.css").read_text(encoding="utf-8")
@@ -357,6 +380,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertNotIn('battery', visual.lower())
         self.assertNotIn('temperature', visual.lower())
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_cryo_gem_tech_has_independent_instrument_workbench(self) -> None:
         layout = (SKIN_SOURCE_DIR / "cryo-gem-tech" / "layout.css").read_text(encoding="utf-8")
         visual = (SKIN_SOURCE_DIR / "cryo-gem-tech" / "visual.css").read_text(encoding="utf-8")
@@ -376,6 +400,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.message .bubble code,', visual)
         self.assertIn('color: #e8f7ff', visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_midnight_console_has_independent_city_terminal_language(self) -> None:
         layout = (SKIN_SOURCE_DIR / "midnight-console" / "layout.css").read_text(encoding="utf-8")
         visual = (SKIN_SOURCE_DIR / "midnight-console" / "visual.css").read_text(encoding="utf-8")
@@ -395,6 +420,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.message .bubble code,', visual)
         self.assertIn('color: #f5e9d3', visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_green_phosphor_reserves_space_for_terminal_file_and_session_ids(self) -> None:
         visual = (SKIN_SOURCE_DIR / "green-phosphor" / "visual.css").read_text(encoding="utf-8")
 
@@ -403,12 +429,14 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.session-row-icon {', visual)
         self.assertIn('gap: 8px', visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_cream_puff_hides_fallback_glyphs_behind_enamel_badges(self) -> None:
         visual = (SKIN_SOURCE_DIR / "cream-puff" / "visual.css").read_text(encoding="utf-8")
 
         self.assertIn(':is(.activity-icon, .tree-node-icon, .session-row-icon) {', visual)
         self.assertIn('font-size: 0 !important', visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_amethyst_observatory_has_independent_arcane_archive(self) -> None:
         layout = (SKIN_SOURCE_DIR / "amethyst-observatory" / "layout.css").read_text(encoding="utf-8")
         visual = (SKIN_SOURCE_DIR / "amethyst-observatory" / "visual.css").read_text(encoding="utf-8")
@@ -426,6 +454,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.file-view-markdown', visual)
         self.assertIn('radial-gradient(circle at 50% 50%', visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_pixel_night_shift_uses_current_signed_skin_structure(self) -> None:
         layout = (PIXEL_SKIN_DIR / "layout.css").read_text(encoding="utf-8")
         visual = (PIXEL_SKIN_DIR / "visual.css").read_text(encoding="utf-8")
@@ -460,6 +489,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.tool-card', visual)
         self.assertIn('.file-view-markdown', visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_every_reward_skin_has_theme_specific_navigation_file_and_control_icons(self) -> None:
         expected_versions = {
             "amethyst-observatory": "3.2.1",
@@ -489,6 +519,7 @@ class DesktopUiContractTest(unittest.TestCase):
                 for selector in required_selectors:
                     self.assertIn(selector, visual)
 
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_every_reward_skin_reserves_file_and_session_icon_slots(self) -> None:
         for source in sorted(SKIN_SOURCE_DIR.iterdir()):
             if not source.is_dir():
@@ -524,11 +555,6 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("border-radius: var(--custom-skin-button-radius", css)
         self.assertNotIn("data:text/css", css)
 
-        example = json.loads(CREAM_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        self.assertEqual(example["schema"], "workmode-skin/v2")
-        self.assertEqual(example["material"]["preset"], "soft-cream")
-        self.assertNotIn("decoration", example)
-
     def test_v3_skin_engine_keeps_assets_local_and_declarative(self) -> None:
         protocol = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
         package = SKIN_PACKAGE_SOURCE.read_text(encoding="utf-8")
@@ -559,19 +585,6 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('className="skin-decoration-overlay"', APP_SOURCE.read_text(encoding="utf-8"))
         self.assertRegex(runtime_css, r"\.skin-decoration-overlay\s*\{[^}]*pointer-events:\s*none")
         self.assertIn("font-src 'self' data: blob:", tauri["app"]["security"]["csp"])
-
-        green = json.loads(GREEN_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        amethyst = json.loads(AMETHYST_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        self.assertEqual(green["schema"], "workmode-skin/v3")
-        self.assertEqual(green["material"]["preset"], "crt")
-        self.assertEqual(green["icons"]["preset"], "terminal")
-        self.assertEqual(green["effects"]["layers"], ["crt", "glow"])
-        self.assertEqual(green["geometry"]["edgeProfile"], "square")
-        self.assertEqual(amethyst["schema"], "workmode-skin/v3")
-        self.assertEqual(amethyst["components"]["chrome"], "observatory")
-        self.assertEqual(amethyst["decoration"]["preset"], "arcane")
-        self.assertEqual(amethyst["effects"]["layers"], ["stars", "glow"])
-        self.assertEqual(amethyst["geometry"]["edgeProfile"], "beveled")
 
     def test_every_structural_skin_keeps_the_workspace_in_the_middle_grid_row(self) -> None:
         css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
@@ -626,11 +639,6 @@ class DesktopUiContractTest(unittest.TestCase):
         for fake_telemetry in ("battery", "temperature", "signalStrength", "cpuUsage", "uptime"):
             self.assertNotIn(fake_telemetry, renderer)
 
-        console = json.loads(CONSOLE_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        gem = json.loads(GEM_TECH_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        self.assertEqual(console["components"]["chrome"], "console")
-        self.assertEqual(gem["components"]["chrome"], "gem-tech")
-
     def test_instrument_context_and_indexed_recipes_keep_real_ui_data(self) -> None:
         protocol = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
         runtime_css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
@@ -649,16 +657,6 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("contextPct", app)
         self.assertIn("entry.name", app)
         self.assertIn("entry.path", app)
-
-        console = json.loads(CONSOLE_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        gem = json.loads(GEM_TECH_SKIN_EXAMPLE.read_text(encoding="utf-8"))
-        self.assertEqual(
-            console["components"],
-            {"chrome": "console", "messages": "log", "tools": "instrument", "context": "signal", "fileTree": "indexed"},
-        )
-        self.assertEqual(gem["components"]["tools"], "instrument")
-        self.assertEqual(gem["components"]["context"], "gem")
-        self.assertEqual(gem["components"]["fileTree"], "indexed")
 
     def test_quick_bug_report_uses_local_qr_and_sanitized_email_channel(self) -> None:
         app = APP_SOURCE.read_text(encoding="utf-8")
@@ -681,6 +679,7 @@ class DesktopUiContractTest(unittest.TestCase):
         allowed_urls = [item["url"] for item in opener["allow"]]
         self.assertIn("mailto:*", allowed_urls)
 
+    @unittest.skipUnless(PRIVATE_LEGACY_EXAMPLES_AVAILABLE, "private legacy skin fixtures are not present")
     def test_skin_lab_representative_examples_keep_their_baseline_recipes(self) -> None:
         cream = json.loads(CREAM_SKIN_EXAMPLE.read_text(encoding="utf-8"))
         green = json.loads(GREEN_SKIN_EXAMPLE.read_text(encoding="utf-8"))
