@@ -734,6 +734,17 @@ pre {
   text-align: left;
 }
 
+.session-row-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--color-primary);
+  font-size: 11px;
+  line-height: 1;
+}
+
 .session-row-actions {
   display: flex;
   align-items: center;
@@ -903,6 +914,34 @@ pre {
 
 .custom-skin-file-input {
   display: none;
+}
+
+.custom-skin-library-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.custom-skin-library-controls label {
+  color: var(--color-on-surface-dim);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.custom-skin-select {
+  min-width: 0;
+  flex: 1;
+  padding: 7px 9px;
+  border: 1px solid var(--color-divider);
+  border-radius: 7px;
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font: inherit;
+}
+
+.custom-skin-select:focus-visible {
+  border-color: var(--color-primary-border);
+  outline: 2px solid var(--color-primary-soft);
 }
 
 .custom-skin-card {
@@ -1259,21 +1298,25 @@ pre {
 }
 
 .tool-card-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--color-primary);
-  box-shadow: 0 0 12px var(--color-primary-glow);
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--color-primary);
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .tool-card.error .tool-card-dot {
-  background: var(--color-danger);
-  box-shadow: 0 0 12px var(--color-danger-border);
+  color: var(--color-danger);
+  text-shadow: 0 0 10px var(--color-danger-border);
 }
 
 .tool-card.cancelled .tool-card-dot {
-  background: var(--color-warning);
-  box-shadow: 0 0 12px var(--color-warning-border);
+  color: var(--color-warning);
+  text-shadow: 0 0 10px var(--color-warning-border);
 }
 
 .tool-card-name {
@@ -1337,6 +1380,16 @@ pre {
 
 .message .bubble p {
   margin: 8px 0;
+}
+
+.message .bubble ul,
+.message .bubble ol {
+  margin: 0.65em 0;
+  padding-left: 1.55em;
+}
+
+.message .bubble li + li {
+  margin-top: 0.35em;
 }
 
 .message .bubble :first-child {
@@ -3689,4 +3742,65 @@ pre {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+:root {
+  --bug-report-backdrop: rgba(2, 6, 12, .78);
+}
+
+.bug-report-backdrop {
+  position: fixed;
+  z-index: 12000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bug-report-backdrop);
+  backdrop-filter: blur(8px);
+}
+
+.bug-report-dialog {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(220px, 300px);
+  gap: 28px;
+  width: min(820px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 30px;
+  border: 2px solid var(--color-outline-variant);
+  border-radius: 18px;
+  color: var(--color-on-surface);
+  background: var(--color-surface-container-lowest);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .45);
+}
+
+.bug-report-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-on-surface-variant);
+  background: transparent;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.bug-report-copy small { color: var(--color-primary); font-family: "Cascadia Mono", Consolas, monospace; letter-spacing: .12em; }
+.bug-report-copy h2 { margin: 8px 0 12px; font-size: 26px; }
+.bug-report-copy p { margin: 0 0 18px; color: var(--color-on-surface-variant); line-height: 1.7; }
+.bug-report-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.bug-report-email { display: inline-block; margin-top: 14px; color: var(--color-primary); }
+.bug-report-status { margin-top: 12px; color: var(--color-success); }
+.bug-report-preview { margin-top: 18px; color: var(--color-on-surface-variant); }
+.bug-report-preview pre { max-height: 220px; overflow: auto; padding: 12px; border: 1px solid var(--color-outline-variant); white-space: pre-wrap; font-size: 11px; }
+.bug-report-qr { display: grid; align-content: center; justify-items: center; gap: 10px; margin: 0; }
+.bug-report-qr img { width: min(260px, 100%); aspect-ratio: 1; border: 12px solid #fff; border-radius: 12px; image-rendering: auto; }
+.bug-report-qr figcaption { color: var(--color-on-surface-variant); font-size: 12px; }
+
+@media (max-width: 720px) {
+  .bug-report-dialog { grid-template-columns: 1fr; padding: 24px; }
+  .bug-report-qr img { width: min(220px, 80vw); }
 }

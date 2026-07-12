@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   API_BASE,
   AppSettings,
@@ -26,11 +26,19 @@ import {
 } from './conversation'
 import { directoryPaths, fileEntryVisual, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { BugReportDialog } from './BugReportDialog'
+import { buildBugReport } from './bugReport'
 import {
   CUSTOM_SKIN_STORAGE_KEY,
+  SKIN_RUNTIME_GUARD_KEY,
   applyCustomSkinToRoot,
-  parseCustomSkinState
+  getActiveCustomSkin,
+  getSkinFoundationTheme,
+  skinUsesChrome,
+  parseCustomSkinLibraryState
 } from './customSkin'
+import { refreshSkinAssetRuntime } from './skinAssetRuntime'
+import { toolSemanticLabel, toolStatusSkinIcon } from './skinSemantics'
 import { SkinChrome } from './SkinChrome'
 import { ThemePanel } from './ThemePanel'
 import {
@@ -105,13 +113,16 @@ function projectDepth(project: Project, projects: Project[]) {
 function ToolMessage({ item }: { item: ToolConversationItem }) {
   const args = Object.keys(item.args).length ? JSON.stringify(item.args, null, 2) : ''
   const hasDetails = Boolean(args || item.result)
+  const toolIconSlot = toolStatusSkinIcon(item.status)
+  const toolLabel = toolSemanticLabel(item.toolName)
+  const toolIconFallback = item.status === 'running' ? '●' : item.status === 'done' ? '✓' : item.status === 'cancelled' ? '■' : '×'
 
   return (
     <article className="message tool">
-      <div className={`tool-card ${item.status}`}>
+      <div className={`tool-card ${item.status}`} data-skin-slot="tool-call">
         <span className="neon-tool-scan" aria-hidden />
         <div className="tool-card-header">
-          <span className="tool-card-dot" />
+          <span className="tool-card-dot skin-icon" data-skin-icon={toolIconSlot} data-tool-label={toolLabel} aria-hidden>{toolIconFallback}</span>
           <span className="tool-card-name">{item.toolName}</span>
           <span className="tool-card-status">
             {item.status === 'running'
@@ -212,17 +223,21 @@ export default function App() {
   const [desktopUpdateVersion, setDesktopUpdateVersion] = useState<string | null>(null)
   const [desktopUpdating, setDesktopUpdating] = useState(false)
   const [desktopUpdateProgress, setDesktopUpdateProgress] = useState(0)
+  const [showBugReport, setShowBugReport] = useState(false)
   const [onboardingProgress, setOnboardingProgress] = useState(() => parseProgress(localStorage.getItem(ONBOARDING_STORAGE_KEY)))
-  const [customSkin, setCustomSkin] = useState(() => {
-    const parsed = parseCustomSkinState(localStorage.getItem(CUSTOM_SKIN_STORAGE_KEY))
-    if (parsed?.enabled && allowedThemeSelection(parsed.skin.baseTheme, onboardingProgress.achievements) !== parsed.skin.baseTheme) {
-      return { ...parsed, enabled: false }
+  const [customSkinLibrary, setCustomSkinLibrary] = useState(() => {
+    const parsed = parseCustomSkinLibraryState(localStorage.getItem(CUSTOM_SKIN_STORAGE_KEY))
+    const activeSkin = getActiveCustomSkin(parsed)
+    const foundationTheme = activeSkin ? getSkinFoundationTheme(activeSkin.skin) : null
+    if (foundationTheme && allowedThemeSelection(foundationTheme, onboardingProgress.achievements) !== foundationTheme) {
+      return { ...parsed, activeSkinId: null }
     }
     return parsed
   })
+  const customSkin = useMemo(() => getActiveCustomSkin(customSkinLibrary), [customSkinLibrary])
   const [themePreference, setThemePreference] = useState(() => {
     const parsed = parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY))
-    const selection = customSkin?.enabled ? customSkin.skin.baseTheme : parsed.selection
+    const selection = customSkin?.enabled ? getSkinFoundationTheme(customSkin.skin) : parsed.selection
     return {
       ...parsed,
       selection: allowedThemeSelection(selection, onboardingProgress.achievements)
@@ -255,7 +270,15 @@ export default function App() {
   const contextBudget = context?.budget_tokens || 0
   const contextPct = contextBudget ? Math.min(100, (Number(contextTotal) / contextBudget) * 100) : 0
   const resolvedTheme = resolveTheme(themePreference.selection, systemPrefersDark)
-  const customHudActive = customSkin?.enabled && customSkin?.skin.chrome?.type === 'hud'
+  const bugReport = useMemo(() => buildBugReport({
+    version: desktopInfo?.version || 'development',
+    runtime: desktopInfo ? 'desktop' : 'web',
+    platform: navigator.userAgent,
+    language: navigator.language,
+    theme: resolvedTheme,
+    customSkin: customSkin?.skin.id || null
+  }), [customSkin?.skin.id, desktopInfo, resolvedTheme])
+  const customHudActive = Boolean(customSkin?.enabled && skinUsesChrome(customSkin.skin))
   const hudLayoutActive = customHudActive || THEMES.find((theme) => theme.id === resolvedTheme)?.layout === 'hud'
   const historyIncluded = typeof context?.history_messages_included === 'number' ? context.history_messages_included : undefined
   const historyTotal = typeof context?.history_messages_total === 'number' ? context.history_messages_total : undefined
@@ -295,9 +318,34 @@ export default function App() {
     applyThemeToRoot(document.documentElement, themePreference, systemPrefersDark)
     applyCustomSkinToRoot(document.documentElement, customSkin)
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themePreference))
-    if (customSkin) localStorage.setItem(CUSTOM_SKIN_STORAGE_KEY, JSON.stringify(customSkin))
+    if (customSkinLibrary.skins.length) localStorage.setItem(CUSTOM_SKIN_STORAGE_KEY, JSON.stringify(customSkinLibrary))
     else localStorage.removeItem(CUSTOM_SKIN_STORAGE_KEY)
-  }, [themePreference, systemPrefersDark, customSkin])
+  }, [themePreference, systemPrefersDark, customSkin, customSkinLibrary])
+
+  useEffect(() => {
+    let cancelled = false
+    let stableTimer: number | undefined
+    if (customSkin) localStorage.setItem(SKIN_RUNTIME_GUARD_KEY, customSkin.skin.id)
+    else localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+    void refreshSkinAssetRuntime(document.documentElement, customSkin).then(() => {
+      if (cancelled || !customSkin) return
+      stableTimer = window.setTimeout(() => {
+        if (localStorage.getItem(SKIN_RUNTIME_GUARD_KEY) === customSkin.skin.id) {
+          localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+        }
+      }, 3000)
+    }).catch((error) => {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      setCustomSkinLibrary((current) => current.activeSkinId === customSkin?.skin.id
+        ? { ...current, activeSkinId: null }
+        : current)
+      setStatus(`官方皮肤加载失败，已自动停用：${error instanceof Error ? error.message : String(error)}`)
+    })
+    return () => {
+      cancelled = true
+      if (stableTimer !== undefined) window.clearTimeout(stableTimer)
+    }
+  }, [customSkin])
 
   useEffect(() => {
     if (!achievementToast) return
@@ -951,12 +999,15 @@ export default function App() {
 
   return (
     <div
+      data-skin-slot="app-shell"
       className={`ide-shell${activePanel === 'settings' ? ' settings-open' : ''}${hudLayoutActive ? ' hud-layout' : ''}`}
       style={{
         gridTemplateColumns: `48px 280px minmax(420px, 1fr) 6px ${rightWidth}px`,
         gridTemplateRows: hudLayoutActive ? '58px minmax(0, 1fr) 27px' : '1fr 24px'
       }}
     >
+      <div className="skin-background-layer" aria-hidden />
+      <div className="skin-decoration-overlay" aria-hidden />
       {hudLayoutActive && (
         <SkinChrome
           themeId={resolvedTheme}
@@ -968,7 +1019,7 @@ export default function App() {
           status={status}
         />
       )}
-      <nav className="activity-bar" aria-label="主活动栏">
+      <nav className="activity-bar" data-skin-slot="activity-navigation" aria-label="主活动栏">
         <div className="activity-bar-top">
           <button
             type="button"
@@ -976,7 +1027,7 @@ export default function App() {
             title="项目"
             onClick={() => setActivePanel('project')}
           >
-            <span className="activity-icon">▣</span>
+            <span className="activity-icon skin-icon" data-skin-icon="project">▣</span>
           </button>
         </div>
         <div className="activity-bar-bottom">
@@ -986,19 +1037,19 @@ export default function App() {
             title="设置"
             onClick={() => setActivePanel('settings')}
           >
-            <span className="activity-icon">⚙</span>
+            <span className="activity-icon skin-icon" data-skin-icon="settings">⚙</span>
           </button>
         </div>
       </nav>
 
-      <aside className="side-panel">
+      <aside className="side-panel" data-skin-slot={activePanel === 'settings' ? 'settings' : 'workspace-sidebar'}>
         <header className="side-panel-header">
           <span className="side-panel-title">{activePanel === 'project' ? '项目' : '设置'}</span>
         </header>
 
         {activePanel === 'project' ? (
           <div className="project-panel">
-            <section className="project-switcher" data-guide="projects">
+            <section className="project-switcher" data-skin-slot="project-list" data-guide="projects">
               <div className="project-switcher-row">
                 <label className="project-switcher-label">项目</label>
                 <span className="project-switcher-spacer" />
@@ -1129,7 +1180,7 @@ export default function App() {
               {error && <div className="project-switcher-error">{error}</div>}
             </section>
 
-            <section className="project-section" data-guide="files">
+            <section className="project-section" data-skin-slot="file-tree" data-guide="files">
               <div className="project-section-title">文件</div>
               <div className="project-section-body project-section-body-tree">
                 {activeSlug ? (
@@ -1149,7 +1200,7 @@ export default function App() {
                           data-file-kind={visual.label}
                         >
                           <span className="tree-node-chevron" aria-hidden>{entry.kind === 'dir' ? (expanded ? '▾' : '▸') : ''}</span>
-                          <span className="tree-node-icon" aria-hidden>{visual.icon}</span>
+                          <span className="tree-node-icon skin-icon" data-skin-icon={visual.slot} aria-hidden>{visual.icon}</span>
                           <span className="tree-node-name">{entry.name}</span>
                           <span className="tree-node-kind">{visual.label}</span>
                         </button>
@@ -1163,7 +1214,7 @@ export default function App() {
               </div>
             </section>
 
-            <section className="project-section project-section-sessions">
+            <section className="project-section project-section-sessions" data-skin-slot="session-list">
               <div className="project-section-title">会话</div>
               <div className="project-section-body">
                 <div className="sessions-toolbar">
@@ -1175,6 +1226,7 @@ export default function App() {
                       key={session.id}
                       className={session.id === sessionId ? 'session-row active' : 'session-row'}
                     >
+                      <span className="session-row-icon skin-icon" data-skin-icon="session" aria-hidden>◉</span>
                       {editingSessionId === session.id ? (
                         <input
                           className="session-title-input"
@@ -1233,7 +1285,7 @@ export default function App() {
             </section>
           </div>
         ) : (
-          <div className="settings-panel">
+          <div className="settings-panel" data-skin-slot="settings-content">
             {desktopInfo && (
               <section className="settings-section desktop-settings-section settings-section-desktop">
                 <div className="settings-label">桌面应用</div>
@@ -1280,6 +1332,11 @@ export default function App() {
                 <div className="settings-hint">关闭应用窗口会同时停止本地后端；最小化后可从托盘重新显示，也可从托盘停止并退出。</div>
               </section>
             )}
+            <section className="settings-section settings-section-support">
+              <div className="settings-label">问题反馈</div>
+              <p className="settings-hint">遇到异常时可关注研天雪公众号后私信，或发送邮件。诊断模板不会读取用户内容或本地目录。</p>
+              <button type="button" className="project-create-submit" onClick={() => setShowBugReport(true)}>快速反馈 Bug</button>
+            </section>
             <section className="settings-section settings-section-model">
               <div className="settings-label">模型 API</div>
               <DeepSeekSetupGuide
@@ -1397,8 +1454,8 @@ export default function App() {
                 achievements={onboardingProgress.achievements}
                 systemPrefersDark={systemPrefersDark}
                 onChange={setThemePreference}
-                customSkin={customSkin}
-                onCustomSkinChange={setCustomSkin}
+                customSkinLibrary={customSkinLibrary}
+                onCustomSkinLibraryChange={setCustomSkinLibrary}
               />
             </section>
             <section className="settings-section settings-section-onboarding">
@@ -1446,8 +1503,8 @@ export default function App() {
         )}
       </aside>
 
-      <main className="ai-panel">
-        <header className="ai-panel-header" data-guide="context">
+      <main className="ai-panel" data-skin-slot="chat-workspace">
+        <header className="ai-panel-header" data-skin-slot="chat-header" data-guide="context">
           <div className="ai-panel-header-top">
             <span className="ai-panel-title">AI 助手</span>
             <span className="ai-panel-meta">
@@ -1470,7 +1527,10 @@ export default function App() {
                 </span>
                 <span
                   className="neon-context-ring"
-                  style={{ background: `conic-gradient(var(--color-primary) 0 ${contextPct}%, rgba(67, 232, 255, .08) ${contextPct}% 100%)` }}
+                  style={{
+                    '--context-pct': `${contextPct}%`,
+                    background: `conic-gradient(var(--color-primary) 0 ${contextPct}%, rgba(67, 232, 255, .08) ${contextPct}% 100%)`
+                  } as CSSProperties}
                 >
                   <strong>{Math.round(contextPct)}%</strong>
                 </span>
@@ -1493,6 +1553,7 @@ export default function App() {
             <button
               type="button"
               className={`ai-panel-token-bar ${context.over_budget ? 'over-threshold' : ''}`}
+              data-skin-slot="context-meter"
               title={`估算 ${formatTokens(contextTotal)} / ${formatTokens(contextBudget)} tokens`}
               onClick={() => {
                 setShowContextDetails((value) => !value)
@@ -1530,9 +1591,10 @@ export default function App() {
           </section>
         )}
 
-        <div className="ai-panel-messages-shell" data-guide="chat">
+        <div className="ai-panel-messages-shell" data-skin-slot="message-stream-shell" data-guide="chat">
           <section
             className="ai-panel-messages"
+            data-skin-slot="message-stream"
             ref={messagesViewportRef}
             onScroll={handleMessagesScroll}
           >
@@ -1545,7 +1607,7 @@ export default function App() {
                 return message.role === 'system' && message.meta?.event === 'context_summary'
                   ? <SummaryMessage key={item.key} message={message} />
                   : (
-                    <article key={item.key} className={`message ${message.role}`}>
+                    <article key={item.key} className={`message ${message.role}`} data-skin-slot="message">
                       <div className="bubble">
                         {message.role === 'assistant' ? <MarkdownRenderer>{message.content}</MarkdownRenderer> : message.content}
                         {message.meta?.interrupted === true && (
@@ -1564,7 +1626,7 @@ export default function App() {
           )}
         </div>
 
-        <footer className="chat-input-wrap" data-guide="composer">
+        <footer className="chat-input-wrap" data-skin-slot="composer" data-guide="composer">
           {error && <div className="inline-error">{error}</div>}
           <div className="chat-input-box">
             <textarea
@@ -1590,9 +1652,9 @@ export default function App() {
         </footer>
       </main>
 
-      <div className="resize-handle" onMouseDown={startResize} />
+      <div className="resize-handle" data-skin-slot="workspace-resizer" onMouseDown={startResize} />
 
-      <aside className="file-view-panel" data-guide="viewer">
+      <aside className="file-view-panel" data-skin-slot="file-viewer" data-guide="viewer">
         <header className="editor-tabs">
           <div className={selectedFile ? 'editor-tab active' : 'editor-tab'}>
             <span>{selectedFile?.name || '欢迎'}</span>
@@ -1655,7 +1717,7 @@ export default function App() {
         </div>
       </aside>
 
-      <footer className="status-bar">
+      <footer className="status-bar" data-skin-slot="status-bar">
         <span className="status-segment">
           <span className="status-dot ok" aria-hidden />
           后端 ok
@@ -1714,6 +1776,7 @@ export default function App() {
       )}
 
       {achievementToast && <AchievementToast achievement={achievementToast} />}
+      {showBugReport && <BugReportDialog report={bugReport} onClose={() => setShowBugReport(false)} />}
     </div>
   )
 }

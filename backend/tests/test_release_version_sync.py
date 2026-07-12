@@ -64,6 +64,18 @@ class ReleaseVersionSyncTest(unittest.TestCase):
         self.assertIn('Join-Path $Resources "tutorial-project"', script)
         self.assertIn('tutorial-project\\WORKMODE_TUTORIAL.json', script)
 
+    def test_release_publishes_only_application_artifacts_and_never_skin_packages(self):
+        script = BUILD_SCRIPT.read_text(encoding="utf-8")
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertNotIn("official-skins", script)
+        self.assertNotIn("publishedSkinRoot", script)
+        self.assertNotIn(".workmode-skin", script)
+        self.assertNotIn('official-skin-ed25519.pem', script)
+        self.assertIn('Get-ChildItem "release/desktop-$version" -File', workflow)
+        self.assertNotIn('-Recurse', workflow)
+        self.assertNotIn('skin-library', workflow)
+
     def test_sync_updates_every_release_version_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

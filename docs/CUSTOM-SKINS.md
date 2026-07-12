@@ -1,99 +1,90 @@
-# 本地声明式皮肤
+# 官方签名皮肤
 
-Workmode Public 0.6.2 支持从「设置 → 外观与皮肤」导入本地 `.workmode-skin.json`。应用继续接受 `workmode-skin/v1`，并新增向后兼容的 `workmode-skin/v2` 材质、组件几何和装饰预设。该格式不是插件系统。
+Workmode 0.7.0 起只导入经过官方 Ed25519 私钥签名的 `.workmode-skin`。旧 `.json`、未签名 ZIP、未知签名者以及内容被修改过的皮肤包全部拒绝；旧版 `workmode-public-custom-skin-v1` localStorage 和 `workmode-public-skins-v3` IndexedDB 不再迁移。
 
-## 安全边界
+这是一项主动收紧的边界。签名皮肤可以携带完整布局 CSS 和视觉 CSS，因此能够重新排布真实内容槽位并逐项重绘界面；相应地，它不再被视为普通数据文件，而是由 Workmode 官方审核、签名和负责兼容性的视觉扩展。
 
-导入器使用浏览器原生文件选择器读取用户主动选择的单个 `.json` 文件，不获得目录或任意文件读取权限。文件最大 32 KB，导入后只保存经过对应 schema 白名单清洗的对象。HUD 仍由 Workmode 自带的 React 组件渲染；v2 阴影、颗粒和装饰也由应用根据枚举及限幅数值生成。
+## 内容、布局与视觉
 
-格式不接受：
+Workmode 本体维护真实项目、文件、会话、消息、工具结果、上下文、设置和状态。React 在稳定位置暴露 `data-skin-slot`：
 
-- CSS、JavaScript、HTML、Lua 或其他代码/标记；
-- URL、网络资源或远程字体；
-- 图片、可执行文件、DLL 或脚本；
-- 项目、模型、工具或 API Key 权限；
-- schema 未声明的任意字段。
+- `app-shell`、`app-chrome`、`activity-navigation`；
+- `workspace-sidebar`、`project-list`、`file-tree`、`session-list`；
+- `chat-workspace`、`chat-header`、`context-meter`、`message-stream`、`message`、`tool-call`、`composer`；
+- `workspace-resizer`、`file-viewer`、`status-bar`；
+- `settings`、`settings-content`。
 
-皮肤状态保存在桌面 WebView 的 `localStorage` 键 `workmode-public-custom-skin-v1`，不进入项目、会话、模型上下文或后端配置。覆盖安装和应用内更新不会主动删除它；解析失败时忽略自定义皮肤并保留内置主题。
+皮肤的 `layout.css` 决定这些内容如何排列、占多大空间以及窗口变窄时如何降级；`visual.css` 决定字体、颜色、材质、边框、图标、装饰和动画。皮肤没有 JavaScript 或 HTML 入口，不能创建项目数据、伪造工具结果或获得文件/网络权限。需要新增真实数据展示时，必须先由 Workmode 核心提供新的语义槽位。
 
-## v1 兼容格式
+## 包格式
+
+```text
+example.workmode-skin
+├─ manifest.json
+├─ signature.json
+├─ layout.css
+├─ visual.css
+├─ LICENSE.txt                 可选
+├─ fonts/                      可选，由 manifest 声明
+├─ images/                     可选，由 manifest 声明
+└─ icons/                      可选，由 manifest 声明
+```
+
+`manifest.json` 当前继续使用 `workmode-skin/v3` 作为身份、foundation、回退视觉积木和资源声明。压缩包必须同时包含非空 UTF-8 `layout.css` 与 `visual.css`，单个 CSS 最大 512 KB。图片、图标和 WOFF2 字体仍受路径、条目数、压缩前后体积、magic bytes 和清单引用检查约束。
+
+CSS 可以使用 `workmode-asset://<asset-id>` 引用 manifest 中已声明的本地资源。运行时只把这个占位符替换为当前皮肤的临时 Blob URL，切换或停用时撤销 URL、FontFace 和 `<style>`。
+
+## 签名覆盖
+
+`signature.json` 使用 `workmode-skin-signature/v1`：
 
 ```json
 {
-  "schema": "workmode-skin/v1",
-  "id": "neon-ice",
-  "name": "Neon Ice",
-  "version": "1.0.0",
-  "baseTheme": "neon-space-lab",
-  "chrome": {
-    "type": "hud",
-    "title": "NEON ICE",
-    "subtitle": "LOCAL RESEARCH HUD",
-    "missionLabel": "ACTIVE PROJECT",
-    "modelLabel": "MODEL LINK",
-    "stateLabel": "CORE STATE",
-    "timeLabel": "LOCAL TIME",
-    "panelGeometry": "stepped",
-    "bubbleGeometry": "mirrored"
-  },
-  "tokens": {
-    "accent": "#66e8ff",
-    "background": "#02070c",
-    "surface": "#07111a",
-    "text": "#e6fbff",
-    "panelOpacity": 0.12,
-    "lineWidth": 2,
-    "radius": 4,
-    "glow": 0.45
-  }
+  "schema": "workmode-skin-signature/v1",
+  "keyId": "workmode-official-2026-01",
+  "algorithm": "Ed25519",
+  "files": [
+    { "path": "layout.css", "size": 1234, "sha256": "..." }
+  ],
+  "signature": "..."
 }
 ```
 
-字段约束：
+文件列表按路径排序，覆盖除 `signature.json` 自身以外的全部普通文件。应用依次检查 ZIP 边界、签名清单、每个文件的大小和 SHA-256、内置公钥的 Ed25519 签名，全部通过后才解析 manifest 或 CSS。额外文件、缺少文件、重复路径、大小变化、摘要变化和未知 `keyId` 都会失败。
 
-| 字段 | 允许值 |
-| --- | --- |
-| `schema` | `workmode-skin/v1` 或 `workmode-skin/v2` |
-| `id` | 1–40 位小写字母、数字和连字符 |
-| `name` | 1–48 个字符 |
-| `version` | SemVer，例如 `1.0.0` |
-| `baseTheme` | 内置主题 ID；受原主题解锁条件约束 |
-| `chrome.type` | 当前支持 `hud`；声明 HUD 时 `baseTheme` 必须是 `neon-space-lab` |
-| `chrome.title/subtitle` | 顶部 HUD 品牌与副标题，分别最多 24/32 字符 |
-| `chrome.*Label` | 任务、模型、状态和时间区标签，最多 20–24 字符 |
-| `chrome.panelGeometry` | `stepped` 或 `continuous` |
-| `chrome.bubbleGeometry` | `mirrored` 或 `continuous` |
-| `accent/background/surface/text` | `#RRGGBB` |
-| `panelOpacity` | `0`–`0.8` |
-| `lineWidth` | `1`–`4` CSS px |
-| `radius` | `0`–`24` CSS px |
-| `glow` | `0`–`1` |
+公钥位于 `frontend/src/officialSkinKeys.ts`。私钥只允许存在于被 Git 忽略的 `.release-secrets/official-skin-ed25519.pem` 或 CI secret；不得进入源码、安装包、日志和 Release。
 
-v1 皮肤至少需要一个 `tokens` 视觉参数或一个 `chrome` HUD 声明，因此纯 HUD 皮肤也可用。v1 文件在 0.6.2 中保持原义，不允许使用 v2 字段。
+## 官方签包
 
-## v2 材质格式
+首次在受信任发布机初始化独立皮肤密钥：
 
-v2 在 v1 顶层字段之外增加以下白名单：
+```powershell
+node scripts/official-skin.mjs init
+```
 
-| 字段 | 允许值 |
-| --- | --- |
-| `material.preset` | 当前为 `soft-cream` |
-| `material.elevation` | `0`–`1`，控制面板投影高度和模糊 |
-| `material.innerHighlight` | `0`–`1`，控制内侧高光 |
-| `material.grain` | `0`–`1`，控制应用生成的点状颗粒强度 |
-| `material.buttonDepth` | `0`–`8` CSS px |
-| `geometry.panelRadius` | `0`–`32` CSS px |
-| `geometry.bubbleRadius` | `0`–`32` CSS px |
-| `geometry.buttonRadius` | `0`–`24` CSS px |
-| `decoration.preset` | `none` 或 `notebook` |
-| `decoration.density` | `0`–`1` |
+签包：
 
-v2 皮肤至少包含一个 token、HUD、材质、几何或装饰声明。`soft-cream` 会重绘现有面板、气泡、工具卡、输入框和安全按钮的材质，但不会复制业务组件；`notebook` 只启用应用内置的胶带、标签、虚线和横线细节。
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-skin-library.ps1 `
+  -SkinId green-phosphor
+```
 
-导入新皮肤会替换当前本地皮肤；选择任意内置主题会停用但不卸载本地皮肤，用户可以再次启用或手动卸载。
+初始化命令会在缺失时创建私钥，并把对应公钥写入应用信任表。私钥必须另做离线备份；丢失后只能发布新公钥和新 `keyId`，不能恢复旧签名身份。
 
-示例文件：[`neon-ice.workmode-skin.json`](../examples/skins/neon-ice.workmode-skin.json)（v1 HUD）和 [`cream-puff.workmode-skin.json`](../examples/skins/cream-puff.workmode-skin.json)（v2 材质）。
+七套奖励皮肤源文件统一位于 `skin-library/sources/`：紫晶星象塔、奶油泡芙、霜核机能台、绿磷终端、午夜控制台、Neon Ice 和酒保行动·像素夜班。签名包统一输出到被 Git 忽略的 `skin-library/packages/`，只用于本地测试和手动奖励发放，不进入 GitHub Release、安装包或 GitHub Actions 构建产物。
 
-## 为什么不支持任意 CSS
+皮肤可独立于应用升级。保持同一 manifest `id`、递增皮肤 `version` 并重新签名后，用户再次导入会覆盖该 ID 的 manifest、签名收据、CSS 和资源；不需要重新安装 Workmode。只有新增核心语义槽位、修改包协议或信任公钥时才需要发布应用版本。
 
-CSS 可以隐藏安全按钮、覆盖伪界面或通过 `url()` 发起网络请求，因此不能等同于无害的颜色文件。v1/v2 都只把白名单值映射到程序维护的语义变量和预设；皮肤不能提供阴影字符串、纹理 URL、新按钮、事件、HTML、工具或数据读取。新增材质预设和交互组件仍需进入项目源码并经过正常测试、构建和发布。
+## 导入与本地状态
+
+设置页支持一次选择多个 `.workmode-skin`，逐个验签后写入 version 4 本地皮肤库。只有验签成功的 manifest、签名收据和资源会持久化；选择器不会列出旧未签名皮肤。
+
+皮肤只保存在当前 WebView 本机，不进入项目文件、会话、JSONL 或模型上下文。覆盖安装和应用更新不会主动删除已经验签的新皮肤库。
+
+## 恢复机制
+
+- 皮肤启动时写入临时 boot guard，CSS 和字体稳定加载三秒后清除；若加载阶段崩溃，下次启动自动停用该皮肤。
+- CSS、字体或资源运行时失败会立即停用当前皮肤并恢复基础主题。
+- 紧急恢复快捷键为 `Ctrl+Alt+Shift+R`，会清除当前官方皮肤选择并刷新应用；它不删除项目、会话、工作记忆或模型配置。
+
+官方签名代表代码审核和发布责任，不代表 CSS 永远没有视觉 bug。每个签名包仍必须按 [皮肤回归基线](SKIN-REGRESSION.md) 验证设置可达、长文档滚动、消息与工具状态、小窗口降级和紧急恢复。

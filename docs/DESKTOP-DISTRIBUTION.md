@@ -10,13 +10,19 @@
 workmode-public-<version>-windows-x86_64-setup.exe
 ```
 
+0.7.0 起 GitHub Release 只包含安装器、更新签名、更新清单和校验文件，不再附带 `.workmode-skin`。用户取得维护者手动发放的奖励皮肤后，可在「设置 → 外观与皮肤」中选择一个或多个包导入；皮肤不需要复制进安装目录，也不需要重新安装应用。
+
 安装器包含 React 前端、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。目标电脑不需要 Node.js、Python 或 Rust，默认按当前用户安装，不要求管理员权限。
 
 首次启动会显示可跳过的新手向导：模型草稿先做连接探测，成功后才落本机配置；DeepSeek 新用户可从向导打开官方注册、充值和 API Key 页面，并一键填入官方 V4 Pro/Flash 配置；随后用户选择教程或自己的项目，并通过六步界面高亮开始工作。外部链接由 Tauri Opener 在系统浏览器打开，capability 仅允许 DeepSeek 官方平台和文档域名。引导、教程任务和成就状态保存在桌面 WebView 本地存储，不写进用户项目或模型上下文。
 
 皮肤偏好和降低动效开关也保存在 WebView 本地存储。升级或覆盖安装不迁移、上传或写入项目；若本地值损坏或来自未来不兼容版本，前端回退到稳定的实验室主题。Origin Ring 与 Neon Space Lab 的解锁只读取本地教程毕业成就，基础亮色、暗色和高对比皮肤始终可用。Neon Space Lab 随前端源码编译进安装包，只包含项目原创 React/CSS/SVG；参考包中的可执行文件、脚本、字体、图片和配置均不进入仓库或 Release。
 
-0.6.1 起，完整设置页可导入最大 32 KB 的 `.workmode-skin.json`；0.6.2 增加向后兼容的 `workmode-skin/v2` 材质引擎。文件由 WebView 原生文件选择器读取，不新增任意文件系统权限；解析后仅保存白名单视觉 token、HUD 文案、结构枚举、材质预设和限幅数值到 `workmode-public-custom-skin-v1`。结构和材质由安装包内现有 React/CSS 渲染，不能携带自己的代码、HTML、事件、URL 或图片。安装器和更新器不主动删除该键，损坏或不兼容状态会被忽略。
+0.7.0 是一次主动断开的皮肤协议升级。WebView 文件选择器只接受 `.workmode-skin`，应用在解析 manifest 和 CSS 之前校验内置 Ed25519 公钥、完整文件集合、大小和 SHA-256；只有官方签名包才写入 `workmode-public-official-skins-v1` 本地库与同名 IndexedDB。旧 `.workmode-skin.json`、未签名包、`workmode-public-custom-skin-v1` 和 `workmode-public-skins-v3` 不迁移。签名包可以包含布局/视觉 CSS 与本地字体图片，因此按受信任的官方界面代码处理；它仍不能携带 JavaScript、HTML 或新增 Tauri 权限。
+
+应用在皮肤加载阶段写入 boot guard，稳定三秒后清除；异常退出后下次启动自动停用该皮肤。运行时资源错误也会回退基础主题。`Ctrl+Alt+Shift+R` 仅清除皮肤选择并刷新应用，不删除用户数据。Release 构建脚本完全不读取 `skin-library/` 或 `.release-secrets/official-skin-ed25519.pem`；GitHub Actions 只上传 `release/desktop-<version>/` 根目录中的应用产物。
+
+设置页“快速反馈 Bug”使用安装包内置的公众号二维码，并允许用户复制脱敏诊断模板或通过系统默认邮件客户端写信给 `yantianxue_skye@qq.com`。打开反馈弹窗不会上传数据；Tauri Opener 仅放行 `mailto:*`，邮件发送必须由用户在邮件客户端中确认。模板不读取项目名、路径、会话正文或 API Key。
 
 用户状态位于 `%LOCALAPPDATA%\WorkmodePublic`，不放进安装目录：
 

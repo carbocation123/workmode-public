@@ -333,7 +333,9 @@ function Publish-Artifacts {
 
   $hashLines = Get-ChildItem -LiteralPath $OutputRoot -File | Where-Object { $_.Extension -in @(".exe", ".zip") } | ForEach-Object {
     $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $($_.Name)"
+    Assert-Inside -Child $_.FullName -Parent $OutputRoot
+    $relative = $_.FullName.Substring($OutputRoot.Length).TrimStart("\", "/").Replace("\", "/")
+    "$hash  $relative"
   }
   [System.IO.File]::WriteAllLines((Join-Path $OutputRoot "SHA256SUMS.txt"), [string[]]$hashLines, $Utf8NoBom)
 

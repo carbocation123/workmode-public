@@ -1,0 +1,64 @@
+{
+  "schema": "workmode-skin/v3",
+  "id": "pixel-night-shift",
+  "name": "酒保行动·像素夜班",
+  "version": "3.1.2",
+  "foundation": "dark",
+  "palette": {
+    "accent": "#42eadc",
+    "accentAlt": "#ff4fa3",
+    "background": "#0b0711",
+    "surface": "#160d20",
+    "surfaceRaised": "#2d193a",
+    "text": "#f6eaff",
+    "textMuted": "#b59bc3",
+    "border": "#5b356d",
+    "success": "#42eadc",
+    "warning": "#ffd166",
+    "danger": "#ff6d78",
+    "selection": "#5a244c"
+  },
+  "typography": {
+    "preset": "pixel",
+    "scale": 1,
+    "assets": {
+      "ui": "pixel-proportional",
+      "content": "pixel-proportional",
+      "code": "pixel-mono",
+      "display": "pixel-mono"
+    }
+  },
+  "material": {
+    "preset": "crt",
+    "strength": 0.72,
+    "elevation": 0.38,
+    "innerHighlight": 0.34,
+    "grain": 0.2,
+    "buttonDepth": 3
+  },
+  "geometry": {
+    "lineWidth": 2,
+    "panelRadius": 0,
+    "bubbleRadius": 0,
+    "buttonRadius": 0,
+    "edgeProfile": "stepped"
+  },
+  "components": {
+    "chrome": "console",
+    "messages": "pixel",
+    "tools": "instrument",
+    "context": "signal",
+    "fileTree": "indexed"
+  },
+  "icons": { "preset": "pixel" },
+  "effects": {
+    "layers": ["crt", "glow"],
+    "intensity": 0.38,
+    "motion": "subtle"
+  },
+  "decoration": { "preset": "retro", "density": 0.36 },
+  "assets": [
+    { "id": "pixel-proportional", "path": "fonts/pixel-proportional.woff2", "kind": "font" },
+    { "id": "pixel-mono", "path": "fonts/pixel-mono.woff2", "kind": "font" }
+  ]
+}

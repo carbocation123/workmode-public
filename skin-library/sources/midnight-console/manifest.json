@@ -1,0 +1,35 @@
+{
+  "schema": "workmode-skin/v3",
+  "id": "midnight-console",
+  "name": "午夜控制台",
+  "version": "3.1.0",
+  "foundation": "dark",
+  "palette": {
+    "accent": "#36e4ff",
+    "accentAlt": "#ff4fa5",
+    "background": "#050710",
+    "surface": "#0a0f1d",
+    "surfaceRaised": "#17223a",
+    "text": "#dbe8f7",
+    "textMuted": "#7184a2",
+    "border": "#293853",
+    "success": "#42eadc",
+    "warning": "#ffdc69",
+    "danger": "#ff657c",
+    "selection": "#243b63"
+  },
+  "typography": { "preset": "pixel", "scale": 1 },
+  "material": { "preset": "metal", "strength": 0.74, "elevation": 0.62, "grain": 0.12 },
+  "geometry": { "lineWidth": 2, "panelRadius": 2, "bubbleRadius": 2, "buttonRadius": 2, "edgeProfile": "stepped" },
+  "components": {
+    "chrome": "console",
+    "messages": "log",
+    "tools": "instrument",
+    "context": "signal",
+    "fileTree": "indexed"
+  },
+  "icons": { "preset": "pixel" },
+  "effects": { "layers": ["glow"], "intensity": 0.34, "motion": "subtle" },
+  "decoration": { "preset": "retro", "density": 0.32 },
+  "assets": []
+}

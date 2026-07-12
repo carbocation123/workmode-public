@@ -34,7 +34,7 @@ start-workmode-public.cmd
 stop-workmode-public.cmd
 ```
 
-开发日志和 PID 位于 ignored 的 `logs/` 与 `.run/`。
+开发日志位于 ignored 的 `logs/`。`.run/` 只保存 PID、临时发行配置、可重建 smoke 目录和项目自带的开发工具，不保存设计稿、论文或教程历史。
 
 ## 手动开发
 
@@ -72,7 +72,13 @@ npm --prefix desktop run dev
 
 内置普通皮肤在 `frontend/src/theme.ts` 注册稳定 ID，并在 `frontend/src/styles.css` 通过 `data-theme` 作用域覆盖语义化 token；需要顶部结构或其他额外外壳时，再通过 `frontend/src/SkinChrome.tsx` 注册只读运行状态组件。业务数据和交互组件不能在皮肤中复制一份。
 
-无需重新打包的本地皮肤使用 `workmode-skin/v1` 或向后兼容的 `workmode-skin/v2` JSON。HUD 可从 `examples/skins/neon-ice.workmode-skin.json` 开始，材质皮肤可从 `examples/skins/cream-puff.workmode-skin.json` 开始，在完整设置页直接导入验证。解析器位于 `frontend/src/customSkin.ts`；结构皮肤由 `SkinChrome.tsx` 选择受维护的 React 外壳，材质皮肤由 `styles.css` 中作用域明确的预设消费解析器生成的有限变量。修改 schema 时必须同步更新版本白名单、旧版兼容测试、越界/注入测试和 [CUSTOM-SKINS.md](CUSTOM-SKINS.md)；不要加入原始 CSS、JavaScript、HTML、URL、外部素材或权限字段。
+0.7.0 起用户入口只接受官方 Ed25519 签名的 `.workmode-skin`。七套奖励皮肤源码统一放在 `skin-library/sources/<skin-id>/`，至少包含 `manifest.json`、`layout.css` 和 `visual.css`；字体、图片和图标必须同时提交许可证。`layout.css` 只能围绕应用维护的 `data-skin-slot` 排列真实内容，`visual.css` 负责外观。不得加入 JavaScript、HTML、远程资源、伪造业务内容或权限声明。
+
+协议、信任表、本地库、包解析、IndexedDB 和运行时分别位于 `skinProtocol.ts`、`officialSkinKeys.ts`、`skinLibrary.ts`、`skinPackage.ts`、`skinAssetStore.ts` 与 `skinAssetRuntime.ts`。修改导入或执行边界时，先更新未知签名、篡改、路径越界、CSS 注入清理、boot guard 和紧急恢复测试，再同步 [CUSTOM-SKINS.md](CUSTOM-SKINS.md)。旧 `examples/skins/*.json` 仅保留为内部 recipe/解析回归样例，不是可导入或可分发皮肤。
+
+签包只在受信任维护机执行：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-skin-library.ps1`。脚本会净化每套源目录，只复制协议文件、manifest 声明素材和许可证，再把签名包写入被 Git 忽略的 `skin-library/packages/`。私钥只能位于被 Git 忽略的 `.release-secrets/official-skin-ed25519.pem`；公钥可进入源码。每次签包后必须运行真实包验签测试。桌面发行脚本与 GitHub Actions 不读取或上传皮肤包。
+
+静态视觉探索统一放在 `design/skin-lab/`。这里的 HTML 只用于设计比较和回归，不是可导入皮肤；确认可产品化后，把样稿迁移为独立的官方 `layout.css`/`visual.css` 并完成真实界面回归。第三方皮肤解包、游戏截图、真实论文和许可证未确认素材只放在 ignored 的 `local-reference/`，任何构建、测试和运行时代码都不得引用它。
 
 ## 验证命令
 
@@ -123,6 +129,15 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1 -ValidateOnly
 - `frontend/dist/`、`release/`、运行日志、PID 和 smoke 安装目录；
 - `desktop/src-tauri/resources/` 中构建时 staging 的 runtime；
 - 当前未构建的 Android、iOS、macOS 和 Store 图标。
+
+本地目录职责：
+
+- `.run/`：随时可重建的运行态、烟测副本、临时发行配置和项目自带开发工具；
+- `design/skin-lab/`：可以提交的自制静态设计样稿；
+- `local-reference/`：Git 忽略的本地档案，包含第三方参考、真实文献和旧实验记录，不属于可随手删除的缓存；
+- `skin-library/sources/`：七套可审核、可继续修改的奖励皮肤源码；
+- `skin-library/packages/`：被 Git 忽略的本地签名包，只用于测试和手动发放；
+- `examples/skins/`：旧声明式协议与 recipe 回归样例，不作为 0.7.0 用户导入入口。
 
 删除文件前先确认没有代码、配置、测试、文档或发行流程引用。用户项目、session、JSONL、工作记忆和迁移备份不属于可清理构建产物。
 

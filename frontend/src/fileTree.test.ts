@@ -30,11 +30,11 @@ describe('visibleFileEntries', () => {
   })
 
   it('uses recognizable icons and labels for common research files', () => {
-    expect(fileEntryVisual(entries[0], false)).toEqual({ icon: '📁', label: '文件夹' })
-    expect(fileEntryVisual(entries[0], true)).toEqual({ icon: '📂', label: '已展开文件夹' })
-    expect(fileEntryVisual(entries[2], false)).toEqual({ icon: '📕', label: 'PDF' })
-    expect(fileEntryVisual(entries[3], false)).toEqual({ icon: '📝', label: 'Markdown' })
-    expect(fileEntryVisual({ path: 'data/run.csv', name: 'run.csv', kind: 'file', size: 4, preview: 'text' }, false)).toEqual({ icon: '📊', label: '数据' })
-    expect(fileEntryVisual({ path: 'scripts/analyze.py', name: 'analyze.py', kind: 'file', size: 4, preview: 'text' }, false)).toEqual({ icon: '⌘', label: '代码' })
+    expect(fileEntryVisual(entries[0], false)).toEqual({ icon: '📁', label: '文件夹', slot: 'folder' })
+    expect(fileEntryVisual(entries[0], true)).toEqual({ icon: '📂', label: '已展开文件夹', slot: 'folder-open' })
+    expect(fileEntryVisual(entries[2], false)).toEqual({ icon: '📕', label: 'PDF', slot: 'pdf' })
+    expect(fileEntryVisual(entries[3], false)).toEqual({ icon: '📝', label: 'Markdown', slot: 'markdown' })
+    expect(fileEntryVisual({ path: 'data/run.csv', name: 'run.csv', kind: 'file', size: 4, preview: 'text' }, false)).toEqual({ icon: '📊', label: '数据', slot: 'data' })
+    expect(fileEntryVisual({ path: 'scripts/analyze.py', name: 'analyze.py', kind: 'file', size: 4, preview: 'text' }, false)).toEqual({ icon: '⌘', label: '代码', slot: 'code' })
   })
 })

@@ -6,10 +6,14 @@ backend/app/__pycache__/
 __pycache__/
 *.py[cod]
 frontend/node_modules/
+/node_modules/
 frontend/dist/
 /data/
 /logs/
 /.run/
+/local-reference/*
+!/local-reference/README.md
+/skin-library/packages/
 /release/
 /backups/
 desktop/node_modules/

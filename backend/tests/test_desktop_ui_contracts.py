@@ -9,16 +9,34 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 STYLES = ROOT / "frontend" / "src" / "styles.css"
+SKIN_RUNTIME_STYLES = ROOT / "frontend" / "src" / "skinRuntime.css"
+SKIN_PROTOCOL_SOURCE = ROOT / "frontend" / "src" / "skinProtocol.ts"
+SKIN_LIBRARY_SOURCE = ROOT / "frontend" / "src" / "skinLibrary.ts"
+SKIN_PACKAGE_SOURCE = ROOT / "frontend" / "src" / "skinPackage.ts"
+OFFICIAL_SKIN_KEYS_SOURCE = ROOT / "frontend" / "src" / "officialSkinKeys.ts"
+OFFICIAL_SKIN_SIGNER = ROOT / "scripts" / "official-skin.mjs"
+SKIN_LIBRARY_DIR = ROOT / "skin-library"
+SKIN_SOURCE_DIR = SKIN_LIBRARY_DIR / "sources"
+PIXEL_SKIN_DIR = SKIN_SOURCE_DIR / "pixel-night-shift"
 APP_SOURCE = ROOT / "frontend" / "src" / "App.tsx"
+BUG_REPORT_SOURCE = ROOT / "frontend" / "src" / "bugReport.ts"
+BUG_REPORT_DIALOG_SOURCE = ROOT / "frontend" / "src" / "BugReportDialog.tsx"
+SUPPORT_QR_SOURCE = ROOT / "frontend" / "src" / "assets" / "support-public-account-qr.jpg"
 ONBOARDING_SOURCE = ROOT / "frontend" / "src" / "OnboardingUI.tsx"
 THEME_SOURCE = ROOT / "frontend" / "src" / "theme.ts"
 THEME_PANEL_SOURCE = ROOT / "frontend" / "src" / "ThemePanel.tsx"
 NEON_HUD_SOURCE = ROOT / "frontend" / "src" / "NeonHud.tsx"
 SKIN_CHROME_SOURCE = ROOT / "frontend" / "src" / "SkinChrome.tsx"
+PRESET_CHROME_SOURCE = ROOT / "frontend" / "src" / "PresetChrome.tsx"
 NEON_ASSET_DIR = ROOT / "frontend" / "src" / "assets" / "neon"
 CREAM_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "cream-puff.workmode-skin.json"
+GREEN_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "green-phosphor.workmode-skin.json"
+AMETHYST_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "amethyst-observatory.workmode-skin.json"
+CONSOLE_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "midnight-console.workmode-skin.json"
+GEM_TECH_SKIN_EXAMPLE = ROOT / "examples" / "skins" / "cryo-gem-tech.workmode-skin.json"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
+TAURI_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.conf.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
 
 
@@ -51,6 +69,14 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertRegex(css, r"\.markdown-table-scroll\s*\{[^}]*overflow-x\s*:\s*auto")
         self.assertRegex(css, r"\.message \.bubble table,[^}]*border-collapse\s*:\s*collapse")
         self.assertRegex(css, r"\.message \.bubble th,[^}]*border-(?:right|bottom)\s*:")
+
+    def test_assistant_markdown_list_markers_stay_inside_chat_bubbles(self) -> None:
+        css = STYLES.read_text(encoding="utf-8")
+        rule = re.search(r"\.message \.bubble ul,\s*\.message \.bubble ol\s*\{(?P<body>[^}]*)\}", css)
+
+        self.assertIsNotNone(rule)
+        self.assertRegex(rule.group("body"), r"padding-left\s*:\s*1\.5[45]em")
+        self.assertRegex(rule.group("body"), r"margin\s*:")
 
     def test_tutorial_projects_expose_install_and_reset_actions(self) -> None:
         source = APP_SOURCE.read_text(encoding="utf-8")
@@ -98,6 +124,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertEqual(allowed_urls, {
             "https://platform.deepseek.com/*",
             "https://api-docs.deepseek.com/*",
+            "mailto:*",
         })
 
     def test_skin_system_has_system_mode_accessibility_and_achievement_unlock(self) -> None:
@@ -172,20 +199,242 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("settings-open", app_source)
         self.assertIn("settings-section-model", app_source)
         self.assertIn("customSkin={customSkin}", app_source)
-        self.assertIn("parseDeclarativeSkin", theme_panel)
-        self.assertIn("CUSTOM_SKIN_MAX_BYTES", theme_panel)
-        self.assertIn('accept=".json,.workmode-skin.json,application/json"', theme_panel)
+        self.assertIn("parseSkinImportFile", theme_panel)
+        self.assertIn("replaceOfficialSkinAssets", theme_panel)
+        self.assertIn(".workmode-skin", theme_panel)
         self.assertIn(".settings-open .side-panel", css)
         self.assertIn("grid-column: 2 / -1", css)
         self.assertIn(".custom-skin-loader", css)
         self.assertIn("customSkin={customSkin}", app_source)
-        self.assertIn("customSkin?.skin.chrome", app_source)
+        self.assertIn("skinUsesChrome", app_source)
         self.assertIn('data-custom-skin-panel="continuous"', css)
         self.assertIn('data-custom-skin-bubble="continuous"', css)
         self.assertIn("var(--custom-skin-line-width, var(--neon-line-width, 1px))", css)
 
+    def test_local_skin_library_supports_multi_import_and_persistent_dropdown_switching(self) -> None:
+        app_source = APP_SOURCE.read_text(encoding="utf-8")
+        theme_panel = THEME_PANEL_SOURCE.read_text(encoding="utf-8")
+        skin_library_source = SKIN_LIBRARY_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("parseCustomSkinLibraryState", app_source)
+        self.assertIn("customSkinLibrary={customSkinLibrary}", app_source)
+        self.assertIn("multiple", theme_panel)
+        self.assertIn("custom-skin-select", theme_panel)
+        self.assertIn("activeSkinId", theme_panel)
+        self.assertIn("version: 4", skin_library_source)
+        self.assertIn("persisted.version !== 4", skin_library_source)
+        self.assertIn("receipts", skin_library_source)
+        self.assertIn("upsertOfficialSkins", skin_library_source)
+
+    def test_skin_import_is_officially_signed_and_exposes_stable_content_slots(self) -> None:
+        package = SKIN_PACKAGE_SOURCE.read_text(encoding="utf-8")
+        library = SKIN_LIBRARY_SOURCE.read_text(encoding="utf-8")
+        panel = THEME_PANEL_SOURCE.read_text(encoding="utf-8")
+        app = APP_SOURCE.read_text(encoding="utf-8")
+        signer = OFFICIAL_SKIN_SIGNER.read_text(encoding="utf-8")
+        keys = OFFICIAL_SKIN_KEYS_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("workmode-skin-signature/v1", package)
+        self.assertIn("crypto.subtle.verify", package)
+        self.assertLess(package.index("verifyOfficialSignature"), package.index("parseDeclarativeSkin(strFromU8(manifestBytes))"))
+        self.assertIn("layout.css", package)
+        self.assertIn("visual.css", package)
+        self.assertNotIn('accept=".json', panel)
+        self.assertIn('accept=".workmode-skin', panel)
+        self.assertIn("LEGACY_CUSTOM_SKIN_STORAGE_KEY", library)
+        self.assertIn("generateKeyPairSync('ed25519')", signer)
+        self.assertNotIn("PRIVATE KEY", keys)
+        self.assertIn("workmode-official-2026-01", keys)
+        for slot in (
+            "app-shell", "app-chrome", "activity-navigation", "project-list", "file-tree",
+            "session-list", "chat-workspace", "chat-header", "context-meter", "message-stream",
+            "composer", "file-viewer", "status-bar", "settings-content",
+        ):
+            source = app + PRESET_CHROME_SOURCE.read_text(encoding="utf-8") + NEON_HUD_SOURCE.read_text(encoding="utf-8")
+            self.assertIn(f'data-skin-slot="{slot}"', source)
+        self.assertTrue((SKIN_LIBRARY_DIR / "README.md").is_file())
+        self.assertTrue((SKIN_SOURCE_DIR / "green-phosphor" / "manifest.json").is_file())
+
+    def test_green_phosphor_keeps_terminal_content_readable_and_role_aligned(self) -> None:
+        layout = (SKIN_SOURCE_DIR / "green-phosphor" / "layout.css").read_text(encoding="utf-8")
+        visual = (SKIN_SOURCE_DIR / "green-phosphor" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('grid-template-columns: 42px minmax(0, 1fr) 42px', visual)
+        self.assertIn('[data-skin-slot="message"].user::before', visual)
+        self.assertIn('grid-column: 3', visual)
+        self.assertIn('.message.user .bubble', visual)
+        self.assertIn('grid-column: 2', visual)
+        self.assertIn('justify-self: end', visual)
+        self.assertIn('height: 24px', visual)
+        self.assertIn('white-space: nowrap', visual)
+        self.assertIn('text-overflow: ellipsis', visual)
+        self.assertIn('.file-view-markdown', visual)
+        self.assertIn('padding: 18px 20px', visual)
+        self.assertIn('.file-view-markdown hr', visual)
+        self.assertIn('border-top: 2px solid var(--phosphor-dim)', visual)
+        self.assertIn('.tool-card-dot', visual)
+        self.assertIn('flex-basis: 38px', visual)
+        self.assertIn('textarea::placeholder', visual)
+        self.assertIn('color: var(--phosphor-dim)', visual)
+        self.assertIn('.ai-panel-header-top', visual)
+        self.assertIn('grid-template-columns: minmax(0, 1fr) auto auto', visual)
+        self.assertIn('.neon-context-copy', visual)
+        self.assertIn('grid-template-columns: auto auto auto', visual)
+        self.assertIn('minmax(450px, 1fr)', layout)
+        self.assertIn('minmax(340px, 400px);', layout)
+        self.assertNotIn('minmax(340px, 400px) !important', layout)
+
+    def test_cream_puff_has_independent_soft_layout_without_demo_copy(self) -> None:
+        layout = (SKIN_SOURCE_DIR / "cream-puff" / "layout.css").read_text(encoding="utf-8")
+        visual = (SKIN_SOURCE_DIR / "cream-puff" / "visual.css").read_text(encoding="utf-8")
+        manifest = json.loads((SKIN_SOURCE_DIR / "cream-puff" / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertIn('gap: 10px', layout)
+        self.assertIn('padding: 12px', layout)
+        self.assertEqual(manifest["components"]["chrome"], "hud")
+        self.assertIn('[data-skin-slot="app-chrome"]', layout)
+        self.assertIn('grid-row: 1', layout)
+        self.assertIn('[data-skin-slot="file-viewer"]', layout)
+        self.assertIn('grid-column: 5', layout)
+        self.assertIn('[data-skin-slot="settings"]', layout)
+        self.assertIn('grid-column: 2 / -1', layout)
+        self.assertIn('--cream: #fff8e9', visual)
+        self.assertIn('border-radius: 24px', visual)
+        self.assertIn('.activity-btn.active', visual)
+        self.assertIn('.project-switcher', visual)
+        self.assertIn('.message.assistant::before', visual)
+        self.assertIn('content: "🐱"', visual)
+        self.assertIn('.side-panel-title::before', visual)
+        self.assertIn('content: "RESEARCH GARDEN"', visual)
+        self.assertIn('.side-panel-title::after', visual)
+        self.assertIn('content: "我的研究花园"', visual)
+        self.assertIn('.neon-hud', visual)
+        self.assertIn('display: flex', visual)
+        self.assertIn('.neon-brand-ring', visual)
+        self.assertIn('data:image/svg+xml', visual)
+        self.assertIn('viewBox=%220%200%2048%2048%22', visual)
+        self.assertIn('.neon-brand-ring::before,', visual)
+        self.assertIn('.neon-brand-ring::after', visual)
+        self.assertIn('content: "CREAM PUFF LAB"', visual)
+        self.assertIn('.neon-mission span', visual)
+        self.assertIn('display: none', visual)
+        self.assertIn('.neon-mission small::before', visual)
+        self.assertIn('.neon-context-cluster', visual)
+        self.assertIn('grid-template-columns: auto minmax(0, 1fr) auto auto auto', visual)
+        self.assertIn('max-width: 220px', visual)
+        self.assertIn('.ai-panel-token-bar', visual)
+        self.assertIn('display: none', visual)
+        self.assertIn('.ai-panel::before', visual)
+        self.assertIn('.editor-tabs::after', visual)
+        self.assertIn('content: "♡"', visual)
+        self.assertIn('.tool-card', visual)
+        self.assertIn('.chat-input-wrap', visual)
+        self.assertIn('.file-view-markdown', visual)
+        self.assertIn('.ai-panel-token-bar', visual)
+        self.assertIn('box-shadow:', visual)
+        self.assertNotIn('MY LITTLE LAB', visual.upper())
+
+    def test_neon_ice_has_independent_glass_hud_and_draggable_viewer(self) -> None:
+        layout = (SKIN_SOURCE_DIR / "neon-ice" / "layout.css").read_text(encoding="utf-8")
+        visual = (SKIN_SOURCE_DIR / "neon-ice" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('[data-skin-slot="app-chrome"]', layout)
+        self.assertIn('grid-row: 1', layout)
+        self.assertIn('[data-skin-slot="file-viewer"]', layout)
+        self.assertIn('grid-column: 5', layout)
+        self.assertIn('minmax(340px, 420px);', layout)
+        self.assertNotIn('minmax(340px, 420px) !important', layout)
+        self.assertIn('--neon-ice: #66e8ff', visual)
+        self.assertIn('.neon-hud', visual)
+        self.assertIn('backdrop-filter: blur(18px)', visual)
+        self.assertIn('border: 2px solid', visual)
+        self.assertIn('.neon-context-cluster', visual)
+        self.assertIn('.message.assistant .bubble', visual)
+        self.assertIn('clip-path: none', visual)
+        self.assertIn('.tool-card', visual)
+        self.assertIn('.chat-input-wrap', visual)
+        self.assertIn('.file-view-markdown', visual)
+        self.assertNotIn('battery', visual.lower())
+        self.assertNotIn('temperature', visual.lower())
+
+    def test_cryo_gem_tech_has_independent_instrument_workbench(self) -> None:
+        layout = (SKIN_SOURCE_DIR / "cryo-gem-tech" / "layout.css").read_text(encoding="utf-8")
+        visual = (SKIN_SOURCE_DIR / "cryo-gem-tech" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('grid-template-rows: 62px minmax(0, 1fr) 28px', layout)
+        self.assertIn('[data-skin-slot="file-viewer"]', layout)
+        self.assertIn('minmax(340px, 420px);', layout)
+        self.assertNotIn('minmax(340px, 420px) !important', layout)
+        self.assertIn('--cryo-cyan: #54dcff', visual)
+        self.assertIn('.preset-chrome-gem-tech', visual)
+        self.assertIn('.preset-chrome-emblem::before', visual)
+        self.assertIn('.neon-context-cluster', visual)
+        self.assertIn('.message.assistant .bubble', visual)
+        self.assertIn('.tool-card', visual)
+        self.assertIn('.file-view-markdown', visual)
+        self.assertIn('backdrop-filter: blur(16px)', visual)
+
+    def test_midnight_console_has_independent_city_terminal_language(self) -> None:
+        layout = (SKIN_SOURCE_DIR / "midnight-console" / "layout.css").read_text(encoding="utf-8")
+        visual = (SKIN_SOURCE_DIR / "midnight-console" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('grid-template-rows: 58px minmax(0, 1fr) 28px', layout)
+        self.assertIn('[data-skin-slot="file-viewer"]', layout)
+        self.assertIn('minmax(340px, 400px);', layout)
+        self.assertNotIn('minmax(340px, 400px) !important', layout)
+        self.assertIn('--midnight-coral: #eb6e70', visual)
+        self.assertIn('.preset-chrome-console', visual)
+        self.assertIn('.preset-chrome-emblem::after', visual)
+        self.assertIn('.neon-context-cluster', visual)
+        self.assertIn('.message.assistant::before', visual)
+        self.assertIn('.tool-card', visual)
+        self.assertIn('.chat-input-wrap', visual)
+        self.assertIn('.file-view-markdown', visual)
+
+    def test_amethyst_observatory_has_independent_arcane_archive(self) -> None:
+        layout = (SKIN_SOURCE_DIR / "amethyst-observatory" / "layout.css").read_text(encoding="utf-8")
+        visual = (SKIN_SOURCE_DIR / "amethyst-observatory" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('grid-template-rows: 62px minmax(0, 1fr) 28px', layout)
+        self.assertIn('[data-skin-slot="file-viewer"]', layout)
+        self.assertIn('minmax(350px, 430px);', layout)
+        self.assertNotIn('minmax(350px, 430px) !important', layout)
+        self.assertIn('--amethyst: #a766e8', visual)
+        self.assertIn('.preset-chrome-observatory', visual)
+        self.assertIn('.preset-chrome-emblem::after', visual)
+        self.assertIn('.neon-context-cluster', visual)
+        self.assertIn('.message .bubble', visual)
+        self.assertIn('.tool-card', visual)
+        self.assertIn('.file-view-markdown', visual)
+        self.assertIn('radial-gradient(circle at 50% 50%', visual)
+
+    def test_pixel_night_shift_uses_current_signed_skin_structure(self) -> None:
+        layout = (PIXEL_SKIN_DIR / "layout.css").read_text(encoding="utf-8")
+        visual = (PIXEL_SKIN_DIR / "visual.css").read_text(encoding="utf-8")
+        manifest = json.loads((PIXEL_SKIN_DIR / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["id"], "pixel-night-shift")
+        self.assertEqual(manifest["version"], "3.1.2")
+        self.assertEqual(manifest["components"]["chrome"], "console")
+        self.assertIn('grid-template-rows: 58px minmax(0, 1fr) 28px', layout)
+        self.assertIn('--pixel-magenta: #ff4fa3', visual)
+        self.assertIn('.preset-chrome-console', visual)
+        self.assertIn('.message.assistant .bubble', visual)
+        self.assertIn('clip-path: none', visual)
+        self.assertIn('content: attr(data-tool-label)', visual)
+        self.assertIn('grid-template-columns: minmax(0, 1fr) auto auto', visual)
+        self.assertIn('.ai-panel-title,', visual)
+        self.assertIn('width: 100%', visual)
+        self.assertIn('display: flex', visual)
+        self.assertIn('margin-left: auto', visual)
+        self.assertIn('top: 50%', visual)
+        self.assertIn('transform: translateY(-50%)', visual)
+        self.assertIn('.tool-card', visual)
+        self.assertIn('.file-view-markdown', visual)
+        self.assertIn('image-rendering: pixelated', visual)
+
     def test_v2_skin_material_engine_uses_bounded_presets(self) -> None:
-        custom_skin_source = (ROOT / "frontend" / "src" / "customSkin.ts").read_text(encoding="utf-8")
+        custom_skin_source = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
         css = STYLES.read_text(encoding="utf-8")
 
         self.assertIn("workmode-skin/v1", custom_skin_source)
@@ -203,7 +452,177 @@ class DesktopUiContractTest(unittest.TestCase):
         example = json.loads(CREAM_SKIN_EXAMPLE.read_text(encoding="utf-8"))
         self.assertEqual(example["schema"], "workmode-skin/v2")
         self.assertEqual(example["material"]["preset"], "soft-cream")
-        self.assertEqual(example["decoration"]["preset"], "notebook")
+        self.assertNotIn("decoration", example)
+
+    def test_v3_skin_engine_keeps_assets_local_and_declarative(self) -> None:
+        protocol = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
+        package = SKIN_PACKAGE_SOURCE.read_text(encoding="utf-8")
+        runtime_css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
+        theme_panel = THEME_PANEL_SOURCE.read_text(encoding="utf-8")
+        tauri = json.loads(TAURI_CONFIG.read_text(encoding="utf-8"))
+
+        self.assertIn("workmode-skin/v3", protocol)
+        self.assertIn("isSafeSkinAssetPath", protocol)
+        self.assertIn("unzipSync", package)
+        self.assertIn("SKIN_PACKAGE_MAX_UNCOMPRESSED_BYTES", package)
+        self.assertIn("文件签名", package)
+        self.assertIn("replaceOfficialSkinAssets", theme_panel)
+        self.assertIn('data-skin-material="obsidian"', runtime_css)
+        self.assertIn('data-skin-icons="terminal"', runtime_css)
+        self.assertIn('data-skin-effect-glow="true"', runtime_css)
+        self.assertIn('data-skin-effect-crt="true"', runtime_css)
+        self.assertIn('data-skin-effect-stars="true"', runtime_css)
+        self.assertIn('data-skin-effect-paper="true"', runtime_css)
+        self.assertIn('data-skin-edge-profile="beveled"', runtime_css)
+        self.assertIn('data-skin-edge-profile="stepped"', runtime_css)
+        self.assertIn("corner-shape: bevel", runtime_css)
+        self.assertIn("corner-shape: notch", runtime_css)
+        self.assertIn("clip-path: polygon", runtime_css)
+        self.assertNotIn("--skin-clip-path", runtime_css)
+        self.assertIn("--skin-background-image", runtime_css)
+        self.assertIn("--skin-decoration-overlay-image", runtime_css)
+        self.assertIn('className="skin-decoration-overlay"', APP_SOURCE.read_text(encoding="utf-8"))
+        self.assertRegex(runtime_css, r"\.skin-decoration-overlay\s*\{[^}]*pointer-events:\s*none")
+        self.assertIn("font-src 'self' data: blob:", tauri["app"]["security"]["csp"])
+
+        green = json.loads(GREEN_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        amethyst = json.loads(AMETHYST_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        self.assertEqual(green["schema"], "workmode-skin/v3")
+        self.assertEqual(green["material"]["preset"], "crt")
+        self.assertEqual(green["icons"]["preset"], "terminal")
+        self.assertEqual(green["effects"]["layers"], ["crt", "glow"])
+        self.assertEqual(green["geometry"]["edgeProfile"], "square")
+        self.assertEqual(amethyst["schema"], "workmode-skin/v3")
+        self.assertEqual(amethyst["components"]["chrome"], "observatory")
+        self.assertEqual(amethyst["decoration"]["preset"], "arcane")
+        self.assertEqual(amethyst["effects"]["layers"], ["stars", "glow"])
+        self.assertEqual(amethyst["geometry"]["edgeProfile"], "beveled")
+
+    def test_every_structural_skin_keeps_the_workspace_in_the_middle_grid_row(self) -> None:
+        css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            css,
+            r"\.ide-shell\.hud-layout\s*>\s*\.preset-chrome\s*\{[^}]*grid-row\s*:\s*1",
+        )
+        for selector in ("activity-bar", "side-panel", "ai-panel", "resize-handle", "file-view-panel"):
+            self.assertRegex(
+                css,
+                rf"\.ide-shell\.hud-layout\s*>[^{{]*\.{selector}[^{{]*\{{[^}}]*grid-row\s*:\s*2",
+            )
+        self.assertRegex(
+            css,
+            r"\.ide-shell\.hud-layout\s*>\s*\.status-bar\s*\{[^}]*grid-row\s*:\s*3",
+        )
+
+    def test_v3_semantic_icon_slots_are_wired_to_live_ui(self) -> None:
+        app = APP_SOURCE.read_text(encoding="utf-8")
+        protocol = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
+        runtime_css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
+
+        for slot in ("session", "tool-running", "tool-done", "tool-error"):
+            self.assertIn(f"'{slot}'", protocol)
+            self.assertIn(f'data-skin-icon-{slot}="asset"', runtime_css)
+            self.assertRegex(
+                runtime_css,
+                rf'data-skin-icon-{slot}="asset"\] \.skin-icon\[data-skin-icon="{slot}"\]\s*\{{',
+            )
+
+        self.assertIn('data-skin-icon="session"', app)
+        self.assertIn("data-skin-icon={toolIconSlot}", app)
+        self.assertIn("data-tool-label={toolLabel}", app)
+        self.assertIn("toolStatusSkinIcon(item.status)", app)
+        self.assertIn('.tool-card.cancelled .skin-icon[data-skin-icon="tool-error"]::before', runtime_css)
+
+    def test_console_and_gem_chrome_use_only_real_runtime_status(self) -> None:
+        protocol = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
+        registry = SKIN_CHROME_SOURCE.read_text(encoding="utf-8")
+        renderer = PRESET_CHROME_SOURCE.read_text(encoding="utf-8")
+        runtime_css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
+
+        for preset in ("console", "gem-tech"):
+            self.assertIn(f"'{preset}'", protocol)
+            self.assertIn(f"'{preset}'", registry)
+            self.assertIn(f"'{preset}'", renderer)
+            self.assertIn(f".preset-chrome-{preset}", runtime_css)
+
+        for runtime_field in ("projectName", "projectPath", "modelName", "streaming", "status"):
+            self.assertIn(runtime_field, renderer)
+        for fake_telemetry in ("battery", "temperature", "signalStrength", "cpuUsage", "uptime"):
+            self.assertNotIn(fake_telemetry, renderer)
+
+        console = json.loads(CONSOLE_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        gem = json.loads(GEM_TECH_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        self.assertEqual(console["components"]["chrome"], "console")
+        self.assertEqual(gem["components"]["chrome"], "gem-tech")
+
+    def test_instrument_context_and_indexed_recipes_keep_real_ui_data(self) -> None:
+        protocol = SKIN_PROTOCOL_SOURCE.read_text(encoding="utf-8")
+        runtime_css = SKIN_RUNTIME_STYLES.read_text(encoding="utf-8")
+        app = APP_SOURCE.read_text(encoding="utf-8")
+
+        for preset in ("instrument", "signal", "gem", "indexed"):
+            self.assertIn(f"'{preset}'", protocol)
+        for selector in (
+            'data-skin-tools="instrument"',
+            'data-skin-context="signal"',
+            'data-skin-context="gem"',
+            'data-skin-file-tree="indexed"',
+        ):
+            self.assertIn(selector, runtime_css)
+        self.assertIn("--context-pct", app)
+        self.assertIn("contextPct", app)
+        self.assertIn("entry.name", app)
+        self.assertIn("entry.path", app)
+
+        console = json.loads(CONSOLE_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        gem = json.loads(GEM_TECH_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        self.assertEqual(
+            console["components"],
+            {"chrome": "console", "messages": "log", "tools": "instrument", "context": "signal", "fileTree": "indexed"},
+        )
+        self.assertEqual(gem["components"]["tools"], "instrument")
+        self.assertEqual(gem["components"]["context"], "gem")
+        self.assertEqual(gem["components"]["fileTree"], "indexed")
+
+    def test_quick_bug_report_uses_local_qr_and_sanitized_email_channel(self) -> None:
+        app = APP_SOURCE.read_text(encoding="utf-8")
+        report = BUG_REPORT_SOURCE.read_text(encoding="utf-8")
+        dialog = BUG_REPORT_DIALOG_SOURCE.read_text(encoding="utf-8")
+        capabilities = json.loads(DESKTOP_CAPABILITIES.read_text(encoding="utf-8"))
+
+        self.assertTrue(SUPPORT_QR_SOURCE.read_bytes().startswith(b"\xff\xd8\xff"))
+        self.assertGreater(SUPPORT_QR_SOURCE.stat().st_size, 1_000)
+        self.assertIn("BugReportDialog", app)
+        self.assertIn("support-public-account-qr.jpg", dialog)
+        self.assertIn("yantianxue_skye@qq.com", report)
+        self.assertNotIn("root_path", report)
+        self.assertNotIn("model_api_key", report)
+
+        opener = next(
+            item for item in capabilities["permissions"]
+            if isinstance(item, dict) and item.get("identifier") == "opener:allow-open-url"
+        )
+        allowed_urls = [item["url"] for item in opener["allow"]]
+        self.assertIn("mailto:*", allowed_urls)
+
+    def test_skin_lab_representative_examples_keep_their_baseline_recipes(self) -> None:
+        cream = json.loads(CREAM_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        green = json.loads(GREEN_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+        amethyst = json.loads(AMETHYST_SKIN_EXAMPLE.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            (cream["schema"], cream["material"]["preset"]),
+            ("workmode-skin/v2", "soft-cream"),
+        )
+        self.assertEqual(
+            green["components"],
+            {"chrome": "terminal", "messages": "log", "tools": "terminal", "context": "bar", "fileTree": "terminal"},
+        )
+        self.assertEqual(
+            amethyst["components"],
+            {"chrome": "observatory", "messages": "manuscript", "tools": "ritual", "context": "dial", "fileTree": "archive"},
+        )
 
 
 

@@ -23,9 +23,5 @@
     "panelRadius": 24,
     "bubbleRadius": 18,
     "buttonRadius": 14
-  },
-  "decoration": {
-    "preset": "notebook",
-    "density": 0.32
   }
 }

@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workmode · Cream Puff Lab Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --cream: #fff8e9;
+      --milk: #fffdf7;
+      --vanilla: #f6e8c8;
+      --biscuit: #dfc99f;
+      --cocoa: #5f5147;
+      --cocoa-soft: #8d7d70;
+      --cocoa-dim: #b8a99a;
+      --peach: #f3a996;
+      --peach-deep: #df806f;
+      --pink: #f8d9de;
+      --mint: #bfe0cf;
+      --mint-deep: #6ca68d;
+      --blue: #c9dceb;
+      --blue-deep: #7297ae;
+      --lemon: #f7dda0;
+      --lavender: #d9d0e9;
+      --line: rgba(111, 86, 67, .13);
+      --shadow: 0 15px 40px rgba(112, 82, 57, .10), 0 2px 5px rgba(112, 82, 57, .08);
+      --soft-shadow: 0 5px 14px rgba(112, 82, 57, .09), inset 0 1px rgba(255,255,255,.75);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+
+    body {
+      min-width: 1180px;
+      color: var(--cocoa);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at 14% 14%, rgba(248, 217, 222, .72), transparent 22%),
+        radial-gradient(circle at 82% 88%, rgba(191, 224, 207, .62), transparent 27%),
+        linear-gradient(135deg, #f7e8cf, #fff8e9 42%, #f4e7d4);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .22;
+      background-image: radial-gradient(rgba(117, 91, 70, .22) .65px, transparent .65px);
+      background-size: 5px 5px;
+      mix-blend-mode: multiply;
+    }
+
+    button, textarea { font: inherit; }
+    button { border: 0; color: inherit; cursor: pointer; }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 66px 272px minmax(470px, 1fr) 400px;
+      grid-template-rows: 58px minmax(0, 1fr) 30px;
+      gap: 10px;
+      width: 100vw;
+      height: 100vh;
+      padding: 12px;
+    }
+
+    .soft-panel {
+      position: relative;
+      overflow: hidden;
+      border: 2px solid rgba(113, 85, 64, .15);
+      border-radius: 25px;
+      background: rgba(255, 253, 247, .83);
+      box-shadow: var(--shadow), inset 0 0 0 3px rgba(255,255,255,.48);
+      backdrop-filter: blur(20px);
+    }
+
+    .soft-panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.92), inset 0 -3px 0 rgba(133, 99, 70, .055);
+    }
+
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 0 18px;
+      border-radius: 22px;
+    }
+
+    .logo {
+      position: relative;
+      width: 37px;
+      height: 37px;
+      flex: 0 0 auto;
+      border-radius: 14px 14px 16px 16px;
+      background: linear-gradient(145deg, #fff9ef, #f3c7b9);
+      box-shadow: var(--soft-shadow);
+    }
+
+    .logo::before,
+    .logo::after {
+      content: "";
+      position: absolute;
+      top: -5px;
+      width: 14px;
+      height: 17px;
+      border-radius: 11px 11px 4px 4px;
+      background: #f3c7b9;
+      z-index: -1;
+    }
+    .logo::before { left: 3px; transform: rotate(-18deg); }
+    .logo::after { right: 3px; transform: rotate(18deg); }
+
+    .logo-face {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 17px;
+      transform: translateY(1px);
+    }
+
+    .brand { min-width: 194px; line-height: 1.08; }
+    .brand strong { display: block; font-size: 15px; letter-spacing: .08em; }
+    .brand small { color: var(--peach-deep); font-size: 9px; font-weight: 700; letter-spacing: .18em; }
+
+    .crumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--cocoa-soft);
+      font-size: 11px;
+    }
+    .crumbs b { color: var(--cocoa); }
+    .crumbs span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crumb-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--biscuit); }
+
+    .top-spacer { flex: 1; }
+    .sun-chip, .online-chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.55);
+      color: var(--cocoa-soft);
+      font-size: 10px;
+      box-shadow: inset 0 1px white;
+    }
+    .online-chip i { width: 7px; height: 7px; border-radius: 50%; background: #7fc29f; box-shadow: 0 0 0 4px rgba(127,194,159,.15); }
+
+    .rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-radius: 25px;
+    }
+    .rail-group { display: grid; gap: 11px; }
+    .rail-btn {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 15px;
+      background: transparent;
+      color: var(--cocoa-dim);
+      font-size: 18px;
+      transition: .18s ease;
+      border: 1px solid transparent;
+    }
+    .rail-btn:hover { transform: translateY(-2px); color: var(--cocoa); background: #fff9ed; box-shadow: var(--soft-shadow); }
+    .rail-btn.active { color: #9a6559; border-color: rgba(145,93,82,.13); background: linear-gradient(145deg, #ffe9e2, #f5cfc7); box-shadow: 0 5px 0 #e7b9ae, 0 8px 15px rgba(112,82,57,.12), inset 0 2px white; transform: translateY(-3px); }
+    .tiny-avatar { font-size: 15px; background: #e2efd9; }
+
+    .sidebar {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) minmax(135px, .68fr);
+      min-height: 0;
+      padding: 18px 15px 13px;
+    }
+
+    .sidebar::before {
+      content: "✿  MY LITTLE LAB";
+      position: absolute;
+      z-index: 3;
+      top: 90px;
+      right: -3px;
+      padding: 4px 8px 4px 10px;
+      border: 1px solid rgba(141,112,87,.12);
+      border-right: 0;
+      border-radius: 10px 0 0 10px;
+      background: #dfeeda;
+      color: #699178;
+      font-size: 7px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      box-shadow: 0 3px 8px rgba(91,79,54,.08), inset 0 1px white;
+    }
+
+    .side-head { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 14px; }
+    .eyebrow { color: var(--peach-deep); font-size: 9px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+    .side-head h2 { margin-top: 2px; font-family: Georgia, "Microsoft YaHei", serif; font-size: 18px; }
+    .round-plus { width: 29px; height: 29px; border-radius: 11px; background: var(--pink); color: #9a6559; box-shadow: var(--soft-shadow); }
+
+    .project-card {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 38px minmax(0,1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 10px;
+      border: 2px solid rgba(114,83,64,.1);
+      border-radius: 17px;
+      background: linear-gradient(135deg, rgba(248,217,222,.58), rgba(255,250,239,.72));
+      box-shadow: 0 5px 0 rgba(222,184,174,.48), 0 9px 16px rgba(111,82,58,.07), inset 0 2px white;
+    }
+    .project-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 13px; background: #fff8ec; box-shadow: var(--soft-shadow); font-size: 19px; }
+    .project-card strong, .project-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .project-card strong { font-size: 12px; }
+    .project-card small { color: var(--cocoa-dim); font-size: 9px; }
+    .project-card .chev { color: var(--cocoa-dim); }
+
+    .section {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+      padding: 10px 2px 6px;
+      border-top: 1px dashed rgba(117,91,70,.15);
+    }
+    .section-title { display: flex; justify-content: space-between; align-items: center; padding: 0 5px 8px; color: var(--cocoa-soft); font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .section-title em { color: var(--cocoa-dim); font-style: normal; letter-spacing: 0; }
+
+    .tree, .chats { min-height: 0; overflow: hidden; }
+    .tree-row, .chat-row { display: flex; align-items: center; gap: 7px; min-height: 30px; padding: 4px 7px; border-radius: 11px; font-size: 11px; }
+    .tree-row:hover, .chat-row:hover { background: rgba(255,255,255,.72); }
+    .tree-row.selected { background: #fff2d5; box-shadow: inset 3px 0 var(--lemon); }
+    .tree-row.indent { padding-left: 23px; }
+    .tree-row .caret { width: 9px; color: var(--cocoa-dim); font-size: 9px; }
+    .tree-row .node { width: 20px; text-align: center; font-size: 14px; }
+    .tree-row .name, .chat-main { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree-row .kind { color: var(--cocoa-dim); font-size: 8px; }
+    .folder { color: #d59a68; }
+    .pdf { color: #d97973; }
+    .md { color: #79a3b7; }
+    .data { color: #70a586; }
+
+    .chat-row { align-items: flex-start; padding: 7px; }
+    .chat-row.active { background: rgba(201,220,235,.46); }
+    .chat-pin { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--blue-deep); flex: 0 0 auto; }
+    .chat-main strong, .chat-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-main strong { font-size: 10px; font-weight: 650; }
+    .chat-main small { color: var(--cocoa-dim); font-size: 8px; }
+
+    .workspace {
+      display: grid;
+      grid-template-rows: 66px minmax(0,1fr) auto;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .workspace::before {
+      content: "";
+      position: absolute;
+      z-index: 4;
+      top: 7px;
+      left: 50%;
+      width: 76px;
+      height: 14px;
+      border-radius: 2px;
+      background: rgba(247,221,160,.58);
+      box-shadow: 0 1px 2px rgba(102,76,50,.08);
+      transform: translateX(-50%) rotate(-1deg);
+      pointer-events: none;
+    }
+    .work-head {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(90deg, rgba(248,217,222,.22), transparent 52%, rgba(191,224,207,.17));
+    }
+    .assistant-avatar {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #fffaf0, #f4d0c7);
+      border: 2px solid rgba(134,96,78,.10);
+      box-shadow: 0 5px 0 #e7bdb4, 0 8px 14px rgba(111,82,57,.10), inset 0 2px white;
+      font-size: 19px;
+    }
+    .assistant-avatar::after { content: ""; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border: 3px solid var(--milk); border-radius: 50%; background: #7fc29f; }
+    .work-title { min-width: 0; flex: 1; }
+    .work-title strong, .work-title small { display: block; }
+    .work-title strong { font-family: Georgia, "Microsoft YaHei", serif; font-size: 16px; }
+    .work-title small { color: var(--cocoa-dim); font-size: 9px; }
+
+    .context-pill {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 10px;
+      border: 1px solid rgba(108,166,141,.22);
+      border-radius: 15px;
+      background: rgba(191,224,207,.27);
+    }
+    .context-copy { text-align: right; line-height: 1.18; }
+    .context-copy b, .context-copy small { display: block; }
+    .context-copy b { color: #628d78; font-size: 9px; }
+    .context-copy small { color: var(--cocoa-dim); font-size: 8px; }
+    .context-ring { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: conic-gradient(#82b69c 0 34%, #e4ede5 34% 100%); }
+    .context-ring::before { content: "34%"; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fffaf0; color: #628d78; font-size: 8px; font-weight: 800; }
+
+    .messages {
+      position: relative;
+      z-index: 1;
+      min-height: 0;
+      overflow: hidden;
+      padding: 26px 32px 10px;
+    }
+    .messages::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: .16;
+      background-image: linear-gradient(rgba(126,101,80,.12) 1px, transparent 1px);
+      background-size: 100% 31px;
+    }
+
+    .day-label { width: max-content; margin: 0 auto 22px; padding: 4px 12px; border-radius: 999px; background: rgba(246,232,200,.62); color: var(--cocoa-dim); font-size: 9px; }
+    .message { display: flex; gap: 10px; max-width: 680px; margin: 0 auto 18px; }
+    .message.user { justify-content: flex-end; }
+    .mini-face { display: grid; place-items: center; width: 29px; height: 29px; flex: 0 0 auto; border-radius: 11px; background: #f6ddd7; box-shadow: var(--soft-shadow); font-size: 13px; }
+    .bubble { padding: 12px 15px; border: 1px solid var(--line); border-radius: 8px 19px 19px 19px; background: rgba(255,253,247,.84); box-shadow: 0 5px 15px rgba(111,82,57,.07); font-size: 12px; line-height: 1.7; }
+    .message.user .bubble { order: 1; max-width: 72%; border-radius: 19px 8px 19px 19px; background: linear-gradient(145deg, #fff1e8, #f8ddd5); }
+    .message.user .mini-face { order: 2; background: #dfe9f1; }
+    .bubble h3 { margin-bottom: 6px; font-family: Georgia, "Microsoft YaHei", serif; font-size: 14px; }
+    .bubble p + p { margin-top: 6px; }
+    .bubble mark { padding: 1px 5px; border-radius: 6px; background: #fff0bf; color: inherit; }
+
+    .tool-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 34px minmax(0,1fr) auto;
+      align-items: center;
+      gap: 10px;
+      max-width: 620px;
+      margin: -4px auto 18px;
+      padding: 9px 11px;
+      border: 2px solid rgba(108,166,141,.16);
+      border-radius: 16px;
+      background: linear-gradient(90deg, rgba(191,224,207,.34), rgba(255,253,247,.65));
+      box-shadow: 0 4px 0 rgba(160,198,177,.34), 0 8px 16px rgba(90,111,97,.06), inset 0 2px rgba(255,255,255,.78);
+    }
+    .tool-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: #edf5ed; color: #68947e; font-size: 16px; }
+    .tool-copy strong, .tool-copy small { display: block; }
+    .tool-copy strong { font-size: 10px; }
+    .tool-copy small { color: var(--cocoa-dim); font-size: 8px; }
+    .tool-state { display: flex; align-items: center; gap: 5px; color: #68947e; font-size: 9px; }
+    .tool-state i { width: 7px; height: 7px; border-radius: 50%; background: #75ad91; }
+
+    .composer {
+      position: relative;
+      z-index: 2;
+      margin: 0 18px 17px;
+      padding: 10px;
+      border: 2px solid rgba(113,85,64,.14);
+      border-radius: 21px;
+      background: rgba(255,253,247,.92);
+      box-shadow: 0 7px 0 rgba(205,184,157,.34), 0 15px 32px rgba(103,75,53,.11), inset 0 2px white;
+    }
+    .composer textarea { display: block; width: 100%; height: 43px; resize: none; border: 0; outline: 0; color: var(--cocoa); background: transparent; padding: 3px 7px; font-size: 11px; }
+    .composer textarea::placeholder { color: var(--cocoa-dim); }
+    .composer-bottom { display: flex; align-items: center; gap: 7px; }
+    .compose-chip { padding: 4px 8px; border: 1px solid rgba(111,86,67,.09); border-radius: 9px; background: #f7efe1; color: var(--cocoa-soft); font-size: 9px; box-shadow: 0 2px 0 #e6dac6, inset 0 1px white; }
+    .compose-hint { flex: 1; color: var(--cocoa-dim); text-align: right; font-size: 8px; }
+    .send { display: flex; align-items: center; gap: 6px; padding: 7px 13px; border: 1px solid rgba(156,84,70,.13); border-radius: 12px; background: linear-gradient(145deg, #f4b4a5, #e89583); color: white; font-size: 10px; font-weight: 700; box-shadow: 0 4px 0 #cf7b6b, 0 8px 12px rgba(208,118,99,.19), inset 0 2px rgba(255,255,255,.45); transform: translateY(-2px); }
+
+    .viewer {
+      display: grid;
+      grid-template-rows: 46px minmax(0,1fr);
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .viewer::before {
+      content: "♡";
+      position: absolute;
+      z-index: 4;
+      top: 30px;
+      right: 21px;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 25px;
+      border: 2px solid rgba(126,93,72,.12);
+      border-radius: 9px 9px 12px 12px;
+      background: #f6cfc8;
+      color: #a66d62;
+      box-shadow: 0 3px 0 #dda9a0, 0 6px 10px rgba(111,82,57,.09), inset 0 1px white;
+      transform: rotate(5deg);
+    }
+    .viewer-head { position: relative; z-index: 1; display: flex; align-items: center; gap: 9px; padding: 0 15px; border-bottom: 1px solid var(--line); }
+    .file-badge { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 9px; background: var(--blue); color: var(--blue-deep); font-size: 11px; font-weight: 800; }
+    .viewer-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; }
+    .viewer-actions { color: var(--cocoa-dim); font-size: 15px; }
+
+    .paper-wrap { position: relative; z-index: 1; min-height: 0; overflow: hidden; padding: 18px; background: rgba(246,232,200,.22); }
+    .paper {
+      height: 100%;
+      overflow: hidden;
+      padding: 30px 31px;
+      border: 2px solid rgba(111,86,67,.12);
+      border-radius: 7px;
+      background:
+        linear-gradient(90deg, transparent 0 25px, rgba(239,169,150,.18) 25px 26px, transparent 26px),
+        repeating-linear-gradient(180deg, transparent 0 28px, rgba(114,151,174,.10) 28px 29px),
+        #fffdf8;
+      box-shadow: 0 5px 0 rgba(206,185,153,.38), 0 14px 28px rgba(108,78,52,.12), inset 0 0 34px rgba(134,102,70,.025);
+    }
+    .paper-tag { display: inline-block; margin-bottom: 14px; padding: 3px 8px; border-radius: 7px; background: var(--pink); color: #a46960; font-size: 8px; font-weight: 800; letter-spacing: .11em; }
+    .paper h1 { margin-bottom: 5px; font-family: Georgia, "Microsoft YaHei", serif; font-size: 22px; color: #55463d; }
+    .paper .meta { margin-bottom: 21px; color: var(--cocoa-dim); font-size: 9px; }
+    .paper h2 { margin: 18px 0 8px; font-family: Georgia, "Microsoft YaHei", serif; font-size: 14px; }
+    .paper p, .paper li { font-family: Georgia, "Microsoft YaHei", serif; font-size: 11px; line-height: 1.85; }
+    .paper ul { padding-left: 17px; }
+    .note {
+      position: relative;
+      margin-top: 18px;
+      padding: 12px 13px 11px;
+      border-radius: 4px 13px 13px 13px;
+      background: #fff0bf;
+      box-shadow: 3px 5px 10px rgba(117,86,59,.10);
+      transform: rotate(-.6deg);
+    }
+    .note::before { content: ""; position: absolute; top: -6px; left: 35%; width: 58px; height: 15px; background: rgba(255,255,255,.55); transform: rotate(2deg); }
+    .note b { font-size: 10px; }
+    .note p { margin-top: 4px; font-size: 10px; }
+
+    .statusbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 19px;
+      padding: 0 14px;
+      border-radius: 13px;
+      background: rgba(255,253,247,.72);
+      color: var(--cocoa-dim);
+      font-size: 8px;
+      box-shadow: 0 5px 16px rgba(105,76,52,.07), inset 0 1px white;
+    }
+    .statusbar b { color: var(--cocoa-soft); font-weight: 650; }
+    .status-spacer { flex: 1; }
+    .leaf { color: #74a98d; }
+
+    .sticker {
+      position: fixed;
+      z-index: 8;
+      display: grid;
+      place-items: center;
+      border: 3px solid rgba(255,255,255,.78);
+      box-shadow: 0 5px 12px rgba(97,69,47,.13);
+      pointer-events: none;
+    }
+    .sticker-a { right: 9px; top: 106px; width: 36px; height: 36px; border-radius: 50% 46% 50% 45%; background: #f4d39a; transform: rotate(9deg); font-size: 16px; }
+    .sticker-b { left: 316px; bottom: 18px; width: 29px; height: 29px; border-radius: 11px; background: #cde4d6; transform: rotate(-8deg); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="sticker sticker-a">☀</div>
+  <div class="sticker sticker-b">♧</div>
+  <main class="shell">
+    <header class="topbar soft-panel">
+      <div class="logo"><span class="logo-face">•ᴗ•</span></div>
+      <div class="brand"><strong>WORKMODE</strong><small>CREAM PUFF LAB</small></div>
+      <div class="crumbs"><b>月光催化研究</b><span class="crumb-dot"></span><span>D:\Research\photocatalysis</span></div>
+      <div class="top-spacer"></div>
+      <div class="sun-chip">☀ 今日专注 48 min</div>
+      <div class="online-chip"><i></i> DeepSeek V4 Pro</div>
+    </header>
+
+    <nav class="rail soft-panel">
+      <div class="rail-group">
+        <button class="rail-btn active" title="项目">⌂</button>
+        <button class="rail-btn" title="搜索">⌕</button>
+        <button class="rail-btn" title="记录">▤</button>
+      </div>
+      <div class="rail-group">
+        <button class="rail-btn" title="设置">⚙</button>
+        <button class="rail-btn tiny-avatar" title="我的成就">✿</button>
+      </div>
+    </nav>
+
+    <aside class="sidebar soft-panel">
+      <div class="side-head">
+        <div><div class="eyebrow">Research garden</div><h2>我的研究花园</h2></div>
+        <button class="round-plus">＋</button>
+      </div>
+      <div class="project-card">
+        <div class="project-icon">🌱</div>
+        <div><strong>月光催化研究</strong><small>12 个文件 · 3 个对话</small></div>
+        <span class="chev">⌄</span>
+      </div>
+      <section class="section">
+        <div class="section-title"><span>项目文件</span><em>12</em></div>
+        <div class="tree">
+          <div class="tree-row"><span class="caret">▾</span><span class="node folder">▰</span><span class="name">papers</span><span class="kind">文件夹</span></div>
+          <div class="tree-row indent selected"><span class="caret"></span><span class="node pdf">▧</span><span class="name">Wang_2024_JACS.pdf</span><span class="kind">PDF</span></div>
+          <div class="tree-row"><span class="caret">▸</span><span class="node folder">▰</span><span class="name">experimental-data</span><span class="kind">文件夹</span></div>
+          <div class="tree-row"><span class="caret">▾</span><span class="node folder">▰</span><span class="name">manuscript</span><span class="kind">文件夹</span></div>
+          <div class="tree-row indent"><span class="caret"></span><span class="node md">▤</span><span class="name">discussion.md</span><span class="kind">MD</span></div>
+          <div class="tree-row indent"><span class="caret"></span><span class="node data">⌁</span><span class="name">epr-spectrum.dat</span><span class="kind">DATA</span></div>
+          <div class="tree-row"><span class="caret"></span><span class="node md">✦</span><span class="name">WORKMODE.md</span><span class="kind">协议</span></div>
+        </div>
+      </section>
+      <section class="section">
+        <div class="section-title"><span>对话小径</span><em>＋ 新对话</em></div>
+        <div class="chats">
+          <div class="chat-row active"><span class="chat-pin"></span><div class="chat-main"><strong>梳理 JACS 文献中的机理证据</strong><small>18 条消息 · 刚刚</small></div></div>
+          <div class="chat-row"><span class="chat-pin" style="background:#d7ad75"></span><div class="chat-main"><strong>周计划与实验安排</strong><small>9 条消息 · 昨天</small></div></div>
+          <div class="chat-row"><span class="chat-pin" style="background:#b599c7"></span><div class="chat-main"><strong>Discussion 初稿润色</strong><small>24 条消息 · 周一</small></div></div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="workspace soft-panel">
+      <header class="work-head">
+        <div class="assistant-avatar">🐰</div>
+        <div class="work-title"><strong>奶芙研究助手</strong><small>正在陪你整理可验证的实验依据</small></div>
+        <div class="context-pill">
+          <div class="context-copy"><b>上下文很轻盈</b><small>238k / 700k tokens</small></div>
+          <div class="context-ring"></div>
+        </div>
+      </header>
+
+      <div class="messages">
+        <div class="day-label">今天 · 文献事实核对</div>
+        <div class="message user">
+          <div class="bubble">帮我核对这篇文章中关于氧空位促进 O₂ 活化的原始证据。</div>
+          <div class="mini-face">👩‍🔬</div>
+        </div>
+        <div class="message">
+          <div class="mini-face">🐰</div>
+          <div class="bubble">
+            <h3>好呀，先把“作者结论”和“直接证据”分开 🌼</h3>
+            <p>我会读取正文与补充信息，定位 <mark>EPR、原位光谱和对照实验</mark>，然后把每条事实附上页码与图号。</p>
+            <p>先从 PDF 中提取可检索文本，不改动你的项目文件。</p>
+          </div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-icon">⌕</div>
+          <div class="tool-copy"><strong>project_read · Wang_2024_JACS.pdf.md</strong><small>读取第 420–610 行 · 191 行文本</small></div>
+          <div class="tool-state"><i></i>完成</div>
+        </div>
+        <div class="message">
+          <div class="mini-face">🐰</div>
+          <div class="bubble">
+            <h3>找到三类可以站得住脚的证据</h3>
+            <p><b>① EPR：</b>光照后出现超氧自由基特征信号；<b>② 原位 DRIFTS：</b>观察到吸附氧中间体；<b>③ 缺陷对照：</b>低氧空位样品的响应明显减弱。</p>
+            <p>右侧是我准备写入事实表的草稿。你确认后，我再补齐图号和限定语。</p>
+          </div>
+        </div>
+      </div>
+
+      <footer class="composer">
+        <textarea placeholder="和奶芙说说接下来要做什么……"></textarea>
+        <div class="composer-bottom">
+          <button class="compose-chip">＋ 文件</button>
+          <button class="compose-chip">⌁ 计划</button>
+          <span class="compose-hint">Ctrl + Enter 发送 · Enter 换行</span>
+          <button class="send">发送 <span>➜</span></button>
+        </div>
+      </footer>
+    </section>
+
+    <aside class="viewer soft-panel">
+      <header class="viewer-head">
+        <span class="file-badge">MD</span>
+        <span class="viewer-name">reports/objective-facts.md</span>
+        <span class="viewer-actions">⋯</span>
+      </header>
+      <div class="paper-wrap">
+        <article class="paper">
+          <span class="paper-tag">FACT SHEET · DRAFT</span>
+          <h1>氧空位与 O₂ 活化</h1>
+          <div class="meta">更新于 11:42 · 来源：Wang et al., JACS 2024</div>
+          <h2>可以直接支持的事实</h2>
+          <ul>
+            <li>缺陷富集样品在光照下表现出更强的自由基信号。</li>
+            <li>原位光谱检测到与吸附氧物种相关的特征峰。</li>
+            <li>对照样品的活性与光谱响应同步降低。</li>
+          </ul>
+          <h2>写作边界</h2>
+          <p>这些结果支持氧空位参与氧气吸附与活化，但不能单独证明它是唯一活性位点；正文中应保留“suggest / support”而不是“prove”。</p>
+          <div class="note"><b>🍮 协作便签</b><p>下一步补齐 Figure 3、Figure S12 的图号与实验条件，再写入 discussion.md。</p></div>
+        </article>
+      </div>
+    </aside>
+
+    <footer class="statusbar">
+      <span class="leaf">●</span><b>本地项目已连接</b>
+      <span>会话已保存</span><span>工作记忆 3.8k tok</span><span>工具空闲</span>
+      <span class="status-spacer"></span><span>UTF-8</span><span>Markdown</span><span>11:43</span>
+    </footer>
+  </main>
+</body>
+</html>
