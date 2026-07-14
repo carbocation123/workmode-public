@@ -110,10 +110,15 @@ class DesktopUiContractTest(unittest.TestCase):
 
     def test_literature_pdf_drop_requires_confirmation_without_fake_chat_messages(self) -> None:
         literature_app = LITERATURE_APP_SOURCE.read_text(encoding="utf-8")
+        tauri_config = json.loads(TAURI_CONFIG.read_text(encoding="utf-8"))
 
         self.assertIn("pendingImportFiles", literature_app)
         self.assertIn("确认入库", literature_app)
         self.assertIn("confirmPendingImport", literature_app)
+        self.assertFalse(
+            tauri_config["app"]["windows"][0]["dragDropEnabled"],
+            "Windows desktop must leave file drops to the HTML5 FileList handler",
+        )
         self.assertNotIn("准备入库 ${pdfFiles.length} 篇 PDF", literature_app)
         self.assertNotIn("我会逐篇写入当前固定结构文献项目", literature_app)
         self.assertNotIn("篇文献已经进入当前 Workmode 文献项目", literature_app)
@@ -546,6 +551,23 @@ class DesktopUiContractTest(unittest.TestCase):
 
         self.assertIn(':is(.activity-icon, .tree-node-icon, .session-row-icon) {', visual)
         self.assertIn('font-size: 0 !important', visual)
+        self.assertIn('.activity-bar-top .activity-icon::before', visual)
+        self.assertIn('.activity-bar-bottom .activity-icon::before', visual)
+        self.assertIn('.activity-bar-bottom .activity-btn.active .activity-icon::before', visual)
+        self.assertIn('.mode-card-icon::before', visual)
+        self.assertIn('.mode-card-literature .mode-card-icon::before', visual)
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
+    def test_cryo_gem_tech_keeps_markdown_code_blocks_high_contrast(self) -> None:
+        visual = (SKIN_SOURCE_DIR / "cryo-gem-tech" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn('.message-block.assistant .message-bubble pre', visual)
+        self.assertIn('.message-block.user .message-bubble pre', visual)
+        self.assertIn('.message-block.system .message-bubble pre', visual)
+        self.assertIn('color: #e8f7ff', visual)
+        self.assertIn('background: #071426', visual)
+        self.assertIn('.message-block .message-bubble pre code', visual)
+        self.assertIn('background: transparent', visual)
 
     @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_amethyst_observatory_has_independent_arcane_archive(self) -> None:
@@ -707,7 +729,7 @@ class DesktopUiContractTest(unittest.TestCase):
         visual = (source / "visual.css").read_text(encoding="utf-8")
 
         self.assertEqual(manifest["id"], "green-phosphor-terminal")
-        self.assertEqual(manifest["version"], "4.2.0")
+        self.assertEqual(manifest["version"], "4.2.1")
         self.assertEqual(manifest["material"]["preset"], "crt")
         self.assertEqual(manifest["components"]["messages"], "log")
 
@@ -733,6 +755,10 @@ class DesktopUiContractTest(unittest.TestCase):
             visual,
             r"(?s)\.message-block\.user\s*\{[^}]*margin-left:\s*auto;[^}]*margin-right:\s*0;",
         )
+        self.assertIn('[data-skin-slot="chat-workspace"] [data-skin-slot="message"]', visual)
+        self.assertIn('[data-skin-slot="chat-workspace"] [data-skin-slot="composer"]', visual)
+        self.assertIn('[data-skin-slot="literature-conversation"] > [data-skin-slot="message-stream"]', visual)
+        self.assertIn('[data-skin-slot="literature-conversation"] .message-block', visual)
         self.assertIn("@media (max-width: 1320px)", layout)
         self.assertNotIn("http://", layout + visual)
         self.assertNotIn("https://", layout + visual)
@@ -741,8 +767,8 @@ class DesktopUiContractTest(unittest.TestCase):
     def test_parallel_reward_skin_migrations_cover_all_three_surfaces(self) -> None:
         expected = {
             "amethyst-observatory": ("amethyst-observatory", "3.3.0"),
-            "cream-puff": ("cream-puff-v3", "3.4.0"),
-            "cryo-gem-tech": ("cryo-gem-tech", "3.3.0"),
+            "cream-puff": ("cream-puff-v3", "3.4.1"),
+            "cryo-gem-tech": ("cryo-gem-tech", "3.3.1"),
             "midnight-console": ("midnight-console", "3.3.0"),
             "neon-ice": ("neon-ice-v3", "3.3.0"),
         }
@@ -786,9 +812,9 @@ class DesktopUiContractTest(unittest.TestCase):
     def test_every_reward_skin_has_theme_specific_navigation_file_and_control_icons(self) -> None:
         expected_versions = {
             "amethyst-observatory": "3.3.0",
-            "cream-puff": "3.4.0",
-            "cryo-gem-tech": "3.3.0",
-            "green-phosphor": "4.2.0",
+            "cream-puff": "3.4.1",
+            "cryo-gem-tech": "3.3.1",
+            "green-phosphor": "4.2.1",
             "inkburst-lab": "1.0.2",
             "midnight-console": "3.3.0",
             "neon-ice": "3.3.0",

@@ -82,6 +82,10 @@ npx --yes npm@10.9.4 ci --prefix desktop
 
 0.8.2 的前端锁文件已用 npm 10.9.4 重新生成并完成两端 `npm ci` 验证；同时修复 GitHub Windows Runner 暴露的临时目录长路径/8.3 短路径别名问题。这些发行修复不改变用户数据格式。
 
+0.8.3 在 Windows Tauri 主窗口中禁用原生 drag-drop 拦截，让文献页现有 HTML5 `FileList` 处理器接收真实 PDF 并显示入库确认。该补丁只改变窗口事件路由，不改变文献项目、catalog、session 或用户数据。
+
+本地日常验证若未修改 `package.json` 或 lockfile，直接使用已有 `node_modules` 运行测试/构建，不重复执行 `npm ci`。`npm ci` 是依赖或锁文件变更后的显式发行门槛；在受限网络环境中不应隐式反复重试。
+
 应用内更新端点固定为：
 
 ```text

@@ -65,7 +65,7 @@ npm ci --prefix frontend
 npm --prefix frontend run dev
 ```
 
-正式 CI 固定 npm 10.9.4。修改前端依赖后必须用同版本更新并验证 lockfile，不能只依赖已有 `node_modules`：
+正式 CI 固定 npm 10.9.4。修改前端依赖后必须用同版本更新并验证 lockfile，不能只依赖已有 `node_modules`。反之，只修改 React/CSS/配置且 `package.json` 与 lockfile 未变时，直接用现有依赖跑测试和构建，不重复联网 `npm ci`：
 
 ```powershell
 Push-Location frontend
