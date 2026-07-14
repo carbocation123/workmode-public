@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import threading
@@ -46,6 +47,23 @@ def _check_cancel(cancel_event: threading.Event | None) -> None:
 
 def _set_stage(root: Path, paper_id: str, *, stage: str, status: str) -> None:
     update_literature_paper(root, paper_id, status=status, stage=stage, error=None)
+
+
+def _project_relative(path: Path, root: Path) -> str:
+    """Return a safe project-relative path after resolving Windows aliases.
+
+    GitHub-hosted Windows runners may expose the same temporary directory as
+    both an 8.3 short path (``RUNNER~1``) and its long path (``runneradmin``).
+    Canonicalizing both operands keeps the containment check strict without
+    rejecting those two spellings of the same real directory.
+    """
+
+    canonical_root = Path(os.path.realpath(os.fspath(root)))
+    canonical_path = Path(os.path.realpath(os.fspath(path)))
+    try:
+        return canonical_path.relative_to(canonical_root).as_posix()
+    except ValueError as exc:
+        raise LiteraturePipelineError("文献处理输出路径越出项目目录") from exc
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
@@ -407,7 +425,7 @@ def run_literature_pipeline(
         _check_cancel(cancel_event)
         _set_stage(root, paper_id, stage="MinerU 正在解析正文", status="parsing")
         output_dir = _run_mineru(root, paper_id, cancel_event)
-        mineru_rel = output_dir.relative_to(root).as_posix()
+        mineru_rel = _project_relative(output_dir, root)
         paths = dict(literature_paper(root, paper_id).get("paths") or {})
         paths.update({"mineru_dir": mineru_rel, "full_md": f"{mineru_rel}/full.md"})
         update_literature_paper(root, paper_id, paths=paths)
@@ -438,7 +456,7 @@ def run_literature_pipeline(
             {
                 "mineru_dir": mineru_rel,
                 "full_md": f"{mineru_rel}/full.md",
-                "fact_report": report_path.relative_to(root).as_posix(),
+                "fact_report": _project_relative(report_path, root),
             }
         )
         update_literature_paper(
@@ -449,7 +467,7 @@ def run_literature_pipeline(
             paths=paths,
             error=None,
         )
-        changed.append(report_path.relative_to(root).as_posix())
+        changed.append(_project_relative(report_path, root))
         return {"status": "review", "stage": "客观事实报告已生成", "changed_files": changed}
     except PipelineCancelled as exc:
         update_literature_paper(root, paper_id, status="pending", stage="处理已停止", error=str(exc))

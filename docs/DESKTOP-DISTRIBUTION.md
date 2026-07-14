@@ -80,7 +80,7 @@ npx --yes npm@10.9.4 ci --prefix frontend
 npx --yes npm@10.9.4 ci --prefix desktop
 ```
 
-0.8.1 的前端锁文件已用 npm 10.9.4 重新生成并完成两端 `npm ci` 验证；这是对 0.8.0 首次标签构建失败的发行修复，不改变用户数据格式。
+0.8.2 的前端锁文件已用 npm 10.9.4 重新生成并完成两端 `npm ci` 验证；同时修复 GitHub Windows Runner 暴露的临时目录长路径/8.3 短路径别名问题。这些发行修复不改变用户数据格式。
 
 应用内更新端点固定为：
 

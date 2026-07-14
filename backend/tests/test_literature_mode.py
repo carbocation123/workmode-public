@@ -287,6 +287,27 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertEqual(paper["archive_filename"], "Zhang_2024_JTest.pdf")
         self.assertTrue((self.root / paper["paths"]["fact_report"]).exists())
 
+    def test_pipeline_relative_path_canonicalizes_windows_path_aliases(self) -> None:
+        from app.literature_pipeline import _project_relative
+
+        alias_root = Path("RUNNER~1") / "temp" / "library"
+        alias_output = alias_root / "papers" / "unprocessed" / "extracted" / "paper-1"
+        canonical_root = Path("runneradmin") / "temp" / "library"
+        canonical_output = canonical_root / "papers" / "unprocessed" / "extracted" / "paper-1"
+        aliases = {
+            os.fspath(alias_root): os.fspath(canonical_root),
+            os.fspath(alias_output): os.fspath(canonical_output),
+        }
+
+        with patch(
+            "app.literature_pipeline.os.path.realpath",
+            side_effect=lambda value: aliases.get(os.fspath(value), os.fspath(value)),
+        ):
+            self.assertEqual(
+                _project_relative(alias_output, alias_root),
+                "papers/unprocessed/extracted/paper-1",
+            )
+
     def test_full_text_read_falls_back_to_the_pdf_text_layer_without_mineru(self) -> None:
         from app.literature_project import execute_literature_tool
 
