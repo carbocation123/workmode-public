@@ -8,6 +8,8 @@ __pycache__/
 frontend/node_modules/
 /node_modules/
 frontend/dist/
+/literature-demo/node_modules/
+/literature-demo/archive/standalone-frontend-dev-shell-2026-07-13/dist/
 /data/
 /logs/
 /.run/

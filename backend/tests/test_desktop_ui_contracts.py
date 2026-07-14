@@ -43,9 +43,119 @@ DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "defaul
 TAURI_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.conf.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
 FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
+FRONTEND_VITE_CONFIG = ROOT / "frontend" / "vite.config.ts"
+LITERATURE_HTML = ROOT / "frontend" / "literature" / "index.html"
+LITERATURE_APP_SOURCE = ROOT / "frontend" / "src" / "literature" / "LiteratureApp.tsx"
+LITERATURE_API_SOURCE = ROOT / "frontend" / "src" / "literature" / "literatureApi.ts"
+LITERATURE_STYLES = ROOT / "frontend" / "src" / "literature" / "styles.css"
+LITERATURE_NAVIGATION_SOURCE = ROOT / "frontend" / "src" / "literatureNavigation.ts"
+LITERATURE_LAUNCHER_SOURCE = ROOT / "frontend" / "src" / "literatureLauncher.ts"
+PDF_VIEWER_SOURCE = ROOT / "frontend" / "src" / "PdfViewer.tsx"
+APPLICATION_HOME_SOURCE = ROOT / "frontend" / "src" / "ApplicationHome.tsx"
+FRONTEND_MAIN_SOURCE = ROOT / "frontend" / "src" / "main.tsx"
+BACKEND_MAIN_SOURCE = ROOT / "backend" / "app" / "main.py"
+BACKEND_ROUTES_SOURCE = ROOT / "backend" / "app" / "routes.py"
+SOURCE_LAUNCHER = ROOT / "scripts" / "one-click-start.ps1"
 
 
 class DesktopUiContractTest(unittest.TestCase):
+    def test_literature_workbench_is_a_packaged_multi_page_frontend(self) -> None:
+        app = APP_SOURCE.read_text(encoding="utf-8")
+        vite = FRONTEND_VITE_CONFIG.read_text(encoding="utf-8")
+        literature_html = LITERATURE_HTML.read_text(encoding="utf-8")
+        literature_app = LITERATURE_APP_SOURCE.read_text(encoding="utf-8")
+        literature_api = LITERATURE_API_SOURCE.read_text(encoding="utf-8")
+        literature_navigation = LITERATURE_NAVIGATION_SOURCE.read_text(encoding="utf-8")
+        literature_launcher = LITERATURE_LAUNCHER_SOURCE.read_text(encoding="utf-8")
+        pdf_viewer = PDF_VIEWER_SOURCE.read_text(encoding="utf-8")
+        application_home = APPLICATION_HOME_SOURCE.read_text(encoding="utf-8")
+        frontend_main = FRONTEND_MAIN_SOURCE.read_text(encoding="utf-8")
+        backend_main = BACKEND_MAIN_SOURCE.read_text(encoding="utf-8")
+
+        self.assertNotIn("openLiteratureWorkbench", app)
+        self.assertNotIn('title="文献智库"', app)
+        self.assertIn("title={activePanel === 'settings'", app)
+        self.assertIn("createLiteratureProject", literature_launcher)
+        self.assertIn("科研工作台", application_home)
+        self.assertIn("文献智库", application_home)
+        self.assertIn("resolveApplicationSurface", frontend_main)
+        self.assertIn("<ApplicationHome themeId={initialThemeId}", frontend_main)
+        self.assertIn("literature/index.html", vite)
+        self.assertIn("/src/literature/main.tsx", literature_html)
+        self.assertIn("功能大厅", literature_app)
+        self.assertIn("workbenchSettingsUrl", literature_app)
+        self.assertIn("打开全局设置", literature_app)
+        self.assertIn('data-skin-slot="literature-shell"', literature_app)
+        self.assertIn('className="activity-bar"', literature_app)
+        self.assertIn('data-skin-slot="activity-navigation"', literature_app)
+        self.assertIn('className="activity-bar-top"', literature_app)
+        self.assertIn('className="activity-bar-bottom"', literature_app)
+        self.assertNotIn("return-workbench-button", literature_app)
+        self.assertNotIn("literature-settings-button", literature_app)
+        self.assertNotIn("Workmode 文献项目已连接", literature_app)
+        self.assertNotIn("SPECIALIZED · LITERATURE", literature_app)
+        self.assertGreaterEqual(literature_app.count('className="modal-backdrop centered-dialog-backdrop"'), 3)
+        self.assertIn("<PdfViewer", app)
+        self.assertIn("<PdfViewer", literature_app)
+        self.assertIn("media pdf", pdf_viewer)
+        self.assertIn("fetch(src", pdf_viewer)
+        self.assertIn("URL.createObjectURL", pdf_viewer)
+        self.assertIn("URL.revokeObjectURL", pdf_viewer)
+        self.assertIn("api.mediaUrl(activeProject.slug, pdfPath)", literature_api)
+        self.assertIn("RUNTIME_API_BASE_KEY", literature_api)
+        self.assertIn("LITERATURE_PROJECT_KEY", literature_api)
+        self.assertIn("workmode-public-api-base", literature_navigation)
+        self.assertIn("workmode-public-literature-project", literature_navigation)
+        self.assertIn('target / "index.html"', backend_main)
+
+    def test_literature_pdf_drop_requires_confirmation_without_fake_chat_messages(self) -> None:
+        literature_app = LITERATURE_APP_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("pendingImportFiles", literature_app)
+        self.assertIn("确认入库", literature_app)
+        self.assertIn("confirmPendingImport", literature_app)
+        self.assertNotIn("准备入库 ${pdfFiles.length} 篇 PDF", literature_app)
+        self.assertNotIn("我会逐篇写入当前固定结构文献项目", literature_app)
+        self.assertNotIn("篇文献已经进入当前 Workmode 文献项目", literature_app)
+
+    def test_literature_overlays_are_not_forced_into_the_app_grid(self) -> None:
+        styles = LITERATURE_STYLES.read_text(encoding="utf-8")
+
+        shell_children = re.search(
+            r"\.app-shell\s*>\s*:not\(\.skin-background-layer\)(?P<selector>[^\{]+)\{",
+            styles,
+        )
+        self.assertIsNotNone(shell_children)
+        self.assertIn(":not(.modal-backdrop)", shell_children.group("selector"))
+        self.assertIn(":not(.drop-overlay)", shell_children.group("selector"))
+
+        backdrop = re.search(r"\.modal-backdrop\s*\{(?P<body>[^}]*)\}", styles)
+        self.assertIsNotNone(backdrop)
+        self.assertRegex(backdrop.group("body"), r"position\s*:\s*fixed\s*;")
+        self.assertRegex(backdrop.group("body"), r"place-items\s*:\s*center\s*;")
+
+    def test_source_launcher_rejects_an_old_backend_on_the_fixed_port(self) -> None:
+        launcher = SOURCE_LAUNCHER.read_text(encoding="utf-8")
+        routes = BACKEND_ROUTES_SOURCE.read_text(encoding="utf-8")
+
+        self.assertIn("ExpectedLiteratureContractVersion", launcher)
+        self.assertIn("literature_project_contract_version", launcher)
+        self.assertIn("ConvertFrom-Json", launcher)
+        self.assertIn("incompatible Workmode backend", launcher)
+        self.assertIn("$ExpectedLiteratureContractVersion = 3", launcher)
+        self.assertIn('"literature_project_contract_version": 3', routes)
+
+    def test_source_launcher_returns_only_the_backend_python_path(self) -> None:
+        launcher = SOURCE_LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("function Test-PythonInterpreter", launcher)
+        self.assertIn("-PathType Leaf", launcher)
+        self.assertIn("pip install --upgrade pip | Out-Host", launcher)
+        self.assertIn("pip install -r $requirements | Out-Host", launcher)
+        self.assertIn("Backend Python is not executable", launcher)
+        self.assertIn("function Normalize-ProcessPathEnvironment", launcher)
+        self.assertIn('SetEnvironmentVariable("PATH", $null, "Process")', launcher)
+
     def test_frontend_build_toolchain_is_not_a_runtime_dependency(self) -> None:
         package = json.loads(FRONTEND_PACKAGE.read_text(encoding="utf-8"))
 
@@ -101,7 +211,8 @@ class DesktopUiContractTest(unittest.TestCase):
         source = APP_SOURCE.read_text(encoding="utf-8") + ONBOARDING_SOURCE.read_text(encoding="utf-8")
         css = STYLES.read_text(encoding="utf-8")
 
-        self.assertIn("重新播放新手引导", source)
+        self.assertIn("重新播放工作台引导", source)
+        self.assertIn("重新播放文献模式引导", source)
         self.assertIn("科研协作教程", source)
         self.assertIn('data-guide="projects"', source)
         self.assertIn('data-guide="files"', source)
@@ -325,7 +436,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.activity-btn.active', visual)
         self.assertIn('.project-switcher', visual)
         self.assertIn('.message.assistant::before', visual)
-        self.assertIn('content: "🐱"', visual)
+        self.assertIn('content: "🐰"', visual)
         self.assertIn('.side-panel-title::before', visual)
         self.assertIn('content: "RESEARCH GARDEN"', visual)
         self.assertIn('.side-panel-title::after', visual)
@@ -461,7 +572,7 @@ class DesktopUiContractTest(unittest.TestCase):
         manifest = json.loads((PIXEL_SKIN_DIR / "manifest.json").read_text(encoding="utf-8"))
 
         self.assertEqual(manifest["id"], "pixel-night-shift")
-        self.assertEqual(manifest["version"], "3.2.1")
+        self.assertEqual(manifest["version"], "3.3.0")
         self.assertEqual(manifest["components"]["chrome"], "console")
         self.assertIn('grid-template-rows: 58px minmax(0, 1fr) 28px', layout)
         self.assertIn('--pixel-magenta: #ff4fa3', visual)
@@ -490,15 +601,198 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn('.file-view-markdown', visual)
 
     @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
+    def test_inkburst_lab_is_a_three_surface_native_skin(self) -> None:
+        source = SKIN_SOURCE_DIR / "inkburst-lab"
+        manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+        layout = (source / "layout.css").read_text(encoding="utf-8")
+        visual = (source / "visual.css").read_text(encoding="utf-8")
+
+        self.assertEqual(manifest["id"], "inkburst-lab")
+        self.assertEqual(manifest["version"], "1.0.2")
+        self.assertEqual(manifest["foundation"], "light")
+        self.assertEqual(manifest["components"]["chrome"], "console")
+        self.assertEqual(manifest["palette"]["accent"], "#ff5fae")
+        self.assertEqual(manifest["palette"]["accentAlt"], "#42d9c0")
+
+        for slot in (
+            "app-shell", "app-chrome", "activity-navigation", "workspace-sidebar",
+            "chat-workspace", "file-viewer", "status-bar", "settings",
+            "feature-hub", "feature-card", "literature-shell", "literature-workspace",
+            "literature-library", "literature-conversation", "literature-paper",
+            "literature-detail", "literature-memory", "literature-notes",
+        ):
+            self.assertIn(f'[data-skin-slot="{slot}"]', layout + visual)
+
+        for selector in (
+            ".mode-card", ".mode-hub-intro", ".preset-chrome-console",
+            ".message.assistant .bubble", ".tool-card", ".file-view-markdown",
+            ".paper-row", ".message-block.assistant .message-bubble",
+            ".tool-event-card", ".paper-detail-modal", ".notes-workspace-modal",
+        ):
+            self.assertIn(selector, visual)
+
+        self.assertIn("--inkburst-ink: #171427", visual)
+        self.assertIn("--inkburst-hard-shadow: 7px 7px 0", visual)
+        self.assertIn("@media (max-width: 1120px)", layout)
+        self.assertNotIn("http://", layout + visual)
+        self.assertNotIn("https://", layout + visual)
+        self.assertNotIn("ACTIVE", visual)
+        self.assertNotIn("TODAY · DISCUSSION ROUND", visual)
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
+    def test_inkburst_lab_keeps_navigation_and_context_labels_legible(self) -> None:
+        visual = (SKIN_SOURCE_DIR / "inkburst-lab" / "visual.css").read_text(encoding="utf-8")
+
+        self.assertIn(".mode-card-literature:hover", visual)
+        self.assertIn("background: var(--inkburst-aqua);", visual)
+        self.assertIn("grid-template-columns: max-content minmax(180px, 1fr) minmax(470px, 560px) max-content max-content;", visual)
+        self.assertIn('.activity-icon[data-skin-icon="settings"] {', visual)
+        self.assertIn("font-size: 0 !important;", visual)
+        self.assertRegex(
+            visual,
+            r"(?s)\.ai-panel-token-bar\s*\{[^}]*height:\s*22px;",
+        )
+        self.assertRegex(
+            visual,
+            r"(?s)\.context-meter\s*\{[^}]*padding:\s*6px 9px 7px;",
+        )
+        self.assertRegex(
+            visual,
+            r"(?s)\.message-block\.user\s*\{[^}]*margin-left:\s*auto;[^}]*margin-right:\s*0;",
+        )
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
+    def test_pixel_night_shift_is_a_three_surface_native_skin(self) -> None:
+        source = SKIN_SOURCE_DIR / "pixel-night-shift"
+        manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+        layout = (source / "layout.css").read_text(encoding="utf-8")
+        visual = (source / "visual.css").read_text(encoding="utf-8")
+
+        self.assertEqual(manifest["id"], "pixel-night-shift")
+        self.assertEqual(manifest["version"], "3.3.0")
+        self.assertEqual(manifest["typography"]["preset"], "pixel")
+        self.assertEqual(manifest["components"]["messages"], "pixel")
+
+        for slot in (
+            "feature-hub", "feature-card", "app-shell", "app-chrome",
+            "activity-navigation", "workspace-sidebar", "chat-workspace",
+            "file-viewer", "status-bar", "settings", "literature-shell",
+            "literature-workspace", "literature-library", "literature-conversation",
+            "literature-paper", "literature-detail", "literature-memory", "literature-notes",
+        ):
+            self.assertIn(f'[data-skin-slot="{slot}"]', layout + visual)
+
+        for selector in (
+            ".mode-hub-intro", ".mode-card", ".mode-card-literature",
+            ".paper-row", ".conversation-header", ".context-meter",
+            ".message-block.user", ".message-block.assistant .message-bubble",
+            ".tool-event-card", ".composer", ".paper-detail-modal",
+            ".memory-popover", ".notes-workspace-modal", ".pdf-viewer-shell",
+        ):
+            self.assertIn(selector, visual)
+
+        self.assertRegex(
+            visual,
+            r"(?s)\.message-block\.user\s*\{[^}]*margin-left:\s*auto;[^}]*margin-right:\s*0;",
+        )
+        self.assertIn("@media (max-width: 1340px)", layout)
+        self.assertNotIn("http://", layout + visual)
+        self.assertNotIn("https://", layout + visual)
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
+    def test_green_phosphor_is_a_three_surface_native_skin(self) -> None:
+        source = SKIN_SOURCE_DIR / "green-phosphor"
+        manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+        layout = (source / "layout.css").read_text(encoding="utf-8")
+        visual = (source / "visual.css").read_text(encoding="utf-8")
+
+        self.assertEqual(manifest["id"], "green-phosphor-terminal")
+        self.assertEqual(manifest["version"], "4.2.0")
+        self.assertEqual(manifest["material"]["preset"], "crt")
+        self.assertEqual(manifest["components"]["messages"], "log")
+
+        for slot in (
+            "feature-hub", "feature-card", "app-shell", "app-chrome",
+            "activity-navigation", "workspace-sidebar", "chat-workspace",
+            "file-viewer", "status-bar", "settings", "literature-shell",
+            "literature-workspace", "literature-library", "literature-conversation",
+            "literature-paper", "literature-detail", "literature-memory", "literature-notes",
+        ):
+            self.assertIn(f'[data-skin-slot="{slot}"]', layout + visual)
+
+        for selector in (
+            ".mode-hub-intro", ".mode-card", ".mode-card-literature",
+            ".paper-row", ".conversation-header", ".context-meter",
+            ".message-block.user", ".message-block.assistant .message-bubble",
+            ".tool-event-card", ".composer", ".paper-detail-modal",
+            ".memory-popover", ".notes-workspace-modal", ".pdf-viewer-shell",
+        ):
+            self.assertIn(selector, visual)
+
+        self.assertRegex(
+            visual,
+            r"(?s)\.message-block\.user\s*\{[^}]*margin-left:\s*auto;[^}]*margin-right:\s*0;",
+        )
+        self.assertIn("@media (max-width: 1320px)", layout)
+        self.assertNotIn("http://", layout + visual)
+        self.assertNotIn("https://", layout + visual)
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
+    def test_parallel_reward_skin_migrations_cover_all_three_surfaces(self) -> None:
+        expected = {
+            "amethyst-observatory": ("amethyst-observatory", "3.3.0"),
+            "cream-puff": ("cream-puff-v3", "3.4.0"),
+            "cryo-gem-tech": ("cryo-gem-tech", "3.3.0"),
+            "midnight-console": ("midnight-console", "3.3.0"),
+            "neon-ice": ("neon-ice-v3", "3.3.0"),
+        }
+        required_slots = (
+            "feature-hub", "feature-card", "app-shell", "app-chrome",
+            "activity-navigation", "workspace-sidebar", "chat-workspace",
+            "file-viewer", "status-bar", "settings", "literature-shell",
+            "literature-workspace", "literature-library", "literature-conversation",
+            "literature-paper", "literature-detail", "literature-memory", "literature-notes",
+        )
+        required_selectors = (
+            ".mode-hub-intro", ".mode-card", ".mode-card-literature",
+            ".paper-row", ".conversation-header", ".context-meter",
+            ".message-block.user", ".message-block.assistant .message-bubble",
+            ".tool-event-card", ".composer", ".paper-detail-modal",
+            ".memory-popover", ".notes-workspace-modal", ".pdf-viewer-shell",
+        )
+
+        for source_name, (skin_id, version) in expected.items():
+            with self.subTest(skin=source_name):
+                source = SKIN_SOURCE_DIR / source_name
+                manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+                layout = (source / "layout.css").read_text(encoding="utf-8")
+                visual = (source / "visual.css").read_text(encoding="utf-8")
+                css = layout + visual
+
+                self.assertEqual(manifest["id"], skin_id)
+                self.assertEqual(manifest["version"], version)
+                for slot in required_slots:
+                    self.assertIn(f'[data-skin-slot="{slot}"]', css)
+                for selector in required_selectors:
+                    self.assertIn(selector, visual)
+                self.assertRegex(
+                    visual,
+                    r"(?s)\.message-block\.user\s*\{[^}]*margin-left:\s*auto;[^}]*margin-right:\s*0;",
+                )
+                self.assertNotRegex(css, r"(?i)url\(\s*['\"]?https?://")
+                self.assertNotRegex(css, r"(?i)@import\s+.*https?://")
+
+    @unittest.skipUnless(PRIVATE_REWARD_SKINS_AVAILABLE, "private reward skin library is not present")
     def test_every_reward_skin_has_theme_specific_navigation_file_and_control_icons(self) -> None:
         expected_versions = {
-            "amethyst-observatory": "3.2.1",
-            "cream-puff": "3.3.2",
-            "cryo-gem-tech": "3.2.2",
-            "green-phosphor": "4.1.1",
-            "midnight-console": "3.2.2",
-            "neon-ice": "3.2.1",
-            "pixel-night-shift": "3.2.1",
+            "amethyst-observatory": "3.3.0",
+            "cream-puff": "3.4.0",
+            "cryo-gem-tech": "3.3.0",
+            "green-phosphor": "4.2.0",
+            "inkburst-lab": "1.0.2",
+            "midnight-console": "3.3.0",
+            "neon-ice": "3.3.0",
+            "pixel-night-shift": "3.3.0",
         }
         required_selectors = (
             '.activity-icon[data-skin-icon="project"]::before',

@@ -20,6 +20,10 @@ start-workmode-public.cmd
 
 启动器会按需创建 `.env`、`backend/.venv`，安装依赖，构建前端，启动 `127.0.0.1:8765` 的 FastAPI 并打开浏览器。它是开发入口，不是给普通用户分发的安装方式。
 
+健康检查同时校验文献项目契约版本。若 8765 已被旧 Workmode 后端占用，启动器会明确报错，不会把旧服务的 HTTP 200 误判为当前源码启动成功。
+
+启动器在复用 `backend/.venv` 前会执行 Python 3.11+ 可用性检查。若虚拟环境文件仍在、但其底层系统 Python 已被移动或卸载，启动器会先核验待删除目录确实是当前仓库的 `backend/.venv`，再自动重建。依赖安装命令的标准输出会直接写到终端，不会成为 `Ensure-Backend` 的返回值；Windows 进程环境中的 `Path`/`PATH` 也会在调用 `Start-Process` 前规范为单一键。
+
 常用参数：
 
 ```powershell
@@ -70,12 +74,25 @@ npx --yes npm@10.9.4 ci --ignore-scripts --no-audit --no-fund
 Pop-Location
 ```
 
-打开 `http://127.0.0.1:5173`。桌面开发使用：
+打开 `http://127.0.0.1:5173` 进入应用级功能大厅，选择「科研工作台」或「文献智库」。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库。三个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不再启动独立的 5176 前端。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
 
 ```powershell
 npm ci --prefix desktop
 npm --prefix desktop run dev
 ```
+
+## MinerU 与 PDF 直接阅读
+
+MinerU 是可选的增强解析，不是文献对话的硬依赖。设置页「MinerU 文献解析」可保存 Token、`pipeline`/`vlm`、文献语言和 60–1800 秒超时；也可直接在 `.env` 设置：
+
+```text
+WORKMODE_MINERU_API_KEY=
+WORKMODE_MINERU_MODEL_VERSION=pipeline
+WORKMODE_MINERU_LANGUAGE=en
+WORKMODE_MINERU_TIMEOUT_SECONDS=180
+```
+
+配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性。没有 MinerU `full.md` 时，`literature_read(part="full_text")` 使用 `pypdf` 读取原 PDF 文本层；扫描件或纯图片 PDF 没有文本层，会返回需要 MinerU/OCR 的明确错误。回归测试既覆盖工具层的降级接线，也用真实生成的最小 PDF 验证文本层抽取与无文本层错误，不能只 mock 解析器。
 
 ## 皮肤开发
 

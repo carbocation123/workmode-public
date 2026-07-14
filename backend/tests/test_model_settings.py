@@ -16,12 +16,20 @@ class ModelSettingsApiTest(unittest.TestCase):
                 "WORKMODE_MODEL_BASE_URL",
                 "WORKMODE_MODEL_API_KEY",
                 "WORKMODE_MODEL_NAME",
+                "WORKMODE_MINERU_API_KEY",
+                "WORKMODE_MINERU_MODEL_VERSION",
+                "WORKMODE_MINERU_LANGUAGE",
+                "WORKMODE_MINERU_TIMEOUT_SECONDS",
             )
         }
         os.environ["WORKMODE_ENV_FILE"] = os.path.join(self.tmp.name, ".env")
         os.environ.pop("WORKMODE_MODEL_BASE_URL", None)
         os.environ.pop("WORKMODE_MODEL_API_KEY", None)
         os.environ.pop("WORKMODE_MODEL_NAME", None)
+        os.environ.pop("WORKMODE_MINERU_API_KEY", None)
+        os.environ.pop("WORKMODE_MINERU_MODEL_VERSION", None)
+        os.environ.pop("WORKMODE_MINERU_LANGUAGE", None)
+        os.environ.pop("WORKMODE_MINERU_TIMEOUT_SECONDS", None)
 
         from app import config
         from app.main import app
@@ -81,6 +89,50 @@ class ModelSettingsApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("API Key", response.json()["detail"])
+
+    def test_mineru_settings_are_persisted_without_echoing_the_secret(self) -> None:
+        response = self.client.put(
+            "/api/settings/mineru",
+            json={
+                "mineru_api_key": "mineru-secret",
+                "mineru_model_version": "vlm",
+                "mineru_language": "en",
+                "mineru_timeout_seconds": 240,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        settings = response.json()["settings"]
+        self.assertTrue(settings["mineru_api_key_set"])
+        self.assertNotIn("mineru_api_key", settings)
+        self.assertEqual(settings["mineru_model_version"], "vlm")
+        self.assertEqual(settings["mineru_language"], "en")
+        self.assertEqual(settings["mineru_timeout_seconds"], 240)
+        with open(os.environ["WORKMODE_ENV_FILE"], encoding="utf-8") as handle:
+            env_text = handle.read()
+        self.assertIn("WORKMODE_MINERU_API_KEY=mineru-secret", env_text)
+        self.assertIn("WORKMODE_MINERU_MODEL_VERSION=vlm", env_text)
+
+    def test_mineru_settings_reject_unsupported_pdf_model(self) -> None:
+        response = self.client.put(
+            "/api/settings/mineru",
+            json={"mineru_model_version": "MinerU-HTML"},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_invalid_manual_mineru_environment_falls_back_to_safe_defaults(self) -> None:
+        from app import config
+
+        os.environ["WORKMODE_MINERU_MODEL_VERSION"] = "unknown"
+        os.environ["WORKMODE_MINERU_LANGUAGE"] = "unknown"
+        os.environ["WORKMODE_MINERU_TIMEOUT_SECONDS"] = "not-a-number"
+
+        current = config.reload_settings()
+
+        self.assertEqual(current.mineru_model_version, "pipeline")
+        self.assertEqual(current.mineru_language, "en")
+        self.assertEqual(current.mineru_timeout_seconds, 180)
 
 
 if __name__ == "__main__":

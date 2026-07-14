@@ -6,6 +6,7 @@ import logging
 import sys
 from collections.abc import AsyncIterator
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -14,12 +15,14 @@ from . import files, storage, tutorial_project
 from .chat_runs import ChatAlreadyRunningError, chat_runs
 from .config import APP_VERSION, get_settings, update_env_file
 from .llm import ModelProbeError, probe_openai_compatible, stream_openai_compatible
+from .literature_project import project_type as detect_project_type, tool_profile as detect_tool_profile
 from .models import (
     ActiveProjectUpdate,
     ChatRequest,
     CompactRequest,
     FileWriteRequest,
     MemoryUpdate,
+    MineruSettingsUpdate,
     ModelConnectionTest,
     ModelSettingsUpdate,
     ProjectCreate,
@@ -40,6 +43,13 @@ logger = logging.getLogger(__name__)
 def _project_payload(project: storage.Project) -> dict[str, object]:
     payload: dict[str, object] = asdict(project)
     payload["is_tutorial"] = tutorial_project.is_tutorial_project(project)
+    root = Path(project.root_path)
+    try:
+        payload["project_type"] = detect_project_type(root)
+        payload["tool_profile"] = detect_tool_profile(root)
+    except Exception:
+        payload["project_type"] = "invalid"
+        payload["tool_profile"] = "none"
     return payload
 
 
@@ -56,8 +66,13 @@ def _handle_error(exc: Exception) -> HTTPException:
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "app": "workmode-public", "version": APP_VERSION}
+def health() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "app": "workmode-public",
+        "version": APP_VERSION,
+        "literature_project_contract_version": 3,
+    }
 
 
 @router.get("/version")
@@ -77,11 +92,34 @@ def _settings_payload() -> dict[str, object]:
         "model_api_key_set": bool(current.model_api_key),
         "context_budget_tokens": current.context_budget_tokens,
         "request_timeout_seconds": current.request_timeout_seconds,
+        "mineru_api_key_set": bool(current.mineru_api_key),
+        "mineru_model_version": current.mineru_model_version,
+        "mineru_language": current.mineru_language,
+        "mineru_timeout_seconds": current.mineru_timeout_seconds,
     }
 
 
 @router.get("/settings")
 def read_settings() -> dict[str, object]:
+    return {"settings": _settings_payload()}
+
+
+@router.put("/settings/mineru")
+def update_mineru_settings(payload: MineruSettingsUpdate) -> dict[str, object]:
+    updates: dict[str, str] = {}
+    if payload.clear_api_key:
+        updates["WORKMODE_MINERU_API_KEY"] = ""
+        updates["MINERU_API_KEY"] = ""
+    elif payload.mineru_api_key is not None and payload.mineru_api_key.strip():
+        updates["WORKMODE_MINERU_API_KEY"] = payload.mineru_api_key.strip()
+    if payload.mineru_model_version is not None:
+        updates["WORKMODE_MINERU_MODEL_VERSION"] = payload.mineru_model_version
+    if payload.mineru_language is not None:
+        updates["WORKMODE_MINERU_LANGUAGE"] = payload.mineru_language
+    if payload.mineru_timeout_seconds is not None:
+        updates["WORKMODE_MINERU_TIMEOUT_SECONDS"] = str(payload.mineru_timeout_seconds)
+
+    update_env_file(updates)
     return {"settings": _settings_payload()}
 
 
@@ -302,7 +340,13 @@ async def chat_stream(session_id: str, payload: ChatRequest) -> StreamingRespons
             )
             session = storage.get_session(session_id)
             project = storage.get_project(session.project_slug)
-            user_message = storage.append_message(session_id, role="user", content=payload.content)
+            active_context = [item.model_dump() for item in payload.active_context]
+            user_message = storage.append_message(
+                session_id,
+                role="user",
+                content=payload.content,
+                meta={"active_context": active_context} if active_context else None,
+            )
             recorder = TurnRecorder(session_id, get_settings().model_name)
             messages, usage = build_llm_messages(project, session_id)
             yield _sse({"type": "user_message", "message": user_message})

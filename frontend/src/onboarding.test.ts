@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   ACHIEVEMENTS,
@@ -5,6 +6,7 @@ import {
   EMPTY_PROGRESS,
   applyDeepSeekPreset,
   applyProductEvent,
+  ensureDevelopmentAchievements,
   parseProgress
 } from './onboarding'
 
@@ -42,6 +44,34 @@ describe('onboarding progress', () => {
     expect(parsed.achievements.unknown).toBeUndefined()
     expect(parsed.tutorialTasks).toEqual(['open_pdf'])
     expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(9)
+  })
+
+  it('unlocks every achievement only when the source development mode requests it', () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    }
+
+    ensureDevelopmentAchievements(storage, false, '2026-07-13T15:30:00.000Z')
+    expect(values.size).toBe(0)
+
+    ensureDevelopmentAchievements(storage, true, '2026-07-13T15:30:00.000Z')
+    const progress = parseProgress(values.get('workmode-public-onboarding-v1') ?? null)
+    expect(Object.keys(progress.achievements)).toHaveLength(ACHIEVEMENTS.length)
+    expect(progress.achievements.tutorial_graduate).toBe('2026-07-13T15:30:00.000Z')
+    expect(progress.stage).toBe('welcome')
+  })
+
+  it('marks both Vite dev and the one-click source build without changing release builds', () => {
+    const main = new TextDecoder().decode(readFileSync(new URL('./main.tsx', import.meta.url)))
+    const literatureMain = new TextDecoder().decode(readFileSync(new URL('./literature/main.tsx', import.meta.url)))
+    const launcher = new TextDecoder().decode(readFileSync(new URL('../../scripts/one-click-start.ps1', import.meta.url)))
+
+    expect(main).toContain("import.meta.env.VITE_WORKMODE_SOURCE_ACHIEVEMENTS === '1'")
+    expect(literatureMain).toContain("import.meta.env.VITE_WORKMODE_SOURCE_ACHIEVEMENTS === '1'")
+    expect(launcher).toContain('$env:VITE_WORKMODE_SOURCE_ACHIEVEMENTS = "1"')
+    expect(launcher).toContain('dist\\.source-achievements')
   })
 
   it('provides current official DeepSeek setup links and safe presets', () => {

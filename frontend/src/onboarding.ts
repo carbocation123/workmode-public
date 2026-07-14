@@ -148,6 +148,24 @@ export function parseProgress(raw: string | null): OnboardingProgress {
   }
 }
 
+export function ensureDevelopmentAchievements(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  enabled: boolean,
+  timestamp = new Date().toISOString(),
+): OnboardingProgress | null {
+  if (!enabled) return null
+  const progress = parseProgress(storage.getItem(ONBOARDING_STORAGE_KEY))
+  const achievements = Object.fromEntries(
+    ACHIEVEMENTS.map((achievement) => [
+      achievement.id,
+      progress.achievements[achievement.id] || timestamp,
+    ]),
+  )
+  const unlocked = { ...progress, achievements }
+  storage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(unlocked))
+  return unlocked
+}
+
 export function applyProductEvent(
   previous: OnboardingProgress,
   event: ProductEvent,

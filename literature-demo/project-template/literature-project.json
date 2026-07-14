@@ -1,0 +1,6 @@
+{
+  "project_type": "literature-library",
+  "schema_version": 1,
+  "tool_profile": "literature",
+  "frontend_projection": "literature-library"
+}

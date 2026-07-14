@@ -1,0 +1,215 @@
+from __future__ import annotations
+
+import json
+import uuid
+from dataclasses import asdict
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
+
+from . import files, storage
+from .literature_project import (
+    LITERATURE_TOOL_SCHEMAS,
+    LiteratureProjectError,
+    execute_literature_tool,
+    initialize_literature_project,
+    is_literature_project,
+    literature_paper,
+    literature_snapshot,
+    register_staged_pdf,
+    verify_literature_archive,
+)
+from .models import (
+    LiteratureCrossRelationUpdate,
+    LiteratureImportNotice,
+    LiteratureNoteUpdate,
+    LiteratureProjectCreate,
+    LiteratureRecordUpdate,
+)
+
+
+router = APIRouter(prefix="/api/work")
+
+
+def _project_root(slug: str) -> Path:
+    project = storage.get_project(slug)
+    root = Path(project.root_path).expanduser().resolve()
+    if not is_literature_project(root):
+        raise HTTPException(status_code=400, detail="当前项目不是 literature-library 项目")
+    return root
+
+
+def _tool_payload(slug: str, name: str, args: dict[str, object]) -> dict[str, object]:
+    result = execute_literature_tool(slug, name, args)
+    try:
+        payload = json.loads(result.content)
+    except json.JSONDecodeError:
+        payload = {"ok": result.ok, "message": result.content}
+    if not result.ok:
+        raise HTTPException(status_code=400, detail=str(payload.get("message") or result.content))
+    return payload
+
+
+@router.post("/literature-projects")
+def create_literature_project(payload: LiteratureProjectCreate) -> dict[str, object]:
+    root = Path(payload.root_path).expanduser().resolve()
+    if root.exists() and not root.is_dir():
+        raise HTTPException(status_code=400, detail="文献项目路径不是文件夹")
+    if root.exists() and any(root.iterdir()) and not (root / "literature-project.json").exists():
+        raise HTTPException(status_code=400, detail="目标文件夹非空且不是已有文献项目")
+    try:
+        initialize_literature_project(root, name=payload.name)
+        project = storage.create_project(payload.name, str(root))
+        session = storage.create_session(project.slug)
+    except (storage.ValidationError, storage.ConflictError, LiteratureProjectError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"project": {**asdict(project), "project_type": "literature-library", "tool_profile": "literature"}, "session": asdict(session)}
+
+
+@router.get("/projects/{slug}/literature/health")
+def literature_health(slug: str) -> dict[str, object]:
+    root = _project_root(slug)
+    manifest = literature_snapshot(root)["manifest"]
+    return {
+        "ok": True,
+        "project_slug": slug,
+        "project_type": "literature-library",
+        "schema_version": manifest.get("schema_version"),
+        "tool_profile": "literature",
+        "agent_tools": [item["function"]["name"] for item in LITERATURE_TOOL_SCHEMAS],
+    }
+
+
+@router.get("/projects/{slug}/literature/papers")
+def list_papers(slug: str) -> list[dict[str, object]]:
+    return literature_snapshot(_project_root(slug))["catalog"]["papers"]
+
+
+@router.get("/projects/{slug}/literature/tags")
+def list_tags(slug: str) -> list[dict[str, object]]:
+    return literature_snapshot(_project_root(slug))["tags"]["tags"]
+
+
+@router.get("/projects/{slug}/literature/notes")
+def list_notes(slug: str) -> list[dict[str, object]]:
+    return literature_snapshot(_project_root(slug))["notes"]
+
+
+@router.get("/projects/{slug}/literature/papers/{paper_id}")
+def read_paper(slug: str, paper_id: str) -> dict[str, object]:
+    try:
+        return literature_paper(_project_root(slug), paper_id)
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/projects/{slug}/literature/papers/{paper_id}/facts")
+def read_facts(slug: str, paper_id: str) -> PlainTextResponse:
+    root = _project_root(slug)
+    try:
+        paper = literature_paper(root, paper_id)
+        rel = str((paper.get("paths") or {}).get("fact_report") or "")
+        if not rel:
+            raise LiteratureProjectError("客观事实报告尚未生成")
+        path = files.resolve_project_path(slug, rel)
+        if not path.exists() or not path.is_file():
+            raise LiteratureProjectError("客观事实报告路径不存在")
+        return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="text/markdown; charset=utf-8")
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/projects/{slug}/literature/papers/{paper_id}/pdf")
+def read_pdf(slug: str, paper_id: str):
+    root = _project_root(slug)
+    try:
+        paper = literature_paper(root, paper_id)
+        rel = str((paper.get("paths") or {}).get("pdf") or "")
+        if not rel:
+            raise LiteratureProjectError("原始 PDF 路径不存在")
+        return files.media_response(slug, rel)
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/papers/import")
+async def import_pdf(
+    slug: str,
+    request: Request,
+    filename: str = Query(min_length=1, max_length=500),
+) -> dict[str, object]:
+    root = _project_root(slug)
+    incoming_dir = root / "papers/unprocessed/pdf"
+    incoming_dir.mkdir(parents=True, exist_ok=True)
+    staged = incoming_dir / f".incoming-{uuid.uuid4().hex}.pdf"
+    try:
+        with staged.open("wb") as handle:
+            async for chunk in request.stream():
+                handle.write(chunk)
+        result = register_staged_pdf(root, staged, original_filename=filename)
+        return {**result, "task": None}
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+@router.post("/projects/{slug}/literature/sessions/{session_id}/imports")
+def record_confirmed_imports(slug: str, session_id: str, payload: LiteratureImportNotice) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        session = storage.get_session(session_id)
+        if session.project_slug != slug:
+            raise LiteratureProjectError("Session does not belong to the current literature project")
+        paper_ids = list(dict.fromkeys(payload.paper_ids))
+        papers = [literature_paper(root, paper_id) for paper_id in paper_ids]
+        message = storage.append_message(
+            session_id,
+            role="system",
+            content=f"用户已确认入库 {len(papers)} 篇文献。",
+            meta={
+                "event": "literature_import_confirmed",
+                "paper_ids": paper_ids,
+            },
+        )
+        return {"message": message, "papers": papers}
+    except (storage.ValidationError, LiteratureProjectError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/projects/{slug}/literature/papers/{paper_id}")
+def update_record(slug: str, paper_id: str, payload: LiteratureRecordUpdate) -> dict[str, object]:
+    args = {"paper_id": paper_id, **payload.model_dump(exclude_none=True)}
+    _tool_payload(slug, "literature_update_record", args)
+    return literature_paper(_project_root(slug), paper_id)
+
+
+@router.put("/projects/{slug}/literature/papers/{paper_id}/cross-literature")
+def update_cross_relation(slug: str, paper_id: str, payload: LiteratureCrossRelationUpdate) -> dict[str, object]:
+    _tool_payload(slug, "literature_update_cross_relation", {"paper_id": paper_id, "markdown": payload.markdown})
+    return literature_paper(_project_root(slug), paper_id)
+
+
+@router.post("/projects/{slug}/literature/papers/{paper_id}/archive")
+def archive_paper(slug: str, paper_id: str) -> dict[str, object]:
+    result = _tool_payload(slug, "literature_archive", {"paper_id": paper_id})
+    return {"paper": literature_paper(_project_root(slug), paper_id), "result": result}
+
+
+@router.get("/projects/{slug}/literature/papers/{paper_id}/verify")
+def verify_archive(slug: str, paper_id: str) -> dict[str, object]:
+    try:
+        return verify_literature_archive(_project_root(slug), paper_id)
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.put("/projects/{slug}/literature/notes/{filename}")
+def save_note(slug: str, filename: str, payload: LiteratureNoteUpdate) -> dict[str, object]:
+    result = _tool_payload(slug, "literature_note_upsert", {"filename": filename, "markdown": payload.markdown})
+    note = next(
+        (item for item in literature_snapshot(_project_root(slug))["notes"] if item["filename"] == filename),
+        None,
+    )
+    return {"note": note, "result": result}

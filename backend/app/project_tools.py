@@ -389,16 +389,24 @@ def execute_project_tool(
 ) -> ProjectToolResult:
     from .storage import get_project
     from .work_state import execute_state_tool, state_tool_names
+    from .literature_project import execute_literature_tool, is_literature_project
 
     if cancel_event is not None and cancel_event.is_set():
         return ProjectToolResult(ok=False, content="ERROR: 用户已停止本轮对话")
     if name in web_tool_names():
         result = execute_web_tool(name, args, cancel_event=cancel_event)
         return ProjectToolResult(ok=result.ok, content=result.content)
+    project = get_project(project_slug)
+    if is_literature_project(Path(project.root_path)):
+        return execute_literature_tool(
+            project_slug,
+            name,
+            args,
+            cancel_event=cancel_event,
+        )
     if name in state_tool_names():
         result = execute_state_tool(project_slug, name, args)
         return ProjectToolResult(ok=not result.startswith("ERROR:"), content=result)
-    project = get_project(project_slug)
     return execute_project_tool_at_root(Path(project.root_path), name, args, cancel_event=cancel_event)
 
 
@@ -440,8 +448,19 @@ def execute_project_tool_at_root(
         return ProjectToolResult(ok=False, content=f"ERROR: 工具执行失败：{exc}")
 
 
-def project_tool_names() -> set[str]:
-    return {item["function"]["name"] for item in PROJECT_TOOL_SCHEMAS}
+def project_tool_schemas(project_slug: str | None = None) -> list[dict[str, Any]]:
+    if project_slug:
+        from .literature_project import LITERATURE_TOOL_SCHEMAS, is_literature_project
+        from .storage import get_project
+
+        project = get_project(project_slug)
+        if is_literature_project(Path(project.root_path)):
+            return LITERATURE_TOOL_SCHEMAS
+    return PROJECT_TOOL_SCHEMAS
+
+
+def project_tool_names(project_slug: str | None = None) -> set[str]:
+    return {item["function"]["name"] for item in project_tool_schemas(project_slug)}
 
 
 def _project_read(root: Path, args: dict[str, Any]) -> ProjectToolResult:

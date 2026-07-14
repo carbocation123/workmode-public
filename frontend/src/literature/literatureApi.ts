@@ -1,0 +1,577 @@
+import type { FactReportSection, PaperRecord } from './model'
+import { LITERATURE_PROJECT_KEY, RUNTIME_API_BASE_KEY } from '../literatureNavigation'
+import { api, streamChat, type ChatStreamEvent } from '../api'
+
+const DEFAULT_API_ROOT = 'http://127.0.0.1:8765/api'
+const cachedApiRoot = typeof window !== 'undefined'
+  ? window.sessionStorage.getItem(RUNTIME_API_BASE_KEY)
+  : null
+export const WORKMODE_API_ROOT = (
+  cachedApiRoot || import.meta.env.VITE_WORKMODE_API_BASE || DEFAULT_API_ROOT
+).replace(/\/$/, '')
+
+export interface WorkmodeProject {
+  slug: string
+  name: string
+  root_path: string
+  project_type?: string
+  tool_profile?: string
+}
+
+interface WorkmodeMessage {
+  id: string
+  role: 'assistant' | 'user' | 'system' | 'tool'
+  content: string
+  ts?: string
+  meta?: {
+    event?: string
+    tool_call_id?: string
+    tool_name?: string
+    args?: Record<string, unknown>
+    status?: string
+    ok?: boolean
+    active_context?: Array<{ kind: 'paper' | 'note'; id: string }>
+    paper_ids?: string[]
+  }
+}
+
+interface WorkmodeSessionMeta {
+  id: string
+  title: string
+  project_slug: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LiteratureBackendHealth {
+  ok: boolean
+  project_slug?: string
+  project_type?: string
+  schema_version?: number
+  tool_profile?: string
+  agent_tools?: string[]
+}
+
+const REQUIRED_AGENT_TOOLS = [
+  'literature_search',
+  'literature_tag_list',
+  'literature_read',
+  'literature_update_record',
+  'literature_note_upsert',
+]
+
+export function isCompatibleLiteratureBackend(health: LiteratureBackendHealth): boolean {
+  const tools = new Set(health.agent_tools || [])
+  return Boolean(
+    health.ok
+    && health.project_type === 'literature-library'
+    && health.tool_profile === 'literature'
+    && REQUIRED_AGENT_TOOLS.every((name) => tools.has(name)),
+  )
+}
+
+interface WorkmodeContextUsage {
+  budget_tokens?: number
+  prompt_tokens_estimate?: number
+}
+
+export interface BackendPaper {
+  id: string
+  original_filename: string
+  archive_filename: string | null
+  archive_location: '文献/未处理' | '文献/已处理'
+  title: string
+  authors: string
+  year: number | null
+  journal: string
+  status: PaperRecord['status']
+  tags: string[]
+  focus: string
+  summary: string
+  paper_type: PaperRecord['paperType']
+  metadata_source: PaperRecord['metadataSource']
+  metadata_trust: PaperRecord['metadataTrust']
+  mineru_output_path?: string | null
+  fact_report_path?: string | null
+  stage?: string
+  error?: string | null
+  verification_status?: PaperRecord['verificationStatus']
+  paths?: { pdf?: string; mineru_dir?: string; full_md?: string; fact_report?: string }
+}
+
+interface CatalogPaper {
+  id: string
+  original_filename?: string
+  archive_filename?: string | null
+  archive_location?: string
+  title?: string
+  authors?: string
+  year?: number | null
+  journal?: string
+  status?: PaperRecord['status']
+  tag_ids?: string[]
+  focus?: string
+  summary?: string
+  paper_type?: PaperRecord['paperType']
+  metadata_source?: string
+  metadata_trust?: PaperRecord['metadataTrust']
+  verification_status?: PaperRecord['verificationStatus']
+  stage?: string
+  error?: string | null
+  paths?: { pdf?: string; mineru_dir?: string; full_md?: string; fact_report?: string }
+}
+
+interface ImportResult {
+  paper: CatalogPaper
+  duplicate: boolean
+}
+
+export interface BackendChatMessage {
+  id: string
+  role: 'assistant' | 'user' | 'system' | 'tool'
+  content: string
+  paper_ids?: string[]
+  note_ids?: string[]
+  tool_call_id?: string
+  tool_name?: string
+  tool_args?: Record<string, unknown>
+  tool_status?: 'running' | 'completed' | 'failed' | 'cancelled'
+  created_at?: string
+}
+
+export interface BackendSession {
+  id: string
+  name: string
+  messages: BackendChatMessage[]
+  attached_paper_ids: string[]
+  attached_note_ids: string[]
+  created_at: string
+  updated_at: string
+  context_percent: number
+}
+
+export interface BackendTag {
+  id: string
+  name: string
+  aliases: string[]
+  category: 'characterization' | 'material' | 'mechanism' | 'performance' | 'uncategorized'
+  status: 'confirmed' | 'provisional'
+}
+
+export interface BackendNote {
+  id: string
+  filename: string
+  title: string
+  markdown: string
+  source_paper_ids: string[]
+  updated_at: string
+}
+
+export interface ArchiveVerification {
+  ok: boolean
+  paper_id: string
+  issues: string[]
+}
+
+let activeProject: WorkmodeProject | null = null
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = localStorage.getItem('workmode-public-token') || ''
+  return {
+    ...(token ? { 'X-Workmode-Token': token } : {}),
+    ...(extra || {}),
+  }
+}
+
+async function rawRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${WORKMODE_API_ROOT}${path}`, {
+    ...init,
+    headers: authHeaders(init?.headers),
+  })
+  if (!response.ok) {
+    let detail = `${response.status} ${response.statusText}`
+    try {
+      const body = await response.json() as { detail?: unknown }
+      if (typeof body.detail === 'string') detail = body.detail
+      else if (body.detail) detail = JSON.stringify(body.detail)
+    } catch {
+      // Keep the HTTP status when the body is not JSON.
+    }
+    throw new Error(detail)
+  }
+  return response.json() as Promise<T>
+}
+
+async function resolveProject(): Promise<WorkmodeProject> {
+  if (activeProject) return activeProject
+  const result = await rawRequest<{ projects: WorkmodeProject[] }>('/work/projects')
+  const requestedSlug = String(
+    (typeof window !== 'undefined' ? window.sessionStorage.getItem(LITERATURE_PROJECT_KEY) : '')
+    || import.meta.env.VITE_LITERATURE_PROJECT_SLUG
+    || '',
+  ).trim()
+  const project = requestedSlug
+    ? result.projects.find((item) => item.slug === requestedSlug && item.project_type === 'literature-library')
+    : result.projects.find((item) => item.project_type === 'literature-library')
+  if (!project) {
+    throw new Error('没有已注册的 literature-library 项目。请先创建文献项目。')
+  }
+  activeProject = project
+  return project
+}
+
+export async function getBackendProjectInfo(): Promise<WorkmodeProject> {
+  return resolveProject()
+}
+
+async function literatureRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const project = await resolveProject()
+  return rawRequest<T>(`/work/projects/${encodeURIComponent(project.slug)}/literature${path}`, init)
+}
+
+function fromCatalogPaper(paper: CatalogPaper): BackendPaper {
+  const source = paper.metadata_source === 'layout_json' ? 'layout_json_fallback' : paper.metadata_source
+  return {
+    id: paper.id,
+    original_filename: paper.original_filename || `${paper.id}.pdf`,
+    archive_filename: paper.archive_filename || null,
+    archive_location: paper.archive_location === 'papers/processed' ? '文献/已处理' : '文献/未处理',
+    title: paper.title || '',
+    authors: paper.authors || '',
+    year: paper.year ?? null,
+    journal: paper.journal || '',
+    status: paper.status || 'pending',
+    tags: paper.tag_ids || [],
+    focus: paper.focus || '',
+    summary: paper.summary || '',
+    paper_type: paper.paper_type || 'research',
+    metadata_source: (source || 'pending') as PaperRecord['metadataSource'],
+    metadata_trust: paper.metadata_trust || 'unknown',
+    mineru_output_path: paper.paths?.mineru_dir || null,
+    fact_report_path: paper.paths?.fact_report || null,
+    paths: paper.paths,
+    stage: paper.stage,
+    error: paper.error,
+    verification_status: paper.verification_status || 'pending',
+  }
+}
+
+function mergeWorkmodeMessages(messages: WorkmodeMessage[]): BackendChatMessage[] {
+  const starts = new Map<string, WorkmodeMessage>()
+  const output: BackendChatMessage[] = []
+  for (const message of messages) {
+    const meta = message.meta || {}
+    if (message.role === 'system' && meta.event === 'literature_import_confirmed') {
+      continue
+    }
+    if (message.role === 'tool' && meta.event === 'tool_call_start' && meta.tool_call_id) {
+      starts.set(meta.tool_call_id, message)
+      continue
+    }
+    if (message.role === 'tool' && meta.event === 'tool_result' && meta.tool_call_id) {
+      const start = starts.get(meta.tool_call_id)
+      starts.delete(meta.tool_call_id)
+      const persistedStatus = meta.status === 'cancelled'
+        ? 'cancelled'
+        : meta.status === 'running'
+          ? 'running'
+          : meta.ok
+            ? 'completed'
+            : 'failed'
+      output.push({
+        id: message.id,
+        role: 'tool',
+        content: message.content,
+        tool_call_id: meta.tool_call_id,
+        tool_name: meta.tool_name || start?.meta?.tool_name,
+        tool_args: start?.meta?.args || {},
+        tool_status: persistedStatus,
+        created_at: message.ts,
+      })
+      continue
+    }
+    const context = meta.active_context || []
+    output.push({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      paper_ids: context.filter((item) => item.kind === 'paper').map((item) => item.id),
+      note_ids: context.filter((item) => item.kind === 'note').map((item) => item.id),
+      created_at: message.ts,
+    })
+  }
+  for (const [callId, start] of starts) {
+    output.push({
+      id: start.id,
+      role: 'tool',
+      content: '工具调用尚未返回结果。',
+      tool_call_id: callId,
+      tool_name: start.meta?.tool_name,
+      tool_args: start.meta?.args || {},
+      tool_status: 'failed',
+      created_at: start.ts,
+    })
+  }
+  return output
+}
+
+async function loadSession(meta: WorkmodeSessionMeta): Promise<BackendSession> {
+  const [result, contextResult] = await Promise.all([
+    rawRequest<{ messages: WorkmodeMessage[] }>(`/work/sessions/${encodeURIComponent(meta.id)}/messages?limit=60`),
+    rawRequest<{ context: WorkmodeContextUsage }>(`/work/sessions/${encodeURIComponent(meta.id)}/context`),
+  ])
+  const lastContext = [...result.messages]
+    .reverse()
+    .find((message) => message.role === 'user' && message.meta?.active_context?.length)
+    ?.meta?.active_context || []
+  return {
+    id: meta.id,
+    name: meta.title,
+    messages: mergeWorkmodeMessages(result.messages),
+    attached_paper_ids: lastContext.filter((item) => item.kind === 'paper').map((item) => item.id),
+    attached_note_ids: lastContext.filter((item) => item.kind === 'note').map((item) => item.id),
+    created_at: meta.created_at,
+    updated_at: meta.updated_at,
+    context_percent: Math.min(100, Math.max(0, Math.round(
+      ((contextResult.context.prompt_tokens_estimate || 0) / Math.max(contextResult.context.budget_tokens || 1, 1)) * 100,
+    ))),
+  }
+}
+
+export function mapBackendPaper(paper: BackendPaper): PaperRecord {
+  const reportReady = Boolean(paper.fact_report_path)
+  const placeholderReport: FactReportSection[] = reportReady
+    ? [{
+        id: 'backend-report',
+        title: '完整客观事实报告',
+        owner: 'extractor',
+        entries: [{ kind: 'metadata', content: '完整报告已生成，请在正文区域阅读。' }],
+      }]
+    : []
+  return {
+    id: paper.id,
+    filename: paper.original_filename,
+    pdfPath: paper.paths?.pdf || null,
+    archiveFilename: paper.archive_filename,
+    archiveLocation: paper.archive_location,
+    metadataSource: paper.metadata_source,
+    paperType: paper.paper_type,
+    verificationStatus: paper.verification_status || 'pending',
+    title: paper.title || paper.original_filename.replace(/\.pdf$/i, ''),
+    authors: paper.authors || '等待首页元数据识别',
+    year: paper.year,
+    journal: paper.journal || '等待首页元数据识别',
+    status: paper.status,
+    tagIds: paper.tags || [],
+    focus: paper.focus || '',
+    summary: paper.summary || paper.stage || '',
+    facts: paper.error ? [`处理错误：${paper.error}`] : [],
+    factReport: placeholderReport,
+    metadataTrust: paper.metadata_trust,
+  }
+}
+
+export async function checkLiteratureBackend(): Promise<boolean> {
+  try {
+    const project = await resolveProject()
+    const health = await rawRequest<LiteratureBackendHealth>(
+      `/work/projects/${encodeURIComponent(project.slug)}/literature/health`,
+    )
+    return isCompatibleLiteratureBackend(health)
+  } catch {
+    return false
+  }
+}
+
+export async function listBackendPapers(): Promise<BackendPaper[]> {
+  return (await literatureRequest<CatalogPaper[]>('/papers')).map(fromCatalogPaper)
+}
+
+export async function listBackendTags(): Promise<BackendTag[]> {
+  return literatureRequest<BackendTag[]>('/tags')
+}
+
+export async function uploadPaper(file: File): Promise<{ paper: BackendPaper; duplicate: boolean }> {
+  const result = await literatureRequest<ImportResult>(`/papers/import?filename=${encodeURIComponent(file.name)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/pdf' },
+    body: file,
+  })
+  return { paper: fromCatalogPaper(result.paper), duplicate: result.duplicate }
+}
+
+export async function recordImportedPapers(sessionId: string, paperIds: string[]): Promise<void> {
+  const project = await resolveProject()
+  await rawRequest(
+    `/work/projects/${encodeURIComponent(project.slug)}/literature/sessions/${encodeURIComponent(sessionId)}/imports`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paper_ids: paperIds }),
+    },
+  )
+}
+
+export async function getFactReport(paperId: string): Promise<string> {
+  const project = await resolveProject()
+  const response = await fetch(
+    `${WORKMODE_API_ROOT}/work/projects/${encodeURIComponent(project.slug)}/literature/papers/${encodeURIComponent(paperId)}/facts`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) throw new Error(response.status === 404 ? '客观事实报告尚未生成' : `读取报告失败：HTTP ${response.status}`)
+  return response.text()
+}
+
+export function paperPdfUrl(pdfPath: string | null | undefined): string {
+  if (!activeProject || !pdfPath) return ''
+  return api.mediaUrl(activeProject.slug, pdfPath)
+}
+
+export async function listBackendSessions(): Promise<BackendSession[]> {
+  const project = await resolveProject()
+  const result = await rawRequest<{ sessions: WorkmodeSessionMeta[] }>(
+    `/work/projects/${encodeURIComponent(project.slug)}/sessions?limit=60`,
+  )
+  return Promise.all(result.sessions.map(loadSession))
+}
+
+export async function createBackendSession(name: string): Promise<BackendSession> {
+  const project = await resolveProject()
+  const result = await rawRequest<{ session: WorkmodeSessionMeta }>(
+    `/work/projects/${encodeURIComponent(project.slug)}/sessions`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: name }) },
+  )
+  return loadSession(result.session)
+}
+
+export async function streamLiteratureChat(
+  sessionId: string,
+  content: string,
+  paperIds: string[],
+  noteIds: string[],
+  onEvent: (event: ChatStreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  let streamError = ''
+  await streamChat(
+    sessionId,
+    content,
+    (event) => {
+      onEvent(event)
+      if (event.type === 'error') streamError = String(event.message || '模型请求失败')
+    },
+    signal,
+    [
+      ...paperIds.map((id) => ({ kind: 'paper' as const, id })),
+      ...noteIds.map((id) => ({ kind: 'note' as const, id })),
+    ],
+  )
+  if (streamError) throw new Error(streamError)
+}
+
+export async function chatWithLiterature(
+  sessionId: string,
+  content: string,
+  paperIds: string[],
+  noteIds: string[],
+  onEvent: (event: ChatStreamEvent) => void = () => undefined,
+  signal?: AbortSignal,
+): Promise<{ message: BackendChatMessage; session: BackendSession }> {
+  await streamLiteratureChat(sessionId, content, paperIds, noteIds, onEvent, signal)
+  const project = await resolveProject()
+  const sessions = await rawRequest<{ sessions: WorkmodeSessionMeta[] }>(
+    `/work/projects/${encodeURIComponent(project.slug)}/sessions?limit=200`,
+  )
+  const meta = sessions.sessions.find((item) => item.id === sessionId)
+  if (!meta) throw new Error('session 不存在')
+  const session = await loadSession(meta)
+  const message = [...session.messages].reverse().find((item) => item.role === 'assistant') || {
+    id: `turn-${Date.now()}`,
+    role: 'assistant' as const,
+    content: '',
+  }
+  return { message, session }
+}
+
+export async function stopBackendChat(sessionId: string): Promise<void> {
+  await rawRequest(`/work/sessions/${encodeURIComponent(sessionId)}/stop`, { method: 'POST' })
+}
+
+export async function listBackendNotes(): Promise<BackendNote[]> {
+  const notes = await literatureRequest<Array<Omit<BackendNote, 'source_paper_ids'>>>('/notes')
+  return notes.map((note) => ({ ...note, source_paper_ids: [] }))
+}
+
+export async function saveBackendNote(
+  filename: string,
+  markdown: string,
+  _sourcePaperIds: string[],
+): Promise<BackendNote> {
+  const result = await literatureRequest<{ note: Omit<BackendNote, 'source_paper_ids'> }>(
+    `/notes/${encodeURIComponent(filename)}`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markdown }) },
+  )
+  return { ...result.note, source_paper_ids: [] }
+}
+
+export async function getBackendMemory(): Promise<string> {
+  const project = await resolveProject()
+  const result = await rawRequest<{ project: string }>(`/work/projects/${encodeURIComponent(project.slug)}/memory`)
+  return result.project
+}
+
+export async function saveBackendPaperReview(
+  paperId: string,
+  payload: { tags: Array<{ name: string; category: string }>; focus: string; summary: string },
+): Promise<BackendPaper> {
+  return fromCatalogPaper(await literatureRequest<CatalogPaper>(`/papers/${encodeURIComponent(paperId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }))
+}
+
+export async function saveCrossLiterature(paperId: string, markdown: string): Promise<BackendPaper> {
+  return fromCatalogPaper(await literatureRequest<CatalogPaper>(`/papers/${encodeURIComponent(paperId)}/cross-literature`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ markdown }),
+  }))
+}
+
+export async function verifyBackendArchive(paperId: string): Promise<ArchiveVerification> {
+  return literatureRequest<ArchiveVerification>(`/papers/${encodeURIComponent(paperId)}/verify`)
+}
+
+export async function archiveBackendPaper(
+  paperId: string,
+): Promise<{ paper: BackendPaper; verification: ArchiveVerification; index_path: string }> {
+  const result = await literatureRequest<{ paper: CatalogPaper }>(`/papers/${encodeURIComponent(paperId)}/archive`, { method: 'POST' })
+  return {
+    paper: fromCatalogPaper(result.paper),
+    verification: { ok: true, paper_id: paperId, issues: [] },
+    index_path: 'processed-index.md',
+  }
+}
+
+export async function compactBackendSession(sessionId: string): Promise<{
+  session: BackendSession
+  summary: string
+  summarized_message_count: number
+}> {
+  const result = await rawRequest<{ compaction: { summary?: string; summarized_message_count?: number } }>(
+    `/work/sessions/${encodeURIComponent(sessionId)}/compact`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keep_recent: 6, extra_instruction: '' }) },
+  )
+  const project = await resolveProject()
+  const sessions = await rawRequest<{ sessions: WorkmodeSessionMeta[] }>(
+    `/work/projects/${encodeURIComponent(project.slug)}/sessions?limit=200`,
+  )
+  const meta = sessions.sessions.find((item) => item.id === sessionId)
+  if (!meta) throw new Error('session 不存在')
+  return {
+    session: await loadSession(meta),
+    summary: result.compaction.summary || '',
+    summarized_message_count: result.compaction.summarized_message_count || 0,
+  }
+}

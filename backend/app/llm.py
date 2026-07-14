@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from .config import get_settings
-from .project_tools import PROJECT_TOOL_SCHEMAS, execute_project_tool, project_tool_names
+from .project_tools import execute_project_tool, project_tool_names, project_tool_schemas
 
 
 class ModelProbeError(RuntimeError):
@@ -93,7 +93,8 @@ async def stream_openai_compatible(
     }
     timeout = httpx.Timeout(settings.request_timeout_seconds, read=None)
     working_messages: list[dict[str, Any]] = [dict(message) for message in messages]
-    tool_names = project_tool_names()
+    tool_schemas = project_tool_schemas(project_slug)
+    tool_names = project_tool_names(project_slug)
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         round_index = 1
@@ -107,7 +108,7 @@ async def stream_openai_compatible(
                 "stream": True,
             }
             if project_slug:
-                payload["tools"] = PROJECT_TOOL_SCHEMAS
+                payload["tools"] = tool_schemas
                 payload["tool_choice"] = "auto"
 
             round_text: list[str] = []

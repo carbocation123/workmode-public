@@ -26,6 +26,7 @@ import {
 } from './conversation'
 import { directoryPaths, fileEntryVisual, visibleFileEntries } from './fileTree'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { PdfViewer } from './PdfViewer'
 import { BugReportDialog } from './BugReportDialog'
 import { buildBugReport } from './bugReport'
 import {
@@ -69,6 +70,16 @@ import {
   parseThemePreference,
   resolveTheme
 } from './theme'
+import {
+  applicationHomeUrl,
+  literatureWorkbenchUrl,
+  resolveSettingsReturnSurface,
+  resolveWorkbenchPanel,
+} from './literatureNavigation'
+import {
+  LITERATURE_ONBOARDING_STORAGE_KEY,
+  resetLiteratureOnboarding,
+} from './literature/onboarding'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -174,7 +185,7 @@ function SummaryMessage({ message }: { message: Message }) {
 }
 
 export default function App() {
-  const [activePanel, setActivePanel] = useState<ActivePanel>('project')
+  const [activePanel, setActivePanel] = useState<ActivePanel>(() => resolveWorkbenchPanel(window.location.href))
   const [projects, setProjects] = useState<Project[]>([])
   const [activeSlug, setActiveSlug] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
@@ -204,6 +215,14 @@ export default function App() {
   })
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [clearApiKey, setClearApiKey] = useState(false)
+  const [mineruDraft, setMineruDraft] = useState({
+    mineru_api_key: '',
+    mineru_model_version: 'pipeline' as 'pipeline' | 'vlm',
+    mineru_language: 'en' as 'ch' | 'en' | 'ch_server' | 'japan',
+    mineru_timeout_seconds: '180'
+  })
+  const [mineruSaving, setMineruSaving] = useState(false)
+  const [clearMineruApiKey, setClearMineruApiKey] = useState(false)
   const [rightWidth, setRightWidth] = useState(() => Number(localStorage.getItem('workmode-file-width') || '460'))
   const [newProject, setNewProject] = useState({ name: '', root_path: '', description: '' })
   const [streaming, setStreaming] = useState(false)
@@ -252,6 +271,7 @@ export default function App() {
   const [achievementToast, setAchievementToast] = useState<AchievementDefinition | null>(null)
   const [showContextDetails, setShowContextDetails] = useState(false)
   const announcedAchievementsRef = useRef(new Set(Object.keys(onboardingProgress.achievements)))
+  const settingsReturnSurface = resolveSettingsReturnSurface(window.location.href)
 
   const activeProject = useMemo(
     () => projects.find((item) => item.slug === activeSlug) || null,
@@ -300,6 +320,19 @@ export default function App() {
     setModelTestStatus('')
     setModelTestOk(false)
     setOnboardingProgress((previous) => ({ ...previous, stage: 'welcome', tourStep: 0 }))
+  }
+
+  function replayLiteratureOnboarding() {
+    localStorage.setItem(
+      LITERATURE_ONBOARDING_STORAGE_KEY,
+      JSON.stringify(resetLiteratureOnboarding())
+    )
+    if (settingsReturnSurface === 'literature') {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      window.location.assign(literatureWorkbenchUrl(window.location.href))
+      return
+    }
+    setStatus('文献模式引导已重置，下次进入文献智库时播放')
   }
 
   useEffect(() => {
@@ -448,6 +481,12 @@ export default function App() {
       model_api_key: '',
       context_budget_tokens: String(payload.settings.context_budget_tokens),
       request_timeout_seconds: String(payload.settings.request_timeout_seconds)
+    })
+    setMineruDraft({
+      mineru_api_key: '',
+      mineru_model_version: payload.settings.mineru_model_version,
+      mineru_language: payload.settings.mineru_language,
+      mineru_timeout_seconds: String(payload.settings.mineru_timeout_seconds)
     })
   }
 
@@ -628,6 +667,28 @@ export default function App() {
     if (guideAfterProjectCreate) {
       setGuideAfterProjectCreate(false)
       setOnboardingProgress((previous) => ({ ...previous, stage: 'tour', tourStep: 0 }))
+    }
+  }
+
+  async function saveMineruSettings() {
+    setMineruSaving(true)
+    setError('')
+    try {
+      const payload = await api.saveMineruSettings({
+        mineru_api_key: mineruDraft.mineru_api_key.trim() || undefined,
+        clear_api_key: clearMineruApiKey,
+        mineru_model_version: mineruDraft.mineru_model_version,
+        mineru_language: mineruDraft.mineru_language,
+        mineru_timeout_seconds: Number(mineruDraft.mineru_timeout_seconds)
+      })
+      setSettings(payload.settings)
+      setMineruDraft((previous) => ({ ...previous, mineru_api_key: '' }))
+      setClearMineruApiKey(false)
+      setStatus('MinerU 设置已保存，下一次文献处理立即生效')
+    } catch (exc) {
+      setError(String(exc))
+    } finally {
+      setMineruSaving(false)
     }
   }
 
@@ -997,6 +1058,19 @@ export default function App() {
     window.addEventListener('mouseup', up)
   }
 
+  function toggleSettingsPanel() {
+    if (activePanel !== 'settings') {
+      setActivePanel('settings')
+      return
+    }
+    if (settingsReturnSurface === 'literature') {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      window.location.assign(literatureWorkbenchUrl(window.location.href))
+      return
+    }
+    setActivePanel('project')
+  }
+
   return (
     <div
       data-skin-slot="app-shell"
@@ -1023,21 +1097,35 @@ export default function App() {
         <div className="activity-bar-top">
           <button
             type="button"
-            className={`activity-btn ${activePanel === 'project' ? 'active' : ''}`}
-            title="项目"
-            onClick={() => setActivePanel('project')}
+            className="activity-btn"
+            title="功能大厅"
+            onClick={() => {
+              if (streaming) {
+                setStatus('请先停止当前生成，再返回功能大厅')
+                return
+              }
+              localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+              window.location.assign(applicationHomeUrl(window.location.href))
+            }}
           >
-            <span className="activity-icon skin-icon" data-skin-icon="project">▣</span>
+            <span className="activity-icon" aria-hidden>⌂</span>
           </button>
         </div>
         <div className="activity-bar-bottom">
           <button
             type="button"
             className={`activity-btn ${activePanel === 'settings' ? 'active' : ''}`}
-            title="设置"
-            onClick={() => setActivePanel('settings')}
+            title={activePanel === 'settings'
+              ? settingsReturnSurface === 'literature' ? '返回文献智库' : '返回项目工作区'
+              : '设置'}
+            onClick={toggleSettingsPanel}
           >
-            <span className="activity-icon skin-icon" data-skin-icon="settings">⚙</span>
+            <span
+              className={`activity-icon ${activePanel === 'settings' ? '' : 'skin-icon'}`}
+              data-skin-icon={activePanel === 'settings' ? undefined : 'settings'}
+            >
+              {activePanel === 'settings' ? '←' : '⚙'}
+            </span>
           </button>
         </div>
       </nav>
@@ -1447,6 +1535,83 @@ export default function App() {
                 </button>
               </div>
             </section>
+            <section className="settings-section settings-section-mineru">
+              <div className="settings-label">MinerU 文献解析</div>
+              <p className="settings-hint">
+                MinerU 不是必须配置：未配置或服务失败时，AI 仍可读取电子版 PDF 的文本层；配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性。扫描件和纯图片 PDF 仍需 MinerU/OCR。
+              </p>
+              <label className="settings-field">
+                <span>MinerU Token</span>
+                <input
+                  className="project-create-input"
+                  type="password"
+                  value={mineruDraft.mineru_api_key}
+                  onChange={(event) => setMineruDraft({ ...mineruDraft, mineru_api_key: event.target.value })}
+                  placeholder={settings?.mineru_api_key_set ? '已配置；留空则不修改' : '未配置'}
+                  disabled={clearMineruApiKey}
+                />
+              </label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={clearMineruApiKey}
+                  onChange={(event) => setClearMineruApiKey(event.target.checked)}
+                />
+                清空当前 MinerU Token
+              </label>
+              <div className="settings-grid">
+                <label className="settings-field">
+                  <span>解析模型</span>
+                  <select
+                    className="project-create-input"
+                    value={mineruDraft.mineru_model_version}
+                    onChange={(event) => setMineruDraft({
+                      ...mineruDraft,
+                      mineru_model_version: event.target.value as 'pipeline' | 'vlm'
+                    })}
+                  >
+                    <option value="pipeline">Pipeline</option>
+                    <option value="vlm">VLM</option>
+                  </select>
+                </label>
+                <label className="settings-field">
+                  <span>文献语言</span>
+                  <select
+                    className="project-create-input"
+                    value={mineruDraft.mineru_language}
+                    onChange={(event) => setMineruDraft({
+                      ...mineruDraft,
+                      mineru_language: event.target.value as 'ch' | 'en' | 'ch_server' | 'japan'
+                    })}
+                  >
+                    <option value="en">English</option>
+                    <option value="ch">中文</option>
+                    <option value="ch_server">中文 Server</option>
+                    <option value="japan">日本語</option>
+                  </select>
+                </label>
+              </div>
+              <label className="settings-field">
+                <span>最长等待时间（秒）</span>
+                <input
+                  className="project-create-input"
+                  type="number"
+                  min={60}
+                  max={1800}
+                  value={mineruDraft.mineru_timeout_seconds}
+                  onChange={(event) => setMineruDraft({ ...mineruDraft, mineru_timeout_seconds: event.target.value })}
+                />
+              </label>
+              <div className="settings-hint">Token 不会回显；保存后写入本机配置，下一次文献处理立即生效。</div>
+              <button
+                type="button"
+                className="project-create-submit"
+                onClick={saveMineruSettings}
+                disabled={mineruSaving}
+              >
+                {mineruSaving ? '保存中…' : '保存 MinerU 设置'}
+              </button>
+            </section>
             <section className="settings-section settings-section-theme">
               <div className="settings-label">外观与皮肤</div>
               <ThemePanel
@@ -1462,7 +1627,8 @@ export default function App() {
               <div className="settings-label">新手引导与成就</div>
               <p className="settings-hint">引导和成就只保存在本机，不上传，不影响项目文件或对话。</p>
               <div className="settings-button-row">
-                <button type="button" className="project-create-submit" onClick={replayOnboarding}>重新播放新手引导</button>
+                <button type="button" className="project-create-submit" onClick={replayOnboarding}>重新播放工作台引导</button>
+                <button type="button" className="project-create-submit" onClick={replayLiteratureOnboarding}>重新播放文献模式引导</button>
                 <button
                   type="button"
                   className="project-create-cancel"
@@ -1698,7 +1864,7 @@ export default function App() {
           {selectedFile?.preview === 'unsupported' && <div className="file-view-error">该格式不在安全预览白名单内。</div>}
           {selectedFile?.preview === 'media' && activeSlug && (
             isPdf(selectedFile.path)
-              ? <iframe className="media pdf" src={api.mediaUrl(activeSlug, selectedFile.path)} title={selectedFile.name} />
+              ? <PdfViewer src={api.mediaUrl(activeSlug, selectedFile.path)} title={selectedFile.name} />
               : isImage(selectedFile.path)
                 ? <img className="media image" src={api.mediaUrl(activeSlug, selectedFile.path)} alt={selectedFile.name} />
                 : <div className="file-view-error">暂不支持该媒体格式。</div>
@@ -1731,7 +1897,7 @@ export default function App() {
         <span className="status-segment status-segment-meta">{status}</span>
       </footer>
 
-      <FirstRunWizard
+      {settingsReturnSurface !== 'literature' && <FirstRunWizard
         stage={onboardingProgress.stage}
         draft={{
           model_base_url: settingsDraft.model_base_url,
@@ -1753,9 +1919,9 @@ export default function App() {
         onTestAndSave={() => testModelConnection(true)}
         onChooseTutorial={() => createTutorialProject(true)}
         onChooseProject={chooseOwnProjectFromOnboarding}
-      />
+      />}
 
-      {onboardingProgress.stage === 'tour' && (
+      {settingsReturnSurface !== 'literature' && onboardingProgress.stage === 'tour' && (
         <GuidedTour
           step={onboardingProgress.tourStep}
           onStep={(tourStep) => setOnboardingProgress((previous) => ({ ...previous, tourStep }))}

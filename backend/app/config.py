@@ -79,6 +79,19 @@ def _static_dir() -> Path:
     return ROOT_DIR / "frontend" / "dist"
 
 
+def _bounded_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return min(max(value, minimum), maximum)
+
+
+def _choice_env(name: str, default: str, choices: set[str]) -> str:
+    value = os.getenv(name, default).strip()
+    return value if value in choices else default
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path
@@ -93,6 +106,10 @@ class Settings:
     model_name: str
     context_budget_tokens: int
     request_timeout_seconds: float
+    mineru_api_key: str | None
+    mineru_model_version: str
+    mineru_language: str
+    mineru_timeout_seconds: int
 
 
 def load_settings() -> Settings:
@@ -109,6 +126,16 @@ def load_settings() -> Settings:
         model_name=os.getenv("WORKMODE_MODEL_NAME", "deepseek-v4-pro"),
         context_budget_tokens=int(os.getenv("WORKMODE_CONTEXT_BUDGET_TOKENS", "700000")),
         request_timeout_seconds=float(os.getenv("WORKMODE_REQUEST_TIMEOUT_SECONDS", "120")),
+        mineru_api_key=(os.getenv("WORKMODE_MINERU_API_KEY") or os.getenv("MINERU_API_KEY") or None),
+        mineru_model_version=_choice_env(
+            "WORKMODE_MINERU_MODEL_VERSION", "pipeline", {"pipeline", "vlm"}
+        ),
+        mineru_language=_choice_env(
+            "WORKMODE_MINERU_LANGUAGE", "en", {"ch", "en", "ch_server", "japan"}
+        ),
+        mineru_timeout_seconds=_bounded_env_int(
+            "WORKMODE_MINERU_TIMEOUT_SECONDS", 180, 60, 1800
+        ),
     )
 
 

@@ -1,0 +1,41 @@
+:root {
+  --ui-app-background: var(--theme-app-background);
+  --ui-page-background: var(--skin-color-background, var(--color-surface-container-lowest));
+  --ui-panel-background: var(--skin-color-surface, var(--color-surface-container-low));
+  --ui-surface-background: var(--skin-color-surface-raised, var(--color-surface-container));
+  --ui-surface-raised: var(--skin-color-surface-raised, var(--color-surface-container-high));
+  --ui-surface-highest: var(--skin-color-surface-raised, var(--color-surface-container-highest));
+  --ui-control-background: var(--ui-surface-raised);
+  --ui-control-hover: var(--color-surface-hover, var(--ui-surface-highest));
+  --ui-input-background: var(--ui-page-background);
+  --ui-floating-background: var(--color-surface-floating, var(--ui-surface-raised));
+  --ui-overlay-background: var(--color-overlay);
+  --ui-document-background: var(--ui-page-background);
+  --ui-code-background: color-mix(in srgb, var(--ui-page-background) 92%, var(--ui-text) 8%);
+
+  --ui-text: var(--skin-color-text, var(--color-on-surface));
+  --ui-text-variant: var(--skin-color-text-muted, var(--color-on-surface-variant));
+  --ui-text-muted: var(--skin-color-text-muted, var(--color-on-surface-subtle));
+  --ui-text-dim: var(--skin-color-text-muted, var(--color-on-surface-dim));
+  --ui-border: var(--skin-color-border, var(--color-divider));
+  --ui-border-strong: var(--skin-color-border, var(--color-primary-border));
+
+  --ui-primary: var(--skin-color-accent, var(--color-primary));
+  --ui-primary-hover: var(--skin-color-accent-alt, var(--color-primary-hover));
+  --ui-on-primary: var(--color-on-primary);
+  --ui-primary-container: var(--skin-color-selection, var(--color-primary-container));
+  --ui-primary-soft: var(--color-primary-soft);
+  --ui-primary-border: var(--color-primary-border);
+  --ui-primary-glow: var(--color-primary-glow);
+
+  --ui-success: var(--skin-color-success, var(--color-success));
+  --ui-success-soft: var(--color-success-soft);
+  --ui-success-border: var(--color-success-border);
+  --ui-warning: var(--skin-color-warning, var(--color-warning));
+  --ui-warning-soft: var(--color-warning-soft);
+  --ui-warning-border: var(--color-warning-border);
+  --ui-danger: var(--skin-color-danger, var(--color-danger));
+  --ui-danger-soft: var(--color-danger-soft);
+  --ui-danger-border: var(--color-danger-border);
+  --ui-shadow: var(--color-shadow);
+}

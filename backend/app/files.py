@@ -200,6 +200,12 @@ def read_text_file(slug: str, rel_path: str) -> dict[str, Any]:
 
 def write_markdown_file(slug: str, rel_path: str, content: str, version: str | None) -> dict[str, Any]:
     path = resolve_project_path(slug, rel_path)
+    from .literature_project import is_literature_project
+
+    if is_literature_project(project_root(slug)):
+        relative = display_path(slug, path)
+        if not relative.startswith("notes/") or Path(relative).name.casefold() == "readme.md":
+            raise ValidationError("文献模式只允许在通用编辑器中修改 notes/*.md；其他文件由文献领域服务维护")
     if not path.exists() or not path.is_file():
         raise ValidationError("只能编辑已存在的 Markdown 文件")
     if not is_markdown_path(path):

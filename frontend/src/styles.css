@@ -236,7 +236,7 @@ body {
   font-size: 14px;
   line-height: 1.6;
   color: var(--color-on-surface);
-  background: var(--theme-app-background);
+  background: var(--ui-app-background);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -279,14 +279,14 @@ pre {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--theme-app-background);
+  background: var(--ui-app-background);
 }
 
 .activity-bar {
   grid-row: 1;
   height: 100%;
-  background: var(--color-surface-container-low);
-  border-right: 1px solid var(--color-divider);
+  background: var(--ui-panel-background);
+  border-right: 1px solid var(--ui-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -306,18 +306,18 @@ pre {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-on-surface-dim);
+  color: var(--ui-text-dim);
   position: relative;
   transition: color 120ms ease, background 120ms ease;
 }
 
 .activity-btn:hover {
-  color: var(--color-on-surface);
-  background: var(--color-surface-hover);
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
 }
 
 .activity-btn.active {
-  color: var(--color-on-surface);
+  color: var(--ui-text);
 }
 
 .activity-btn.active::before {
@@ -327,7 +327,7 @@ pre {
   top: 8px;
   bottom: 8px;
   width: 2px;
-  background: var(--color-primary);
+  background: var(--ui-primary);
   border-radius: 0 2px 2px 0;
 }
 
@@ -340,8 +340,8 @@ pre {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-surface-container-low);
-  border-right: 1px solid var(--color-divider);
+  background: var(--ui-panel-background);
+  border-right: 1px solid var(--ui-border);
   display: flex;
   flex-direction: column;
 }
@@ -351,7 +351,7 @@ pre {
   display: flex;
   align-items: center;
   padding: 0 14px;
-  border-bottom: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--ui-border);
   flex: 0 0 auto;
 }
 
@@ -364,7 +364,7 @@ pre {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-on-surface-subtle);
+  color: var(--ui-text-muted);
 }
 
 .project-panel {
@@ -377,7 +377,7 @@ pre {
 
 .project-switcher {
   padding: 12px 14px;
-  border-bottom: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--ui-border);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -397,11 +397,11 @@ pre {
 .project-create-input {
   width: 100%;
   min-width: 0;
-  background: var(--color-surface-container);
-  border: 1px solid var(--color-divider);
+  background: var(--ui-input-background);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
   padding: 6px 8px;
-  color: var(--color-on-surface);
+  color: var(--ui-text);
   font-size: 12px;
 }
 
@@ -412,17 +412,17 @@ pre {
 
 .project-switcher-select:focus,
 .project-create-input:focus {
-  border-color: var(--color-primary);
+  border-color: var(--ui-primary);
 }
 
 .project-switcher-icon-btn,
 .project-create-browse {
   width: 28px;
   height: 28px;
-  background: var(--color-surface-container);
-  border: 1px solid var(--color-divider);
+  background: var(--ui-control-background);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
-  color: var(--color-on-surface-subtle);
+  color: var(--ui-text-muted);
   font-size: 15px;
   display: flex;
   align-items: center;
@@ -432,8 +432,8 @@ pre {
 
 .project-switcher-icon-btn:hover:not(:disabled),
 .project-create-browse:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-  color: var(--color-on-surface);
+  background: var(--ui-control-hover);
+  color: var(--ui-text);
 }
 
 .project-switcher-icon-btn.danger:hover:not(:disabled),
@@ -851,6 +851,7 @@ pre {
 }
 
 .settings-open .settings-section-model,
+.settings-open .settings-section-mineru,
 .settings-open .settings-section-theme,
 .settings-open .settings-section-memory,
 .settings-open .settings-panel > .settings-toggle {
@@ -865,8 +866,8 @@ pre {
   display: grid;
   gap: 8px;
   padding: 10px;
-  background: var(--color-surface-container);
-  border: 1px solid var(--color-divider);
+  background: var(--ui-surface-background);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
 }
 
@@ -935,7 +936,7 @@ pre {
   border: 1px solid var(--color-divider);
   border-radius: 7px;
   background: var(--color-surface-container-lowest);
-  color: var(--color-on-surface);
+  color: var(--ui-text);
   font: inherit;
 }
 
@@ -1064,10 +1065,10 @@ pre {
 
 .memory-editor {
   min-height: 240px;
-  background: var(--color-surface-container-lowest);
-  border: 1px solid var(--color-divider);
+  background: var(--ui-input-background);
+  border: 1px solid var(--ui-border);
   border-radius: 6px;
-  color: var(--color-on-surface);
+  color: var(--ui-text);
   padding: 8px;
   font-family: "JetBrains Mono", Consolas, monospace;
   font-size: 12px;
@@ -1080,7 +1081,7 @@ pre {
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  background: var(--color-surface-container-low);
+  background: var(--ui-panel-background);
   overflow: hidden;
 }
 
@@ -1090,7 +1091,7 @@ pre {
   flex-direction: column;
   gap: 4px;
   padding: 6px 14px;
-  border-bottom: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .ai-panel-header-top {
@@ -1103,7 +1104,7 @@ pre {
 
 .ai-panel-meta {
   font-size: 11px;
-  color: var(--color-on-surface-dim);
+  color: var(--ui-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1115,24 +1116,24 @@ pre {
   font-size: 10px;
   padding: 2px 8px;
   border-radius: 4px;
-  color: var(--color-on-surface-subtle);
-  border: 1px solid var(--color-divider);
+  color: var(--ui-text-muted);
+  border: 1px solid var(--ui-border);
   white-space: nowrap;
 }
 
 .ai-panel-compact-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-  color: var(--color-on-surface);
+  background: var(--ui-control-hover);
+  color: var(--ui-text);
 }
 
 .ai-panel-token-bar {
   position: relative;
   height: 16px;
   margin-top: 6px;
-  background: var(--color-surface-container);
+  background: var(--ui-control-background);
   border-radius: 4px;
   overflow: hidden;
-  border: 1px solid var(--color-divider);
+  border: 1px solid var(--ui-border);
 }
 
 .ai-panel-token-bar-fill {
@@ -1220,14 +1221,14 @@ pre {
 }
 
 .message.user .bubble {
-  background: var(--color-primary-container);
-  border: 1px solid var(--color-primary-border);
+  background: var(--ui-primary-container);
+  border: 1px solid var(--ui-primary-border);
   max-width: 90%;
 }
 
 .message.assistant .bubble {
-  background: var(--color-surface-container);
-  border: 1px solid var(--color-divider);
+  background: var(--ui-surface-background);
+  border: 1px solid var(--ui-border);
   max-width: 100%;
 }
 
@@ -1269,10 +1270,10 @@ pre {
 }
 
 .tool-card {
-  border: 1px solid var(--color-divider);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: var(--color-surface-container-high);
-  color: var(--color-on-surface-variant);
+  background: var(--ui-surface-background);
+  color: var(--ui-text-variant);
   padding: 6px 9px;
   font-size: 11px;
 }
@@ -1344,8 +1345,8 @@ pre {
   margin: 5px 0 0;
   padding: 7px 8px;
   border-radius: 6px;
-  background: var(--color-surface-container-lowest);
-  color: var(--color-on-surface);
+  background: var(--ui-code-background);
+  color: var(--ui-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1368,9 +1369,9 @@ pre {
   padding: 5px 12px;
   border: 1px solid var(--color-primary-border);
   border-radius: 999px;
-  background: var(--color-surface-floating);
-  color: var(--color-on-surface);
-  box-shadow: 0 8px 22px var(--color-shadow);
+  background: var(--ui-floating-background);
+  color: var(--ui-text);
+  box-shadow: 0 8px 22px var(--ui-shadow);
   font-size: 11px;
 }
 
@@ -1410,7 +1411,7 @@ pre {
 
 .message .bubble code,
 .file-view-markdown code {
-  background: var(--color-surface-container-highest);
+  background: var(--ui-code-background);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.9em;
@@ -1418,7 +1419,7 @@ pre {
 
 .message .bubble pre,
 .file-view-markdown pre {
-  background: var(--color-surface-container-highest);
+  background: var(--ui-code-background);
   padding: 10px 12px;
   border-radius: 8px;
   overflow-x: auto;
@@ -1471,8 +1472,8 @@ pre {
 
 .chat-input-wrap {
   grid-row: 4;
-  border-top: 1px solid var(--color-divider);
-  background: var(--color-surface-container-low);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-panel-background);
   padding: 12px 14px 14px;
 }
 
@@ -1481,21 +1482,21 @@ pre {
   grid-template-columns: 1fr auto;
   gap: 8px;
   padding: 8px 10px;
-  background: var(--color-surface-container);
-  border: 1px solid var(--color-divider);
+  background: var(--ui-input-background);
+  border: 1px solid var(--ui-border);
   border-radius: 12px;
   transition: border-color 120ms ease;
 }
 
 .chat-input-box:focus-within {
-  border-color: var(--color-primary);
+  border-color: var(--ui-primary);
 }
 
 .chat-input-box textarea {
   min-height: 24px;
   max-height: 180px;
   line-height: 1.6;
-  color: var(--color-on-surface);
+  color: var(--ui-text);
   background: transparent;
   border: none;
 }
@@ -1505,21 +1506,21 @@ pre {
   height: 30px;
   padding: 0 12px;
   border-radius: 8px;
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
   font-weight: 500;
 }
 
 .chat-input-box .send-btn:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--ui-primary-hover);
 }
 
 .chat-input-box .send-btn.stop {
-  background: var(--color-danger);
+  background: var(--ui-danger);
 }
 
 .chat-input-box .send-btn.stop:hover:not(:disabled) {
-  background: #dc5d3a;
+  background: color-mix(in srgb, var(--ui-danger) 86%, var(--ui-text) 14%);
 }
 
 .inline-error {
@@ -1529,13 +1530,13 @@ pre {
 .resize-handle {
   grid-row: 1;
   cursor: col-resize;
-  background: var(--color-surface-container-lowest);
-  border-left: 1px solid var(--color-divider);
-  border-right: 1px solid var(--color-divider);
+  background: var(--ui-page-background);
+  border-left: 1px solid var(--ui-border);
+  border-right: 1px solid var(--ui-border);
 }
 
 .resize-handle:hover {
-  background: var(--color-primary);
+  background: var(--ui-primary);
 }
 
 .file-view-panel {
@@ -1543,8 +1544,8 @@ pre {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  background: var(--color-surface-container-low);
-  border-left: 1px solid var(--color-divider);
+  background: var(--ui-panel-background);
+  border-left: 1px solid var(--ui-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1555,8 +1556,8 @@ pre {
   flex: 0 0 auto;
   display: flex;
   align-items: stretch;
-  background: var(--color-surface-container-low);
-  border-bottom: 1px solid var(--color-divider);
+  background: var(--ui-panel-background);
+  border-bottom: 1px solid var(--ui-border);
   padding: 0 4px;
 }
 
@@ -1566,8 +1567,8 @@ pre {
   gap: 8px;
   padding: 0 8px 0 14px;
   font-size: 12px;
-  color: var(--color-on-surface-subtle);
-  border-right: 1px solid var(--color-divider);
+  color: var(--ui-text-muted);
+  border-right: 1px solid var(--ui-border);
   position: relative;
   min-width: 0;
   max-width: 70%;
@@ -1580,8 +1581,8 @@ pre {
 }
 
 .editor-tab.active {
-  color: var(--color-on-surface);
-  background: var(--color-surface-container);
+  color: var(--ui-text);
+  background: var(--ui-surface-background);
 }
 
 .editor-tab.active::after {
@@ -1591,7 +1592,7 @@ pre {
   right: 0;
   bottom: 0;
   height: 2px;
-  background: var(--color-primary);
+  background: var(--ui-primary);
 }
 
 .editor-tab-close {
@@ -1726,6 +1727,19 @@ pre {
   min-height: 0;
 }
 
+.media.pdf.pdf-viewer-state {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.media.pdf.pdf-viewer-state.error {
+  color: var(--color-danger);
+}
+
 .media.image {
   max-height: 72vh;
   object-fit: contain;
@@ -1787,9 +1801,9 @@ pre {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 8px;
-  border: 1px solid rgba(108, 159, 255, 0.35);
+  border: 1px solid var(--ui-primary-border);
   border-radius: 8px;
-  background: var(--color-surface-container);
+  background: var(--ui-floating-background);
 }
 
 .context-detail-popover > div {
@@ -3769,7 +3783,7 @@ pre {
   padding: 30px;
   border: 2px solid var(--color-outline-variant);
   border-radius: 18px;
-  color: var(--color-on-surface);
+  color: var(--ui-text);
   background: var(--color-surface-container-lowest);
   box-shadow: 0 28px 80px rgba(0, 0, 0, .45);
 }

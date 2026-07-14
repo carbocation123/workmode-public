@@ -7,7 +7,8 @@ from typing import Any
 from .config import get_settings
 from .context_imports import count_text_tokens, expand_project_imports_detailed
 from .context_window import build_context_window
-from .project_tools import PROJECT_TOOL_SCHEMAS
+from .literature_project import describe_active_context, describe_imported_papers, is_literature_project
+from .project_tools import project_tool_schemas
 from .storage import Project, read_memory, read_messages
 from .session_compactor import SUMMARY_PREFIX, messages_visible_to_llm
 from .work_state import build_memory_context, build_plan_context
@@ -41,6 +42,26 @@ SYSTEM_BASE = """你是 Workmode Public，一个纯净的科研工作助手。
 """
 
 
+LITERATURE_SYSTEM_BASE = """你是 Workmode Public 的文献库特化模式，一个严格依据项目材料工作的科研文献助手。
+
+你的目标：
+- 帮助用户导入、处理、检索、讨论、整理和归档当前文献库中的论文与项目笔记。
+- 以当前项目的 catalog、标签注册表、PDF、MinerU 产物、客观事实报告和笔记为事实来源。
+- 不编造没有读取到的文献内容、数据、出处、处理结果或写入结果。
+
+工具与执行纪律：
+- 当前模式只提供 literature_* 文献领域工具；不要声称自己拥有 shell、Python、通用文件、网络、记忆或计划工具。
+- 需要读取或修改文献库时必须调用相应领域工具，不能用文字声称已经落盘。
+- 文献领域写工具调用后会直接执行，不存在提案、二次批准、confirmed 参数或确认关键词门槛。
+- 前端当前选择的论文和笔记只是本轮优先上下文，不是权限；可以按用户要求操作当前项目中任意真实 paper ID。
+- 后端仍会校验固定目录、项目内路径、paper ID、JSON 结构和原子写入；失败时原样说明错误。
+
+证据纪律：
+- 客观事实、数值、现象和作者观点必须保留原文位置；AI 推理与跨文献判断必须进入明确的讨论区域。
+- 元数据优先来自 PDF 首页 Cite This，必要时回退既有 layout.json，不从文件名或搜索摘要猜测。
+"""
+
+
 PROJECT_PROMPT_FILENAME = "WORKMODE.md"
 
 
@@ -69,16 +90,19 @@ def _read_project_prompt(project: Project) -> tuple[str, Any, list[str], str | N
 
 def build_system_prompt(project: Project) -> tuple[str, dict[str, Any]]:
     settings = get_settings()
+    literature_mode = is_literature_project(Path(project.root_path))
+    system_base = LITERATURE_SYSTEM_BASE if literature_mode else SYSTEM_BASE
+    tool_schemas = project_tool_schemas(project.slug)
     memories = read_memory(project.slug)
     project_memory_raw = memories["project"]
     global_memory = memories["global"]
     project_prompt_raw, project_prompt_imports, project_prompt_errors, project_prompt_file = _read_project_prompt(project)
     imports = expand_project_imports_detailed(project_memory_raw, project_root=Path(project.root_path))
     memory_context = build_memory_context(project.slug)
-    plan_context = build_plan_context(project.slug)
+    plan_context = "" if literature_mode else build_plan_context(project.slug)
 
     sections = [
-        SYSTEM_BASE.strip(),
+        system_base.strip(),
         "## 当前项目",
         f"- 名称：{project.name}",
         f"- slug：{project.slug}",
@@ -117,8 +141,10 @@ def build_system_prompt(project: Project) -> tuple[str, dict[str, Any]]:
     all_import_errors = [*project_prompt_errors, *project_prompt_imports.errors, *imports.errors]
     usage = {
         "budget_tokens": settings.context_budget_tokens,
-        "system_tokens": count_text_tokens(SYSTEM_BASE),
-        "tool_tokens": count_text_tokens(json.dumps(PROJECT_TOOL_SCHEMAS, ensure_ascii=False)),
+        "system_tokens": count_text_tokens(system_base),
+        "tool_tokens": count_text_tokens(json.dumps(tool_schemas, ensure_ascii=False)),
+        "tool_profile": "literature" if literature_mode else "workmode",
+        "tool_count": len(tool_schemas),
         "project_prompt_file": project_prompt_file,
         "project_prompt_tokens": count_text_tokens(project_prompt_raw),
         "project_prompt_total_tokens": count_text_tokens(project_prompt_imports.text),
@@ -175,20 +201,44 @@ def _tool_result_message(raw: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _history_to_openai_messages(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _history_to_openai_messages(
+    history: list[dict[str, Any]],
+    *,
+    project: Project | None = None,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for raw in history:
         role = raw.get("role")
         content = raw.get("content") or ""
         if role == "user":
-            out.append({"role": "user", "content": str(content)})
+            user_content = str(content)
+            if project is not None and is_literature_project(Path(project.root_path)):
+                active_context = (raw.get("meta") or {}).get("active_context") or []
+                if isinstance(active_context, list):
+                    block = describe_active_context(Path(project.root_path), active_context)
+                    if block:
+                        user_content = f"{user_content}\n\n{block}"
+            out.append({"role": "user", "content": user_content})
             continue
         if role == "assistant":
             out.append({"role": "assistant", "content": str(content)})
             continue
-        if role == "system" and isinstance(content, str) and content.startswith(SUMMARY_PREFIX):
-            out.append({"role": "system", "content": content})
-            continue
+        if role == "system":
+            if isinstance(content, str) and content.startswith(SUMMARY_PREFIX):
+                out.append({"role": "system", "content": content})
+                continue
+            meta = raw.get("meta") or {}
+            if (
+                project is not None
+                and is_literature_project(Path(project.root_path))
+                and meta.get("event") == "literature_import_confirmed"
+            ):
+                paper_ids = meta.get("paper_ids") or []
+                if isinstance(paper_ids, list):
+                    block = describe_imported_papers(Path(project.root_path), paper_ids)
+                    if block:
+                        out.append({"role": "system", "content": block})
+                continue
         if role == "tool":
             tool_call = _tool_call_message(raw)
             if tool_call:
@@ -205,10 +255,10 @@ def build_llm_messages(project: Project, session_id: str) -> tuple[list[dict[str
     system_prompt, usage = build_system_prompt(project)
     raw_history = read_messages(session_id, limit=0)
     visible_history = messages_visible_to_llm(raw_history)
-    openai_history = _history_to_openai_messages(visible_history)
+    openai_history = _history_to_openai_messages(visible_history, project=project)
     window = build_context_window(
         system_prompt=system_prompt,
-        tool_schemas=PROJECT_TOOL_SCHEMAS,
+        tool_schemas=project_tool_schemas(project.slug),
         messages=openai_history,
         total_budget_tokens=settings.context_budget_tokens,
         summary_prefix=SUMMARY_PREFIX,

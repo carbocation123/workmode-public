@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import APP_NAME, APP_VERSION, settings
 from .history_repair import repair_stale_tool_runs
+from .literature_routes import router as literature_router
 from .routes import router
 from .storage import data_dir, ensure_data_dirs, sessions_dir
 
@@ -37,8 +38,15 @@ async def local_security_boundary(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     is_media_preview = (
-        request.url.path.startswith("/api/work/projects/")
-        and request.url.path.endswith("/fs/media")
+        (
+            request.url.path.startswith("/api/work/projects/")
+            and request.url.path.endswith("/fs/media")
+        )
+        or (
+            request.url.path.startswith("/api/work/projects/")
+            and "/literature/papers/" in request.url.path
+            and request.url.path.endswith("/pdf")
+        )
     )
     if is_media_preview:
         response.headers["Content-Security-Policy"] = (
@@ -70,6 +78,7 @@ def startup() -> None:
 
 
 app.include_router(router)
+app.include_router(literature_router)
 
 
 FRONTEND_DIST = settings.static_dir
@@ -83,4 +92,7 @@ if FRONTEND_DIST.exists() and (FRONTEND_DIST / "index.html").exists():
         target = FRONTEND_DIST / path
         if path and target.exists() and target.is_file():
             return FileResponse(target)
+        nested_index = target / "index.html"
+        if path and target.is_dir() and nested_index.exists():
+            return FileResponse(nested_index)
         return FileResponse(FRONTEND_DIST / "index.html")

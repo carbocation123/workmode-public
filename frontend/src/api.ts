@@ -1,3 +1,5 @@
+import { RUNTIME_API_BASE_KEY } from './literatureNavigation'
+
 export interface Project {
   slug: string
   name: string
@@ -8,6 +10,8 @@ export interface Project {
   is_tutorial?: boolean
   parent_slug?: string | null
   archived_at?: string | null
+  project_type?: string
+  tool_profile?: string
 }
 
 export interface Session {
@@ -74,6 +78,10 @@ export interface AppSettings {
   model_api_key_set: boolean
   context_budget_tokens: number
   request_timeout_seconds: number
+  mineru_api_key_set: boolean
+  mineru_model_version: 'pipeline' | 'vlm'
+  mineru_language: 'ch' | 'en' | 'ch_server' | 'japan'
+  mineru_timeout_seconds: number
 }
 
 export interface ModelSettingsUpdate {
@@ -104,10 +112,41 @@ export interface CompactionResult {
 }
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:8765/api'
-export let API_BASE = import.meta.env.VITE_WORKMODE_API_BASE || DEFAULT_API_BASE
+const cachedApiBase = typeof window !== 'undefined'
+  ? window.sessionStorage.getItem(RUNTIME_API_BASE_KEY)
+  : null
+export let API_BASE = cachedApiBase || import.meta.env.VITE_WORKMODE_API_BASE || DEFAULT_API_BASE
 
 export function setApiBase(value: string) {
   API_BASE = value.replace(/\/$/, '')
+  if (typeof window !== 'undefined') window.sessionStorage.setItem(RUNTIME_API_BASE_KEY, API_BASE)
+}
+
+export interface MineruSettingsUpdate {
+  mineru_api_key?: string
+  clear_api_key?: boolean
+  mineru_model_version?: 'pipeline' | 'vlm'
+  mineru_language?: 'ch' | 'en' | 'ch_server' | 'japan'
+  mineru_timeout_seconds?: number
+}
+
+export interface ActiveContextItem {
+  kind: 'paper' | 'note'
+  id: string
+}
+
+export interface ChatStreamEvent extends Record<string, unknown> {
+  type: string
+  content?: string
+  context?: Partial<ContextUsage>
+  message?: Message | string
+  id?: string
+  name?: string
+  input?: Record<string, unknown>
+  result?: string
+  ok?: boolean
+  changed_paths?: string[]
+  round?: number
 }
 
 export function getToken(): string {
@@ -171,6 +210,18 @@ export const api = {
   },
   async createProject(payload: { name: string; root_path: string; description: string }) {
     return request<{ project: Project; session: Session }>('/work/projects', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+  },
+  async saveMineruSettings(payload: MineruSettingsUpdate) {
+    return request<{ settings: AppSettings }>('/settings/mineru', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    })
+  },
+  async createLiteratureProject(payload: { name: string; root_path: string }) {
+    return request<{ project: Project; session: Session }>('/work/literature-projects', {
       method: 'POST',
       body: JSON.stringify(payload)
     })
@@ -274,13 +325,14 @@ export const api = {
 export async function streamChat(
   sessionId: string,
   content: string,
-  onEvent: (event: Record<string, unknown>) => void,
-  signal?: AbortSignal
+  onEvent: (event: ChatStreamEvent) => void,
+  signal?: AbortSignal,
+  activeContext: ActiveContextItem[] = []
 ) {
   const response = await fetch(`${API_BASE}/work/sessions/${sessionId}/chat/stream`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, ...(activeContext.length ? { active_context: activeContext } : {}) }),
     signal
   })
   if (!response.ok || !response.body) {
@@ -301,7 +353,7 @@ export async function streamChat(
         .find((line) => line.startsWith('data:'))
         ?.replace(/^data:\s*/, '')
       if (!data) continue
-      onEvent(JSON.parse(data))
+      onEvent(JSON.parse(data) as ChatStreamEvent)
     }
   }
 }
