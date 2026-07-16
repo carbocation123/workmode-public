@@ -19,6 +19,7 @@ from .literature_project import (
     LiteratureProjectError,
     apply_literature_metadata,
     literature_paper,
+    normalize_journal_abbreviation,
     update_literature_paper,
 )
 from .web_tools import WebToolError, validate_public_web_url
@@ -84,7 +85,12 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     return value
 
 
-def _model_completion(system: str, user: str) -> str:
+def _model_completion(
+    system: str,
+    user: str,
+    *,
+    response_format: dict[str, str] | None = None,
+) -> str:
     settings = get_settings()
     if not settings.model_base_url or not settings.model_api_key:
         raise LiteraturePipelineError("模型未配置：请先在 Workmode 设置中配置 OpenAI-compatible 模型")
@@ -100,6 +106,8 @@ def _model_completion(system: str, user: str) -> str:
         ],
         "stream": False,
     }
+    if response_format is not None:
+        payload["response_format"] = response_format
     timeout = httpx.Timeout(max(settings.request_timeout_seconds, 600), connect=30)
     try:
         with httpx.Client(timeout=timeout) as client:
@@ -320,14 +328,19 @@ def _layout_fallback(output_dir: Path) -> str:
     return "\n---\n".join(snippets[:8])
 
 
-def _extract_metadata(output_dir: Path) -> dict[str, Any]:
-    page_zero = _collect_page_zero_text(output_dir)
-    fallback = _layout_fallback(output_dir)
-    prompt = f"""请只根据下面的 PDF 首页解析文本提取元数据，不准搜索，不准根据原文件名猜测。
+def _normalized_evidence(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().casefold()
+
+
+def _metadata_prompt(page_zero: str, fallback: str) -> str:
+    return f"""请只根据下面的 PDF 首页解析文本提取元数据，不准搜索，不准根据原文件名猜测。
 优先使用首页明确的 Cite This 行。若 ACS/Elsevier 页眉在正文中缺失，只可使用后附 layout.json DOI 邻近片段回退。
-返回一个 JSON object，字段必须是：title, authors, first_author_surname, year, journal, journal_abbreviation, doi, paper_type, metadata_source。
+必须返回一个 JSON object，字段为：title, authors, first_author_surname, year, journal, journal_abbreviation, doi, paper_type, metadata_source, evidence_quote。
 journal_abbreviation 必须无点无空格，例如 JACS、ACSAMI、NatCommun；不确定就返回 null。
 paper_type 只能是 research、review、unknown。metadata_source 只能是 cite_this、layout_json_fallback、pending。
+evidence_quote 必须逐字复制真正支持上述元数据的 Cite This 行或 layout.json DOI 邻近原文；没有直接证据就返回空字符串并把 metadata_source 设为 pending。
+JSON 结构示例（只示意键名；不得复制占位值，未知字段保持 null）：
+{{"title": null, "authors": null, "first_author_surname": null, "year": null, "journal": null, "journal_abbreviation": null, "doi": null, "paper_type": "unknown", "metadata_source": "pending", "evidence_quote": null}}
 
 [PDF 首页解析文本]
 {page_zero}
@@ -335,36 +348,110 @@ paper_type 只能是 research、review、unknown。metadata_source 只能是 cit
 [layout.json 回退片段]
 {fallback or '无'}
 """
-    metadata = _extract_json_object(
-        _model_completion(
-            "你是严格的学术元数据抽取器。只输出 JSON，不补猜、不搜索、不解释。",
-            prompt,
+
+
+def _normalize_metadata_candidate(
+    raw: dict[str, Any],
+    *,
+    page_zero: str,
+    fallback: str,
+) -> dict[str, Any]:
+    metadata = {
+        key: raw.get(key)
+        for key in (
+            "title", "authors", "first_author_surname", "year", "journal",
+            "journal_abbreviation", "doi", "paper_type", "metadata_source", "evidence_quote",
         )
-    )
-    required = ("title", "first_author_surname", "year", "journal_abbreviation")
-    if any(metadata.get(key) in {None, ""} for key in required):
-        raise LiteraturePipelineError("首页元数据不完整，需要人工补充后才能标准命名")
-    try:
-        metadata["year"] = int(metadata["year"])
-    except (TypeError, ValueError) as exc:
-        raise LiteraturePipelineError("首页年份无法确认") from exc
-    source = metadata.get("metadata_source")
-    if source == "cite_this" and "cite this" not in page_zero.lower():
-        raise LiteraturePipelineError("模型声称使用 Cite This，但首页解析文本中没有该证据")
-    if source == "layout_json_fallback" and not fallback:
-        raise LiteraturePipelineError("模型声称使用 layout.json 回退，但没有 DOI 邻近片段")
-    if source not in {"cite_this", "layout_json_fallback"}:
-        raise LiteraturePipelineError("首页元数据来源不能确认，需要人工补充")
+    }
     authors = metadata.get("authors")
     if isinstance(authors, list):
         metadata["authors"] = ", ".join(str(author).strip() for author in authors if str(author).strip())
     elif authors is None:
         metadata["authors"] = ""
     else:
-        metadata["authors"] = str(authors)
+        metadata["authors"] = str(authors).strip()
+
+    issues: list[str] = []
+    try:
+        metadata["year"] = int(metadata["year"])
+        if not 1000 <= metadata["year"] <= 3000:
+            raise ValueError
+    except (TypeError, ValueError):
+        metadata["year"] = None
+        issues.append("首页年份无法确认")
+
+    for key, label in (
+        ("title", "标题"),
+        ("authors", "作者"),
+        ("first_author_surname", "第一作者姓氏"),
+        ("journal", "期刊"),
+        ("journal_abbreviation", "期刊缩写"),
+    ):
+        if not str(metadata.get(key) or "").strip():
+            issues.append(f"缺少{label}")
+    surname = str(metadata.get("first_author_surname") or "").strip()
+    if surname and not re.fullmatch(r"[A-Za-z][A-Za-z'-]*", surname):
+        issues.append("第一作者姓氏格式不能用于标准命名")
+    abbreviation = str(metadata.get("journal_abbreviation") or "").strip()
+    if abbreviation:
+        try:
+            metadata["journal_abbreviation"] = normalize_journal_abbreviation(abbreviation)
+        except LiteratureProjectError:
+            metadata["journal_abbreviation"] = None
+            issues.append("期刊缩写未包含可用于标准命名的字母或数字")
+
+    source = str(metadata.get("metadata_source") or "pending")
+    quote = str(metadata.get("evidence_quote") or "").strip()
+    normalized_quote = _normalized_evidence(quote)
+    if source == "cite_this":
+        if not normalized_quote or "cite this" not in normalized_quote:
+            issues.append("Cite This 证据原文缺失")
+        elif normalized_quote not in _normalized_evidence(page_zero):
+            issues.append("模型返回的 Cite This 证据不在首页解析文本中")
+    elif source == "layout_json_fallback":
+        if not normalized_quote:
+            issues.append("layout.json 证据原文缺失")
+        elif normalized_quote not in _normalized_evidence(fallback):
+            issues.append("模型返回的证据不在 layout.json DOI 邻近片段中")
+    else:
+        metadata["metadata_source"] = "pending"
+        issues.append("首页元数据来源不能确认")
+
     if metadata.get("paper_type") not in {"research", "review"}:
-        metadata["paper_type"] = "research"
+        metadata["paper_type"] = "unknown"
+    metadata["metadata_trust"] = "complete" if not issues else "partial"
+    metadata["metadata_issue"] = "；".join(dict.fromkeys(issues))
     return metadata
+
+
+def _extract_metadata(output_dir: Path) -> dict[str, Any]:
+    page_zero = _collect_page_zero_text(output_dir)
+    fallback = _layout_fallback(output_dir)
+    prompt = _metadata_prompt(page_zero, fallback)
+    system = "你是严格的学术元数据抽取器。只输出 JSON，不补猜、不搜索、不解释。"
+    raw_response = _model_completion(system, prompt, response_format={"type": "json_object"})
+    (output_dir / "metadata-response-raw.txt").write_text(raw_response, encoding="utf-8")
+    try:
+        raw_metadata = _extract_json_object(raw_response)
+    except LiteraturePipelineError as first_error:
+        repair_prompt = f"""把下面无法解析的模型输出修复为一个合法 JSON object。
+只能修复 JSON 语法，不得新增、猜测或改写任何事实。字段必须保持为：title, authors, first_author_surname, year, journal, journal_abbreviation, doi, paper_type, metadata_source, evidence_quote。
+
+[原始输出]
+{raw_response}
+"""
+        repaired = _model_completion(
+            "你是 JSON 语法修复器。只输出合法 JSON object。",
+            repair_prompt,
+            response_format={"type": "json_object"},
+        )
+        (output_dir / "metadata-response-repaired.json").write_text(repaired, encoding="utf-8")
+        try:
+            raw_metadata = _extract_json_object(repaired)
+        except LiteraturePipelineError as exc:
+            (output_dir / "metadata-response-error.txt").write_text(str(exc), encoding="utf-8")
+            raise LiteraturePipelineError(f"模型返回的元数据 JSON 无法解析；已重试一次：{first_error}") from exc
+    return _normalize_metadata_candidate(raw_metadata, page_zero=page_zero, fallback=fallback)
 
 
 def _extract_facts(output_dir: Path, metadata: dict[str, Any]) -> str:
@@ -387,7 +474,7 @@ def _extract_facts(output_dir: Path, metadata: dict[str, Any]) -> str:
 5. 第 3 段按技术分类并保留实验条件、数值和作者归属；第 5 段使用 Markdown 表格。
 6. 输出完整 Markdown，不要输出 JSON，不要写过程说明。
 
-[已核对元数据]
+[书目信息；metadata_trust=complete 才表示已核对，partial 表示仍待人工确认]
 {json.dumps(metadata, ensure_ascii=False)}
 
 [MinerU full.md]
@@ -423,8 +510,17 @@ def run_literature_pipeline(
     changed: list[str] = []
     try:
         _check_cancel(cancel_event)
-        _set_stage(root, paper_id, stage="MinerU 正在解析正文", status="parsing")
-        output_dir = _run_mineru(root, paper_id, cancel_event)
+        current_paths = dict(literature_paper(root, paper_id).get("paths") or {})
+        existing_full_rel = str(current_paths.get("full_md") or "")
+        existing_full = (root / existing_full_rel).resolve() if existing_full_rel else None
+        if existing_full is not None:
+            _project_relative(existing_full, root)
+        if existing_full is not None and existing_full.exists() and existing_full.stat().st_size > 0:
+            _set_stage(root, paper_id, stage="正在复用已有 MinerU 正文", status="parsing")
+            output_dir = existing_full.parent
+        else:
+            _set_stage(root, paper_id, stage="MinerU 正在解析正文", status="parsing")
+            output_dir = _run_mineru(root, paper_id, cancel_event)
         mineru_rel = _project_relative(output_dir, root)
         paths = dict(literature_paper(root, paper_id).get("paths") or {})
         paths.update({"mineru_dir": mineru_rel, "full_md": f"{mineru_rel}/full.md"})
@@ -434,6 +530,7 @@ def run_literature_pipeline(
         _check_cancel(cancel_event)
         _set_stage(root, paper_id, stage="正在核对首页元数据", status="extracting")
         current = literature_paper(root, paper_id)
+        metadata_issue = ""
         if current.get("metadata_trust") == "complete":
             metadata = {
                 key: current.get(key)
@@ -442,9 +539,56 @@ def run_literature_pipeline(
                     "journal_abbreviation", "doi", "paper_type", "metadata_source",
                 )
             }
+            metadata["metadata_trust"] = "complete"
         else:
-            metadata = _extract_metadata(output_dir)
-            apply_literature_metadata(root, paper_id, metadata)
+            try:
+                metadata = _extract_metadata(output_dir)
+                metadata_trust = str(metadata.get("metadata_trust") or "complete")
+                metadata_issue = str(metadata.get("metadata_issue") or "")
+                if metadata_trust == "complete":
+                    apply_literature_metadata(root, paper_id, metadata)
+                else:
+                    candidate_updates = {
+                        key: metadata.get(key)
+                        for key in (
+                            "title", "authors", "first_author_surname", "year", "journal",
+                            "journal_abbreviation", "doi", "paper_type", "metadata_source",
+                        )
+                        if metadata.get(key) not in {None, ""}
+                    }
+                    update_literature_paper(
+                        root,
+                        paper_id,
+                        **candidate_updates,
+                        metadata_trust="partial",
+                        metadata_issue=metadata_issue or "首页元数据需要人工确认",
+                    )
+            except Exception as exc:
+                metadata_issue = str(exc)[:1000] or exc.__class__.__name__
+                update_literature_paper(
+                    root,
+                    paper_id,
+                    metadata_trust="partial",
+                    metadata_issue=metadata_issue,
+                )
+                current = literature_paper(root, paper_id)
+                metadata = {
+                    key: current.get(key)
+                    for key in (
+                        "title", "authors", "first_author_surname", "year", "journal",
+                        "journal_abbreviation", "doi", "paper_type", "metadata_source",
+                    )
+                }
+                metadata["metadata_trust"] = "partial"
+                metadata["metadata_issue"] = metadata_issue
+        for artifact in (
+            "metadata-response-raw.txt",
+            "metadata-response-repaired.json",
+            "metadata-response-error.txt",
+        ):
+            artifact_path = output_dir / artifact
+            if artifact_path.exists():
+                changed.append(_project_relative(artifact_path, root))
 
         _check_cancel(cancel_event)
         _set_stage(root, paper_id, stage="正在抽取客观事实", status="extracting")
@@ -463,12 +607,23 @@ def run_literature_pipeline(
             root,
             paper_id,
             status="review",
-            stage="待讨论标签、关注点与跨文献关系",
+            stage=(
+                "客观事实报告已生成；首页元数据待人工确认"
+                if metadata_issue or metadata.get("metadata_trust") == "partial"
+                else "待讨论标签、关注点与跨文献关系"
+            ),
             paths=paths,
             error=None,
         )
         changed.append(_project_relative(report_path, root))
-        return {"status": "review", "stage": "客观事实报告已生成", "changed_files": changed}
+        needs_review = bool(metadata_issue or metadata.get("metadata_trust") == "partial")
+        return {
+            "status": "review",
+            "stage": "客观事实报告已生成",
+            "metadata_needs_review": needs_review,
+            "metadata_issue": metadata_issue or str(metadata.get("metadata_issue") or ""),
+            "changed_files": list(dict.fromkeys(changed)),
+        }
     except PipelineCancelled as exc:
         update_literature_paper(root, paper_id, status="pending", stage="处理已停止", error=str(exc))
         raise LiteratureProjectError(str(exc)) from exc

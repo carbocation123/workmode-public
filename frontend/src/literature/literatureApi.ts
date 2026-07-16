@@ -16,6 +16,7 @@ export interface WorkmodeProject {
   root_path: string
   project_type?: string
   tool_profile?: string
+  storage_mode?: 'managed' | 'external'
 }
 
 interface WorkmodeMessage {
@@ -57,7 +58,10 @@ const REQUIRED_AGENT_TOOLS = [
   'literature_tag_list',
   'literature_read',
   'literature_update_record',
+  'literature_delete',
+  'literature_restore',
   'literature_note_upsert',
+  'literature_note_delete',
 ]
 
 export function isCompatibleLiteratureBackend(health: LiteratureBackendHealth): boolean {
@@ -89,8 +93,9 @@ export interface BackendPaper {
   focus: string
   summary: string
   paper_type: PaperRecord['paperType']
-  metadata_source: PaperRecord['metadataSource']
-  metadata_trust: PaperRecord['metadataTrust']
+  metadata_source: PaperRecord['metadataSource'] | 'manual' | 'layout_json'
+  metadata_trust: PaperRecord['metadataTrust'] | 'pending'
+  metadata_issue?: string | null
   mineru_output_path?: string | null
   fact_report_path?: string | null
   stage?: string
@@ -114,7 +119,8 @@ interface CatalogPaper {
   summary?: string
   paper_type?: PaperRecord['paperType']
   metadata_source?: string
-  metadata_trust?: PaperRecord['metadataTrust']
+  metadata_trust?: PaperRecord['metadataTrust'] | 'pending'
+  metadata_issue?: string | null
   verification_status?: PaperRecord['verificationStatus']
   stage?: string
   error?: string | null
@@ -173,6 +179,13 @@ export interface ArchiveVerification {
   issues: string[]
 }
 
+export interface DeletedBackendPaper {
+  trash_id: string
+  deleted_at: string
+  paper: BackendPaper
+  file_count: number
+}
+
 let activeProject: WorkmodeProject | null = null
 
 function authHeaders(extra?: HeadersInit): HeadersInit {
@@ -210,14 +223,42 @@ async function resolveProject(): Promise<WorkmodeProject> {
     || import.meta.env.VITE_LITERATURE_PROJECT_SLUG
     || '',
   ).trim()
-  const project = requestedSlug
-    ? result.projects.find((item) => item.slug === requestedSlug && item.project_type === 'literature-library')
-    : result.projects.find((item) => item.project_type === 'literature-library')
+  const literatureProjects = result.projects.filter((item) => item.project_type === 'literature-library')
+  const project = literatureProjects.find((item) => item.slug === requestedSlug) || literatureProjects[0]
   if (!project) {
     throw new Error('没有已注册的 literature-library 项目。请先创建文献项目。')
   }
   activeProject = project
   return project
+}
+
+export async function listBackendLiteratureProjects(): Promise<WorkmodeProject[]> {
+  const result = await api.projects()
+  return result.projects.filter((project) => project.project_type === 'literature-library')
+}
+
+export async function createBackendLiteratureProject(name: string): Promise<WorkmodeProject> {
+  const result = await api.createLiteratureProject({ name })
+  activeProject = result.project
+  window.sessionStorage.setItem(LITERATURE_PROJECT_KEY, result.project.slug)
+  return result.project
+}
+
+export async function activateBackendLiteratureProject(slug: string): Promise<void> {
+  await api.setActive(slug)
+  activeProject = null
+  window.sessionStorage.setItem(LITERATURE_PROJECT_KEY, slug)
+}
+
+export async function renameBackendProject(slug: string, name: string): Promise<WorkmodeProject> {
+  const result = await api.updateProject(slug, { name })
+  if (activeProject?.slug === slug) activeProject = result.project
+  return result.project
+}
+
+export async function removeBackendProject(slug: string): Promise<void> {
+  await api.deleteProject(slug)
+  if (activeProject?.slug === slug) activeProject = null
 }
 
 export async function getBackendProjectInfo(): Promise<WorkmodeProject> {
@@ -230,7 +271,11 @@ async function literatureRequest<T>(path: string, init?: RequestInit): Promise<T
 }
 
 function fromCatalogPaper(paper: CatalogPaper): BackendPaper {
-  const source = paper.metadata_source === 'layout_json' ? 'layout_json_fallback' : paper.metadata_source
+  const source = paper.metadata_source === 'layout_json'
+    ? 'layout_json_fallback'
+    : paper.metadata_source === 'manual'
+      ? 'manual_review'
+      : paper.metadata_source
   return {
     id: paper.id,
     original_filename: paper.original_filename || `${paper.id}.pdf`,
@@ -247,6 +292,7 @@ function fromCatalogPaper(paper: CatalogPaper): BackendPaper {
     paper_type: paper.paper_type || 'research',
     metadata_source: (source || 'pending') as PaperRecord['metadataSource'],
     metadata_trust: paper.metadata_trust || 'unknown',
+    metadata_issue: paper.metadata_issue || '',
     mineru_output_path: paper.paths?.mineru_dir || null,
     fact_report_path: paper.paths?.fact_report || null,
     paths: paper.paths,
@@ -256,12 +302,16 @@ function fromCatalogPaper(paper: CatalogPaper): BackendPaper {
   }
 }
 
-function mergeWorkmodeMessages(messages: WorkmodeMessage[]): BackendChatMessage[] {
+export function mergeWorkmodeMessages(messages: WorkmodeMessage[]): BackendChatMessage[] {
   const starts = new Map<string, WorkmodeMessage>()
   const output: BackendChatMessage[] = []
-  for (const message of messages) {
+  for (const [index, message] of messages.entries()) {
     const meta = message.meta || {}
-    if (message.role === 'system' && meta.event === 'literature_import_confirmed') {
+    if (
+      message.role === 'system'
+      && meta.event === 'literature_import_confirmed'
+      && !messages.slice(index + 1).some((later) => later.role === 'user')
+    ) {
       continue
     }
     if (message.role === 'tool' && meta.event === 'tool_call_start' && meta.tool_call_id) {
@@ -295,7 +345,7 @@ function mergeWorkmodeMessages(messages: WorkmodeMessage[]): BackendChatMessage[
       id: message.id,
       role: message.role,
       content: message.content,
-      paper_ids: context.filter((item) => item.kind === 'paper').map((item) => item.id),
+      paper_ids: meta.paper_ids || context.filter((item) => item.kind === 'paper').map((item) => item.id),
       note_ids: context.filter((item) => item.kind === 'note').map((item) => item.id),
       created_at: message.ts,
     })
@@ -354,7 +404,11 @@ export function mapBackendPaper(paper: BackendPaper): PaperRecord {
     pdfPath: paper.paths?.pdf || null,
     archiveFilename: paper.archive_filename,
     archiveLocation: paper.archive_location,
-    metadataSource: paper.metadata_source,
+    metadataSource: paper.metadata_source === 'manual'
+      ? 'manual_review'
+      : paper.metadata_source === 'layout_json'
+        ? 'layout_json_fallback'
+        : paper.metadata_source,
     paperType: paper.paper_type,
     verificationStatus: paper.verification_status || 'pending',
     title: paper.title || paper.original_filename.replace(/\.pdf$/i, ''),
@@ -367,7 +421,8 @@ export function mapBackendPaper(paper: BackendPaper): PaperRecord {
     summary: paper.summary || paper.stage || '',
     facts: paper.error ? [`处理错误：${paper.error}`] : [],
     factReport: placeholderReport,
-    metadataTrust: paper.metadata_trust,
+    metadataTrust: paper.metadata_trust === 'pending' ? 'unknown' : paper.metadata_trust,
+    metadataIssue: paper.metadata_issue || '',
   }
 }
 
@@ -385,6 +440,29 @@ export async function checkLiteratureBackend(): Promise<boolean> {
 
 export async function listBackendPapers(): Promise<BackendPaper[]> {
   return (await literatureRequest<CatalogPaper[]>('/papers')).map(fromCatalogPaper)
+}
+
+export async function listDeletedBackendPapers(): Promise<DeletedBackendPaper[]> {
+  const result = await literatureRequest<{
+    papers: Array<{ trash_id: string; deleted_at: string; paper: CatalogPaper; file_count: number }>
+  }>('/trash/papers')
+  return result.papers.map((entry) => ({ ...entry, paper: fromCatalogPaper(entry.paper) }))
+}
+
+export async function deleteBackendPaper(paperId: string): Promise<{ trash_id: string; trash_path: string }> {
+  const result = await literatureRequest<{ result: { trash_id: string; trash_path: string } }>(
+    `/papers/${encodeURIComponent(paperId)}`,
+    { method: 'DELETE' },
+  )
+  return result.result
+}
+
+export async function restoreBackendPaper(trashId: string): Promise<BackendPaper> {
+  const result = await literatureRequest<{ paper: CatalogPaper }>(
+    `/trash/papers/${encodeURIComponent(trashId)}/restore`,
+    { method: 'POST' },
+  )
+  return fromCatalogPaper(result.paper)
 }
 
 export async function listBackendTags(): Promise<BackendTag[]> {
@@ -442,6 +520,11 @@ export async function createBackendSession(name: string): Promise<BackendSession
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: name }) },
   )
   return loadSession(result.session)
+}
+
+export async function renameBackendSession(sessionId: string, title: string): Promise<string> {
+  const result = await api.updateSession(sessionId, title)
+  return result.session.title
 }
 
 export async function streamLiteratureChat(
@@ -512,6 +595,14 @@ export async function saveBackendNote(
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markdown }) },
   )
   return { ...result.note, source_paper_ids: [] }
+}
+
+export async function deleteBackendNote(filename: string): Promise<{ trash_path: string }> {
+  const result = await literatureRequest<{ result: { trash_path: string } }>(
+    `/notes/${encodeURIComponent(filename)}`,
+    { method: 'DELETE' },
+  )
+  return result.result
 }
 
 export async function getBackendMemory(): Promise<string> {

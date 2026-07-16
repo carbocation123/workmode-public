@@ -4,6 +4,7 @@ import { openExternalUrl } from './desktop'
 import {
   ACHIEVEMENTS,
   DEEPSEEK_SETUP,
+  MINERU_SETUP,
   TUTORIAL_TASKS,
   applyDeepSeekPreset,
   type AchievementDefinition,
@@ -53,7 +54,7 @@ export function DeepSeekSetupGuide({ draft, defaultOpen = false, onDraftChange }
           </li>
           <li>
             <strong>创建 API Key</strong>
-            <span>创建后复制到下方输入框。不要把 Key 发进聊天、项目文件或截图。</span>
+            <span>进入 API Keys 页面，点击「创建 API Key」，填写名称并确认；复制新生成的 Key 到下方输入框。Key 通常只完整显示一次。</span>
             <button type="button" className="deepseek-link" onClick={() => externalLink(DEEPSEEK_SETUP.apiKeysUrl)}>创建 API Key ↗</button>
           </li>
         </ol>
@@ -63,6 +64,36 @@ export function DeepSeekSetupGuide({ draft, defaultOpen = false, onDraftChange }
           <button type="button" className="deepseek-link" onClick={() => externalLink(DEEPSEEK_SETUP.docsUrl)}>官方 API 文档 ↗</button>
         </div>
         <p>推荐科研主任务使用 V4 Pro；更看重速度和成本时使用 V4 Flash。预设只填写官方 Base URL 和模型名，不会读取、上传或覆盖 API Key。</p>
+      </div>
+    </details>
+  )
+}
+
+export function MineruSetupGuide() {
+  function externalLink(url: string) {
+    void openExternalUrl(url)
+  }
+
+  return (
+    <details className="deepseek-setup-guide mineru-setup-guide">
+      <summary>如何申请 MinerU Token</summary>
+      <div className="deepseek-setup-content">
+        <ol>
+          <li>
+            <strong>打开 MinerU API 管理</strong>
+            <span>打开官方 API 管理页面并登录 MinerU 账号。</span>
+            <button type="button" className="deepseek-link" onClick={() => externalLink(MINERU_SETUP.manageUrl)}>打开 MinerU API 管理 ↗</button>
+          </li>
+          <li>
+            <strong>创建并复制 Token</strong>
+            <span>在 Token 管理区域点击创建 API Token，生成后立即复制；不要把 Token 发进聊天、项目文件或截图。</span>
+          </li>
+          <li>
+            <strong>粘贴并保存</strong>
+            <span>把 Token 粘贴到下方。普通英文论文先选 Pipeline + English；复杂版面可再尝试 VLM。</span>
+          </li>
+        </ol>
+        <p>MinerU 不是必需项；不配置时仍会尝试读取 PDF 文本层，配置后更适合多栏正文、表格、公式和复杂版面。</p>
       </div>
     </details>
   )

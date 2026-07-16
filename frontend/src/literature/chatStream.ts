@@ -56,6 +56,11 @@ function metaObject(message: Message | undefined, key: string): Record<string, u
     : {}
 }
 
+function metaStringArray(message: Message | undefined, key: string): string[] {
+  const value = message?.meta?.[key]
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : []
+}
+
 function toolStatus(event: ChatStreamEvent, message?: Message): LiteratureToolStatus {
   const status = metaString(message, 'status')
   if (status === 'running') return 'running'
@@ -131,6 +136,25 @@ export function reduceLiveChatEvent(state: LiveChatState, event: ChatStreamEvent
       activeAssistantId: id,
       messages: [...state.messages, { id, role: 'assistant', text: content }],
     }
+  }
+
+  if (event.type === 'system_message') {
+    const persisted = eventMessage(event)
+    if (!persisted || persisted.role !== 'system' || !persisted.content) return state
+    if (state.messages.some((message) => message.id === persisted.id)) return state
+    const incoming: LiteratureChatMessage = {
+      id: persisted.id,
+      role: 'system',
+      text: persisted.content,
+      paperIds: metaStringArray(persisted, 'paper_ids'),
+    }
+    const messages = [...state.messages]
+    let insertionIndex = messages.length
+    if (!state.activeAssistantId && messages[messages.length - 1]?.role === 'user') {
+      insertionIndex = messages.length - 1
+    }
+    messages.splice(insertionIndex, 0, incoming)
+    return { ...state, messages }
   }
 
   if (event.type === 'tool_call_start' || event.type === 'tool_result') {

@@ -13,9 +13,15 @@ from fastapi.responses import StreamingResponse
 
 from . import files, storage, tutorial_project
 from .chat_runs import ChatAlreadyRunningError, chat_runs
-from .config import APP_VERSION, get_settings, update_env_file
+from .config import APP_VERSION, get_settings, managed_projects_dir, update_env_file
 from .llm import ModelProbeError, probe_openai_compatible, stream_openai_compatible
-from .literature_project import project_type as detect_project_type, tool_profile as detect_tool_profile
+from .literature_project import (
+    append_literature_selection_event,
+    pending_literature_context_events,
+    project_type as detect_project_type,
+    seed_literature_session,
+    tool_profile as detect_tool_profile,
+)
 from .models import (
     ActiveProjectUpdate,
     ChatRequest,
@@ -47,6 +53,12 @@ def _project_payload(project: storage.Project) -> dict[str, object]:
     try:
         payload["project_type"] = detect_project_type(root)
         payload["tool_profile"] = detect_tool_profile(root)
+        if payload["project_type"] == "literature-library":
+            try:
+                root.expanduser().resolve().relative_to(managed_projects_dir())
+                payload["storage_mode"] = "managed"
+            except ValueError:
+                payload["storage_mode"] = "external"
     except Exception:
         payload["project_type"] = "invalid"
         payload["tool_profile"] = "none"
@@ -71,7 +83,7 @@ def health() -> dict[str, object]:
         "status": "ok",
         "app": "workmode-public",
         "version": APP_VERSION,
-        "literature_project_contract_version": 3,
+        "literature_project_contract_version": 5,
     }
 
 
@@ -267,7 +279,12 @@ def list_sessions(slug: str, limit: int = Query(default=60, ge=1, le=200)) -> di
 @router.post("/work/projects/{slug}/sessions")
 def create_session(slug: str, payload: SessionCreate) -> dict[str, object]:
     try:
-        return {"session": asdict(storage.create_session(slug, payload.title))}
+        project = storage.get_project(slug)
+        session = storage.create_session(slug, payload.title)
+        if detect_project_type(Path(project.root_path)) == "literature-library":
+            seed_literature_session(session.id)
+            session = storage.get_session(session.id)
+        return {"session": asdict(session)}
     except Exception as exc:
         raise _handle_error(exc)
 
@@ -341,6 +358,18 @@ async def chat_stream(session_id: str, payload: ChatRequest) -> StreamingRespons
             session = storage.get_session(session_id)
             project = storage.get_project(session.project_slug)
             active_context = [item.model_dump() for item in payload.active_context]
+            context_events: list[dict[str, object]] = []
+            if detect_project_type(Path(project.root_path)) == "literature-library":
+                context_events.extend(
+                    pending_literature_context_events(storage.read_messages(session_id, limit=0))
+                )
+                selection_event = append_literature_selection_event(
+                    Path(project.root_path),
+                    session_id,
+                    active_context,
+                )
+                if selection_event is not None:
+                    context_events.append(selection_event)
             user_message = storage.append_message(
                 session_id,
                 role="user",
@@ -349,6 +378,8 @@ async def chat_stream(session_id: str, payload: ChatRequest) -> StreamingRespons
             )
             recorder = TurnRecorder(session_id, get_settings().model_name)
             messages, usage = build_llm_messages(project, session_id)
+            for context_event in context_events:
+                yield _sse({"type": "system_message", "message": context_event})
             yield _sse({"type": "user_message", "message": user_message})
             yield _sse({"type": "context_usage", "context": usage})
             interrupted = False

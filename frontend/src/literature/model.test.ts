@@ -52,11 +52,57 @@ describe('literature frontend model', () => {
     expect(paper.factReport).toEqual([])
   })
 
+  it('maps backend manual metadata and review issues to the visible frontend contract', () => {
+    const paper = mapBackendPaper({
+      id: 'paper-manual',
+      original_filename: 'raw.pdf',
+      archive_filename: 'Wang_2026_JACS.pdf',
+      archive_location: '文献/未处理',
+      title: 'Verified title',
+      authors: 'Wang et al.',
+      year: 2026,
+      journal: 'JACS',
+      status: 'review',
+      tags: [],
+      focus: '',
+      summary: '',
+      paper_type: 'research',
+      metadata_source: 'manual',
+      metadata_trust: 'partial',
+      metadata_issue: '首页年份无法确认',
+    })
+
+    expect(paper.metadataSource).toBe('manual_review')
+    expect(paper.metadataIssue).toBe('首页年份无法确认')
+  })
+
   it('registers PDFs as pending without pretending that parsing already happened', () => {
     const papers = createImportedPapers(['Wang_2024.pdf', 'notes.txt'])
 
     expect(papers).toHaveLength(1)
     expect(papers[0]).toMatchObject({ title: 'Wang 2024', status: 'pending', factReport: [] })
+  })
+
+  it('normalizes backend pending metadata trust to the frontend unknown state', () => {
+    const paper = mapBackendPaper({
+      id: 'paper-pending',
+      original_filename: 'pending.pdf',
+      archive_filename: null,
+      archive_location: '文献/未处理',
+      title: '',
+      authors: '',
+      year: null,
+      journal: '',
+      status: 'pending',
+      tags: [],
+      focus: '',
+      summary: '',
+      paper_type: 'unknown',
+      metadata_source: 'pending',
+      metadata_trust: 'pending',
+    })
+
+    expect(paper.metadataTrust).toBe('unknown')
   })
 
   it('progresses through deterministic pipeline states', () => {

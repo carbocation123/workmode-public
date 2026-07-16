@@ -749,7 +749,7 @@ pre {
   display: flex;
   align-items: center;
   gap: 2px;
-  opacity: 0;
+  opacity: .65;
   transition: opacity 120ms ease;
 }
 
@@ -839,27 +839,81 @@ pre {
 
 .settings-open .settings-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  grid-template-areas:
+    "model mineru"
+    "theme theme"
+    "support onboarding"
+    "connection onboarding"
+    "memory memory";
+  align-items: stretch;
   align-content: start;
-  gap: 18px;
+  gap: 16px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
   padding: 22px 24px 34px;
 }
 
 .settings-open .settings-section {
   align-content: start;
-  padding: 18px;
+  height: 100%;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.settings-open .settings-section-model { grid-area: model; }
+.settings-open .settings-section-mineru { grid-area: mineru; }
+.settings-open .settings-section-theme { grid-area: theme; }
+.settings-open .settings-section-support { grid-area: support; }
+.settings-open .settings-section-onboarding { grid-area: onboarding; }
+.settings-open .settings-section-connection { grid-area: connection; }
+.settings-open .settings-section-memory { grid-area: memory; }
+
+.settings-open .settings-section-theme,
+.settings-open .settings-section-memory {
+  grid-column: 1 / -1;
 }
 
 .settings-open .settings-section-model,
-.settings-open .settings-section-mineru,
-.settings-open .settings-section-theme,
-.settings-open .settings-section-memory,
-.settings-open .settings-panel > .settings-toggle {
+.settings-open .settings-section-mineru {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-open .settings-section-model > .settings-label,
+.settings-open .settings-section-model > details,
+.settings-open .settings-section-model > .settings-hint,
+.settings-open .settings-section-model > .settings-toggle,
+.settings-open .settings-section-model > .settings-button-row,
+.settings-open .settings-section-mineru > .settings-label,
+.settings-open .settings-section-mineru > details,
+.settings-open .settings-section-mineru > .settings-hint,
+.settings-open .settings-section-mineru > .settings-toggle,
+.settings-open .settings-section-mineru > button,
+.settings-open .settings-field-wide {
   grid-column: 1 / -1;
 }
 
 .settings-open .theme-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.settings-open .achievement-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .settings-open .settings-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "model"
+      "mineru"
+      "theme"
+      "support"
+      "onboarding"
+      "connection"
+      "memory";
+  }
 }
 
 .settings-section {
@@ -1006,6 +1060,36 @@ pre {
 .desktop-settings-section {
   border-color: rgba(108, 159, 255, 0.35);
   background: linear-gradient(135deg, rgba(108, 159, 255, 0.08), rgba(51, 214, 197, 0.05));
+}
+
+.desktop-settings-content {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-support-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-divider);
+}
+
+.settings-support-content strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--color-on-surface);
+  font-size: 12px;
+}
+
+.settings-support-content .settings-hint {
+  word-break: normal;
+}
+
+.settings-support-content .project-create-submit {
+  white-space: nowrap;
 }
 
 .desktop-version-row,

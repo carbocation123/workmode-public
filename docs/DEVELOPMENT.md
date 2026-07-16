@@ -76,6 +76,8 @@ Pop-Location
 
 打开 `http://127.0.0.1:5173` 进入应用级功能大厅，选择「科研工作台」或「文献智库」。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库。三个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不再启动独立的 5176 前端。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
 
+`vite.config.ts` 的多页面 `input` 必须保持为相对 frontend root 的 `index.html` 与 `literature/index.html`。Vite 8/Rolldown 在 Windows 上会拒绝把绝对盘符路径直接作为生成资产名；修改入口后必须在 Windows 上执行一次 `npm run build`，不能只验证 dev server。
+
 ```powershell
 npm ci --prefix desktop
 npm --prefix desktop run dev
@@ -83,7 +85,7 @@ npm --prefix desktop run dev
 
 ## MinerU 与 PDF 直接阅读
 
-MinerU 是可选的增强解析，不是文献对话的硬依赖。设置页「MinerU 文献解析」可保存 Token、`pipeline`/`vlm`、文献语言和 60–1800 秒超时；也可直接在 `.env` 设置：
+MinerU 是用户明确选择的高级增强解析，不是文献入库、选择或普通对话的默认步骤。设置页「MinerU 文献解析」可保存 Token、`pipeline`/`vlm`、文献语言和 60–1800 秒超时；也可直接在 `.env` 设置：
 
 ```text
 WORKMODE_MINERU_API_KEY=
@@ -92,7 +94,19 @@ WORKMODE_MINERU_LANGUAGE=en
 WORKMODE_MINERU_TIMEOUT_SECONDS=180
 ```
 
-配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性。没有 MinerU `full.md` 时，`literature_read(part="full_text")` 使用 `pypdf` 读取原 PDF 文本层；扫描件或纯图片 PDF 没有文本层，会返回需要 MinerU/OCR 的明确错误。回归测试既覆盖工具层的降级接线，也用真实生成的最小 PDF 验证文本层抽取与无文本层错误，不能只 mock 解析器。
+配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性。没有 MinerU `full.md` 时，`literature_read(part="full_text")` 使用 `pypdf` 读取原 PDF 文本层；扫描件或纯图片 PDF 没有文本层，会返回需要 MinerU/OCR 的明确错误。普通多篇概括可由模型一次调用 `literature_read(paper_ids=[...], part="full_text")`，最多 3 路并发且不创建流水线；只有用户明确要求 MinerU、结构化事实报告或归档时，才由模型一次调用 `literature_process(paper_ids=[...])`，后端同样限制为最多 3 路并发并逐篇返回结果。涉及 `catalog.json` 的读改写和标准命名使用项目级重入锁。元数据调用使用 JSON object 响应约束，保留原始响应，并只允许一次 JSON 修复；首页证据无法逐字核验时仍继续事实抽取，把论文留在人工元数据复核状态。回归测试既覆盖轻量导入/选择 system 事件、只读批量调用，也覆盖增强流水线的降级接线、批量并发、部分成功和 JSON 修复；PDF 文本层仍用真实生成的最小 PDF 验证，不能只 mock 解析器。
+
+文献记录写入测试还必须覆盖人类期刊缩写规范化与失败原子性：`J Mol Catal A Chem`、`Angew. Chem. Int. Ed.` 应直接成功并生成无点无空格的标准文件名；无法提取任何字母数字的缩写必须在改动 `catalog.json` / `tags.json` 前失败。
+
+文献 session 的默认交互契约是：新 session 先持久化一条 assistant 自我介绍；确认上传只写项目文件和 `literature_import_confirmed` system 事件，不调用模型、不自动选择文献；下一次聊天开始时通过 `system_message` SSE 显示尚未跟随用户消息的导入事件。论文选择变化由共享 chat route 写入 `literature_selection_changed`，相同选择不重复记录，取消全部选择会留下明确事件。调试这些行为时同时检查 session JSONL、`build_llm_messages()` 输出与文献时间线，不要只看 React 临时 state。
+
+两个模式的会话重命名都必须调用共享 `api.updateSession()` / `PATCH /api/work/sessions/{id}`，不得在文献模块另建标题存储。修改后应验证工作台行内编辑和文献 session 选择器即时显示新名称，并确认对应 JSONL 没有被重写。
+
+文献项目的新建入口只提交项目名称，默认托管根目录规则为：显式 `WORKMODE_MANAGED_PROJECTS_DIR` 优先；否则 Windows 有 D 盘时使用 `D:\workmode`，其余环境使用 `~/workmode`。后端负责安全目录名和同名序号，不允许前端拼接绝对路径。旧客户端仍可传 `root_path`；旧注册项目保持原地，访问文献投影时只幂等补齐缺失结构。相关回归必须覆盖名称创建、同名冲突、旧路径不搬迁、缺失结构补齐以及项目软删除不碰实体目录。
+
+文献笔记保存与删除必须同时维护领域工具和投影 API。删除使用 `notes/.trash/<时间>--<原名>`，不处理 `exports/`，也不允许删除 `notes/README.md`。前端删除已保存笔记时调用正式 DELETE API；未保存草稿只移除本地 state。
+
+文献删除必须使用 `literature_delete` / `literature_restore` 领域服务，不得让前端直接 unlink PDF。删除单位是“catalog 记录 + PDF + 解析目录 + processed index”：先预检全部路径，再整体移入 `papers/.trash/<时间>--<paper-id>/` 并保存 manifest；恢复遇到任一目标冲突必须整体拒绝，不能覆盖用户文件。前端删除后清理当前 live attachment 和详情缓存，但不得修改既有 session JSONL 中的导入、选择或工具历史。回收站 UI 与 AI 工具必须走同一 executor。
 
 ## 皮肤开发
 
@@ -143,6 +157,12 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1 -ValidateOnly
 - 改变已交付基线或未来优先级时更新 `docs/PRODUCT-ROADMAP.md`。
 
 文档只描述已经实现并验证的行为。提交前用 `git diff --check` 和全文检索排查旧版本号、退役入口及失效链接。
+
+## 持久对象 CRUD 纪律
+
+凡是允许用户或 AI 创建的持久对象，设计和评审时必须同时覆盖创建、读取、修改与删除，不能交付只能不断累积的创建入口。修改与删除应在对应对象附近可发现；删除默认采用可恢复方案，并同步处理引用关系、派生文件、索引和当前界面状态。确实需要不可变的审计记录或历史消息时，必须明确标注其留存语义，不把它伪装成普通可编辑对象。
+
+新增持久对象前，测试至少覆盖一次创建、一次修改和一次删除；删除测试还应验证关联索引不会留下幽灵记录、其它对象不会被意外级联删除。若当前版本只能完成部分 CRUD，必须在合并前将缺口标为阻断项，而不是留给用户测试后发现。
 
 ## 仓库卫生
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
 from . import files, storage
+from .config import managed_projects_dir
 from .literature_project import (
     LITERATURE_TOOL_SCHEMAS,
     LiteratureProjectError,
@@ -16,8 +17,11 @@ from .literature_project import (
     initialize_literature_project,
     is_literature_project,
     literature_paper,
+    list_deleted_literature_papers,
+    literature_import_event_content,
     literature_snapshot,
     register_staged_pdf,
+    seed_literature_session,
     verify_literature_archive,
 )
 from .models import (
@@ -37,7 +41,31 @@ def _project_root(slug: str) -> Path:
     root = Path(project.root_path).expanduser().resolve()
     if not is_literature_project(root):
         raise HTTPException(status_code=400, detail="当前项目不是 literature-library 项目")
+    # Zero-copy compatibility migration: old registered projects stay where
+    # they are while missing fixed directories/files are added in place.
+    initialize_literature_project(root, name=project.name)
     return root
+
+
+def _managed_storage_mode(root: Path) -> str:
+    try:
+        root.expanduser().resolve().relative_to(managed_projects_dir())
+        return "managed"
+    except ValueError:
+        return "external"
+
+
+def _allocate_managed_root(name: str) -> Path:
+    base = managed_projects_dir()
+    base.mkdir(parents=True, exist_ok=True)
+    stem = storage.slugify(name)
+    candidate = base / stem
+    suffix = 2
+    while candidate.exists():
+        candidate = base / f"{stem}-{suffix}"
+        suffix += 1
+    candidate.mkdir()
+    return candidate.resolve()
 
 
 def _tool_payload(slug: str, name: str, args: dict[str, object]) -> dict[str, object]:
@@ -53,18 +81,35 @@ def _tool_payload(slug: str, name: str, args: dict[str, object]) -> dict[str, ob
 
 @router.post("/literature-projects")
 def create_literature_project(payload: LiteratureProjectCreate) -> dict[str, object]:
-    root = Path(payload.root_path).expanduser().resolve()
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="文献项目名称不能为空")
+    root = (
+        Path(payload.root_path).expanduser().resolve()
+        if payload.root_path
+        else _allocate_managed_root(name)
+    )
     if root.exists() and not root.is_dir():
         raise HTTPException(status_code=400, detail="文献项目路径不是文件夹")
     if root.exists() and any(root.iterdir()) and not (root / "literature-project.json").exists():
         raise HTTPException(status_code=400, detail="目标文件夹非空且不是已有文献项目")
     try:
-        initialize_literature_project(root, name=payload.name)
-        project = storage.create_project(payload.name, str(root))
+        initialize_literature_project(root, name=name)
+        project = storage.create_project(name, str(root))
         session = storage.create_session(project.slug)
+        seed_literature_session(session.id)
+        session = storage.get_session(session.id)
     except (storage.ValidationError, storage.ConflictError, LiteratureProjectError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"project": {**asdict(project), "project_type": "literature-library", "tool_profile": "literature"}, "session": asdict(session)}
+    return {
+        "project": {
+            **asdict(project),
+            "project_type": "literature-library",
+            "tool_profile": "literature",
+            "storage_mode": _managed_storage_mode(root),
+        },
+        "session": asdict(session),
+    }
 
 
 @router.get("/projects/{slug}/literature/health")
@@ -84,6 +129,20 @@ def literature_health(slug: str) -> dict[str, object]:
 @router.get("/projects/{slug}/literature/papers")
 def list_papers(slug: str) -> list[dict[str, object]]:
     return literature_snapshot(_project_root(slug))["catalog"]["papers"]
+
+
+@router.get("/projects/{slug}/literature/trash/papers")
+def list_deleted_papers(slug: str) -> dict[str, object]:
+    try:
+        return {"papers": list_deleted_literature_papers(_project_root(slug))}
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/trash/papers/{trash_id}/restore")
+def restore_deleted_paper(slug: str, trash_id: str) -> dict[str, object]:
+    result = _tool_payload(slug, "literature_restore", {"trash_id": trash_id})
+    return {"paper": result["paper"], "result": result}
 
 
 @router.get("/projects/{slug}/literature/tags")
@@ -167,7 +226,7 @@ def record_confirmed_imports(slug: str, session_id: str, payload: LiteratureImpo
         message = storage.append_message(
             session_id,
             role="system",
-            content=f"用户已确认入库 {len(papers)} 篇文献。",
+            content=literature_import_event_content(root, paper_ids),
             meta={
                 "event": "literature_import_confirmed",
                 "paper_ids": paper_ids,
@@ -183,6 +242,12 @@ def update_record(slug: str, paper_id: str, payload: LiteratureRecordUpdate) -> 
     args = {"paper_id": paper_id, **payload.model_dump(exclude_none=True)}
     _tool_payload(slug, "literature_update_record", args)
     return literature_paper(_project_root(slug), paper_id)
+
+
+@router.delete("/projects/{slug}/literature/papers/{paper_id}")
+def delete_paper(slug: str, paper_id: str) -> dict[str, object]:
+    result = _tool_payload(slug, "literature_delete", {"paper_id": paper_id})
+    return {"result": result}
 
 
 @router.put("/projects/{slug}/literature/papers/{paper_id}/cross-literature")
@@ -213,3 +278,9 @@ def save_note(slug: str, filename: str, payload: LiteratureNoteUpdate) -> dict[s
         None,
     )
     return {"note": note, "result": result}
+
+
+@router.delete("/projects/{slug}/literature/notes/{filename}")
+def delete_note(slug: str, filename: str) -> dict[str, object]:
+    result = _tool_payload(slug, "literature_note_delete", {"filename": filename})
+    return {"result": result}

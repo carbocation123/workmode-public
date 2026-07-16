@@ -9,7 +9,7 @@ from app.web_tools import (
     WebToolResult,
     WebToolError,
     execute_web_tool,
-    parse_bing_rss,
+    parse_duckduckgo_html,
     run_web_fetch,
     run_web_search,
     validate_public_web_url,
@@ -28,7 +28,7 @@ class WebToolsTest(unittest.TestCase):
     @patch("app.web_tools.run_web_search")
     def test_failed_search_result_does_not_report_success(self, mocked_search):
         mocked_search.return_value = {
-            "engine": "bing-cn-rss",
+            "engine": "duckduckgo-html",
             "queries": ["test"],
             "results": [],
             "errors": [{"query": "test", "error": "network unavailable"}],
@@ -71,32 +71,32 @@ class WebToolsTest(unittest.TestCase):
         )
         self.assertEqual(proxied, "https://example.com/proxied")
 
-    def test_bing_rss_parser_extracts_title_url_and_plain_snippet(self):
-        source = """<?xml version="1.0" encoding="utf-8"?>
-        <rss version="2.0"><channel>
-          <item>
-            <title>Paper &amp; Notes</title>
-            <link>https://example.com/paper</link>
-            <description>A useful &lt;b&gt;research&lt;/b&gt; result.</description>
-          </item>
-        </channel></rss>"""
+    def test_duckduckgo_parser_extracts_title_url_and_plain_snippet(self):
+        source = """
+        <div class="result">
+          <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpaper">
+            Paper &amp; Notes
+          </a>
+          <a class="result__snippet">A useful <b>research</b> result.</a>
+        </div>
+        """
 
-        results = parse_bing_rss(source, max_results=3)
+        results = parse_duckduckgo_html(source, max_results=3)
 
         self.assertEqual(
             results,
             [{"title": "Paper & Notes", "url": "https://example.com/paper", "snippet": "A useful research result."}],
         )
 
-    @patch("app.web_tools._bing_cn_search_one")
-    def test_default_search_provider_is_bing_cn_rss(self, mocked_search):
+    @patch("app.web_tools._duckduckgo_search_one")
+    def test_default_search_provider_is_duckduckgo_html(self, mocked_search):
         mocked_search.return_value = [
             {"title": "Result", "url": "https://example.com/result", "snippet": "ok"}
         ]
 
         result = run_web_search(["alpha"])
 
-        self.assertEqual(result["engine"], "bing-cn-rss")
+        self.assertEqual(result["engine"], "duckduckgo-html")
         self.assertEqual(result["results"][0]["title"], "Result")
         mocked_search.assert_called_once_with("alpha", 5)
 

@@ -64,6 +64,11 @@ export const DEEPSEEK_SETUP = {
   models: ['deepseek-v4-pro', 'deepseek-v4-flash'] as DeepSeekModel[]
 }
 
+export const MINERU_SETUP = {
+  manageUrl: 'https://mineru.net/apiManage/docs',
+  docsUrl: 'https://mineru.net/apiManage/docs'
+}
+
 export function applyDeepSeekPreset<T extends ModelPresetDraft>(draft: T, model: DeepSeekModel): T {
   return {
     ...draft,

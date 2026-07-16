@@ -13,7 +13,7 @@ $Logs = Join-Path $Root "logs"
 $Run = Join-Path $Root ".run"
 $LauncherLog = Join-Path $Logs "launcher.log"
 $BackendPidFile = Join-Path $Run "backend.pid"
-$ExpectedLiteratureContractVersion = 3
+$ExpectedLiteratureContractVersion = 5
 
 New-Item -ItemType Directory -Force $Logs, $Run | Out-Null
 

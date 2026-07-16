@@ -26,7 +26,9 @@ class TutorialProjectInstall(BaseModel):
 
 class LiteratureProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    root_path: str = Field(min_length=1)
+    # Kept optional for compatibility with old clients that explicitly chose a
+    # folder. New clients omit it and use the app-managed project root.
+    root_path: str | None = Field(default=None, min_length=1)
 
 
 class LiteratureRecordUpdate(BaseModel):

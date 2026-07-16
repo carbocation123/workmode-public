@@ -46,6 +46,7 @@ import {
   AchievementPanel,
   AchievementToast,
   DeepSeekSetupGuide,
+  MineruSetupGuide,
   FirstRunWizard,
   GuidedTour,
   TutorialChecklist,
@@ -1351,6 +1352,7 @@ export default function App() {
                           type="button"
                           className="session-action-btn"
                           onClick={() => startRenamingSession(session)}
+                          aria-label="重命名会话"
                           title="重命名"
                         >
                           ✎
@@ -1374,56 +1376,60 @@ export default function App() {
           </div>
         ) : (
           <div className="settings-panel" data-skin-slot="settings-content">
-            {desktopInfo && (
-              <section className="settings-section desktop-settings-section settings-section-desktop">
-                <div className="settings-label">桌面应用</div>
-                <div className="desktop-version-row">
-                  <span>当前版本</span>
-                  <strong>{desktopInfo.version}</strong>
-                </div>
-                <div className="settings-hint">用户数据：{desktopInfo.dataDir}</div>
-                <div className="desktop-update-actions">
-                  <button
-                    type="button"
-                    className="project-create-submit"
-                    onClick={checkDesktopUpdate}
-                    disabled={desktopUpdating}
-                  >
-                    检查更新
-                  </button>
-                  {desktopUpdateVersion && (
+            <section className="settings-section settings-section-support settings-section-desktop desktop-settings-section">
+              <div className="settings-label">{desktopInfo ? '桌面应用与支持' : '帮助与支持'}</div>
+              {desktopInfo && (
+                <div className="desktop-settings-content">
+                  <div className="desktop-version-row">
+                    <span>当前版本</span>
+                    <strong>{desktopInfo.version}</strong>
+                  </div>
+                  <div className="settings-hint">用户数据：{desktopInfo.dataDir}</div>
+                  <div className="desktop-update-actions">
                     <button
                       type="button"
                       className="project-create-submit"
-                      onClick={installUpdate}
+                      onClick={checkDesktopUpdate}
                       disabled={desktopUpdating}
                     >
-                      {desktopUpdating ? '正在更新…' : `安装 ${desktopUpdateVersion}`}
+                      检查更新
+                    </button>
+                    {desktopUpdateVersion && (
+                      <button
+                        type="button"
+                        className="project-create-submit"
+                        onClick={installUpdate}
+                        disabled={desktopUpdating}
+                      >
+                        {desktopUpdating ? '正在更新…' : `安装 ${desktopUpdateVersion}`}
+                      </button>
+                    )}
+                  </div>
+                  {desktopUpdateStatus && <div className="settings-hint">{desktopUpdateStatus}</div>}
+                  {desktopUpdating && (
+                    <div className="desktop-update-progress" aria-label="更新下载进度">
+                      <span style={{ width: `${desktopUpdateProgress}%` }} />
+                    </div>
+                  )}
+                  {desktopInfo.migrationAvailable && (
+                    <button
+                      type="button"
+                      className="project-create-cancel desktop-migrate-btn"
+                      onClick={migrateLegacyPortable}
+                    >
+                      导入旧版便携包数据
                     </button>
                   )}
+                  <div className="settings-hint">关闭应用窗口会同时停止本地后端；最小化后可从托盘重新显示，也可从托盘停止并退出。</div>
                 </div>
-                {desktopUpdateStatus && <div className="settings-hint">{desktopUpdateStatus}</div>}
-                {desktopUpdating && (
-                  <div className="desktop-update-progress" aria-label="更新下载进度">
-                    <span style={{ width: `${desktopUpdateProgress}%` }} />
-                  </div>
-                )}
-                {desktopInfo.migrationAvailable && (
-                  <button
-                    type="button"
-                    className="project-create-cancel desktop-migrate-btn"
-                    onClick={migrateLegacyPortable}
-                  >
-                    导入旧版便携包数据
-                  </button>
-                )}
-                <div className="settings-hint">关闭应用窗口会同时停止本地后端；最小化后可从托盘重新显示，也可从托盘停止并退出。</div>
-              </section>
-            )}
-            <section className="settings-section settings-section-support">
-              <div className="settings-label">问题反馈</div>
-              <p className="settings-hint">遇到异常时可关注研天雪公众号后私信，或发送邮件。诊断模板不会读取用户内容或本地目录。</p>
-              <button type="button" className="project-create-submit" onClick={() => setShowBugReport(true)}>快速反馈 Bug</button>
+              )}
+              <div className="settings-support-content">
+                <div>
+                  <strong>问题反馈</strong>
+                  <p className="settings-hint">遇到异常时可关注研天雪公众号后私信，或发送邮件。诊断模板不会读取用户内容或本地目录。</p>
+                </div>
+                <button type="button" className="project-create-submit" onClick={() => setShowBugReport(true)}>快速反馈 Bug</button>
+              </div>
             </section>
             <section className="settings-section settings-section-model">
               <div className="settings-label">模型 API</div>
@@ -1465,7 +1471,7 @@ export default function App() {
                   placeholder="deepseek-v4-pro"
                 />
               </label>
-              <label className="settings-field">
+              <label className="settings-field settings-field-wide">
                 <span>API Key</span>
                 <input
                   className="project-create-input"
@@ -1537,10 +1543,11 @@ export default function App() {
             </section>
             <section className="settings-section settings-section-mineru">
               <div className="settings-label">MinerU 文献解析</div>
+              <MineruSetupGuide />
               <p className="settings-hint">
                 MinerU 不是必须配置：未配置或服务失败时，AI 仍可读取电子版 PDF 的文本层；配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性。扫描件和纯图片 PDF 仍需 MinerU/OCR。
               </p>
-              <label className="settings-field">
+              <label className="settings-field settings-field-wide">
                 <span>MinerU Token</span>
                 <input
                   className="project-create-input"
@@ -1659,12 +1666,12 @@ export default function App() {
                 onChange={(event) => setMemoryDraft(event.target.value)}
                 disabled={!activeSlug}
               />
+              <label className="settings-toggle">
+                <input type="checkbox" checked={showMemory} onChange={(event) => setShowMemory(event.target.checked)} />
+                在聊天顶部显示工作记忆编辑区
+              </label>
               <button type="button" className="project-create-submit" onClick={saveMemory} disabled={!activeSlug}>保存工作记忆</button>
             </section>
-            <label className="settings-toggle">
-              <input type="checkbox" checked={showMemory} onChange={(event) => setShowMemory(event.target.checked)} />
-              在聊天顶部显示工作记忆编辑区
-            </label>
           </div>
         )}
       </aside>

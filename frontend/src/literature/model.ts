@@ -59,6 +59,7 @@ export interface PaperRecord {
   facts: string[]
   factReport: FactReportSection[]
   metadataTrust: 'complete' | 'partial' | 'unknown'
+  metadataIssue: string
 }
 
 export interface ProjectMemoryState {
@@ -118,6 +119,7 @@ export function createImportedPapers(filenames: string[]): PaperRecord[] {
       facts: [],
       factReport: [],
       metadataTrust: 'unknown' as const,
+      metadataIssue: '',
     }))
 }
 

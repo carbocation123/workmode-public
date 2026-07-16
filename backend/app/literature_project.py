@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
 import re
 import shutil
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,12 +21,28 @@ PROJECT_TYPE = "literature-library"
 TOOL_PROFILE = "literature"
 SCHEMA_VERSION = 1
 MAX_TEXT_RESULT_CHARS = 120_000
+LITERATURE_PROCESS_CONCURRENCY = 3
+LITERATURE_READ_CONCURRENCY = 3
+
+LITERATURE_SESSION_INTRODUCTION = """你好，我是你的 AI 文献助手。
+
+我可以帮你简洁概括一篇或多篇文献，也可以围绕你感兴趣的问题，对文献中的实验现象、研究手段、关键证据和结论进行分析。
+
+我还能像 EndNote 一样，通过标签和元数据整理文献库，并根据你的关注点，为每篇文献生成一段简洁概要，方便后续检索和回顾。如果需要，我也可以把讨论内容整理成笔记；笔记可以在顶部的「项目笔记」中查看和导出。
+
+默认情况下，我会直接读取 PDF 并尽量简洁地回答。配置 MinerU API 后，可以获得更准确的版面、表格和公式识别，不过增强处理每篇文献通常需要几分钟。
+
+现在，我能帮你什么？"""
+
+_CATALOG_LOCKS: dict[str, threading.RLock] = {}
+_CATALOG_LOCKS_GUARD = threading.Lock()
 
 FIXED_DIRECTORIES = (
     "papers/unprocessed/pdf",
     "papers/unprocessed/extracted",
     "papers/processed/pdf",
     "papers/processed/extracted",
+    "papers/.trash",
     "notes",
     "exports",
 )
@@ -43,6 +61,8 @@ remain the conversation kernel.
 - `papers/unprocessed/pdf/`: imported PDFs awaiting discussion or archival checks.
 - `papers/unprocessed/extracted/<paper-id>/`: MinerU text, layout, images and facts.
 - `papers/processed/`: archived PDF and extraction trees.
+- `papers/.trash/`: recoverable paper deletions. Each entry keeps the catalog
+  record, original relative paths and moved files as one restore unit.
 - `notes/*.md`: project notes that may be searched and discussed.
 - `exports/`: generated Markdown or PDF note exports.
 
@@ -60,9 +80,36 @@ The papers or notes selected in the interface are current context, like an edito
 current file. Selection is never permission. A domain tool may operate on any real
 paper ID in the current project.
 
+Importing a PDF only registers it in the library. Import and selection events are
+conversation context, not requests to process, summarize, tag or archive a paper.
+When the user asks about paper content, prefer `literature_read(part="full_text")`;
+do not run MinerU or the objective-fact pipeline unless the user explicitly asks for
+enhanced parsing, structured extraction or archival work, or the PDF text layer is
+insufficient for the requested evidence.
+
+Default replies are concise. Unless the user explicitly asks for a detailed report,
+summarize one paper around four questions: what experimental phenomenon was observed,
+what research methods were used, what key evidence was obtained, and what problem the
+evidence explains. Expand conditions, numbers, figures and the full evidence chain only
+on request.
+
 Before assigning or replacing paper tags, call `literature_tag_list` and inspect the
 canonical registry. Reuse existing names or aliases whenever possible; create a new
 provisional tag only when no existing tag expresses the same concept.
+
+Delete a paper only when the user asks to remove it. `literature_delete` moves the
+catalog record, PDF and extraction artifacts into the project recycle bin; it does
+not rewrite historical session messages. Use `literature_restore` with the returned
+trash ID when the user asks to undo that deletion.
+
+Only when the user explicitly requests enhanced processing for several papers, call
+`literature_process` once with `paper_ids`; the backend runs at most three pipelines
+concurrently and isolates each paper's result. A missing or unverifiable first-page
+metadata field does not invalidate the objective fact report. Keep that paper in
+review, report the exact metadata issue, and use `literature_update_record` when the
+user supplies the missing author, year or journal. Never claim `Cite This` evidence
+unless the quoted text is literally present in the first-page extraction or the
+documented `layout.json` fallback.
 
 ## Evidence discipline
 
@@ -117,16 +164,22 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "literature_read",
-            "description": "Read one paper record, its objective fact report, or full text. Full text prefers MinerU Markdown and automatically falls back to the PDF text layer. Use offset and limit for long content.",
+            "description": "Read one or several paper records, objective fact reports, or full texts. For normal questions about paper content use part=full_text; it prefers existing MinerU Markdown and automatically falls back to the PDF text layer without starting enhanced processing. Use paper_ids for a batch and offset/limit for long content.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "paper_id": {"type": "string"},
+                    "paper_id": {"type": "string", "description": "One real paper ID."},
+                    "paper_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                        "maxItems": 20,
+                        "description": "Use one call to read several selected papers with the same part and line range.",
+                    },
                     "part": {"type": "string", "enum": ["record", "facts", "full_text"], "default": "record"},
                     "offset": {"type": "integer", "default": 0, "minimum": 0},
                     "limit": {"type": "integer", "default": 400, "minimum": 1, "maximum": 3000},
                 },
-                "required": ["paper_id"],
             },
         },
     },
@@ -146,11 +199,19 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "literature_process",
-            "description": "Start or retry the configured MinerU and objective-fact pipeline for a real paper ID.",
+            "description": "Start or retry MinerU and objective-fact extraction. For more than one paper, send paper_ids in one call; the executor processes up to three papers concurrently and reports each result independently.",
             "parameters": {
                 "type": "object",
-                "properties": {"paper_id": {"type": "string"}},
-                "required": ["paper_id"],
+                "properties": {
+                    "paper_id": {"type": "string", "description": "One real paper ID."},
+                    "paper_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "description": "Preferred for a batch. Each paper is isolated; at most three run concurrently.",
+                    },
+                },
             },
         },
     },
@@ -182,7 +243,10 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "first_author_surname": {"type": "string"},
                     "year": {"type": "integer"},
                     "journal": {"type": "string"},
-                    "journal_abbreviation": {"type": "string"},
+                    "journal_abbreviation": {
+                        "type": "string",
+                        "description": "Human-readable journal abbreviation is accepted. Dots, spaces and punctuation are removed automatically for the canonical filename, e.g. 'Angew. Chem. Int. Ed.' becomes 'AngewChemIntEd'.",
+                    },
                     "doi": {"type": "string"},
                     "paper_type": {"type": "string", "enum": ["research", "review"]},
                     "metadata_source": {"type": "string", "enum": ["cite_this", "layout_json", "manual", "pending"]},
@@ -214,6 +278,22 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "literature_delete",
+            "description": "Remove one paper from the active library by moving its catalog record, PDF and extraction artifacts into the recoverable project recycle bin. Historical conversation records are retained.",
+            "parameters": {"type": "object", "properties": {"paper_id": {"type": "string"}}, "required": ["paper_id"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "literature_restore",
+            "description": "Restore one recoverably deleted paper from papers/.trash by its trash ID. Existing active files are never overwritten.",
+            "parameters": {"type": "object", "properties": {"trash_id": {"type": "string"}}, "required": ["trash_id"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "literature_note_search",
             "description": "Search project notes by filename, title or Markdown content.",
             "parameters": {
@@ -239,19 +319,33 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "literature_note_upsert",
+        {
+            "type": "function",
+            "function": {
+                "name": "literature_note_upsert",
             "description": "Directly create or replace one Markdown note under notes/. No approval flag is used.",
             "parameters": {
                 "type": "object",
                 "properties": {"filename": {"type": "string"}, "markdown": {"type": "string"}},
                 "required": ["filename", "markdown"],
             },
+            },
         },
-    },
-    {
+        {
+            "type": "function",
+            "function": {
+                "name": "literature_note_delete",
+                "description": "Delete one existing project note by moving it into notes/.trash for recovery. README.md cannot be deleted.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string", "description": "One existing notes/*.md basename."},
+                    },
+                    "required": ["filename"],
+                },
+            },
+        },
+        {
         "type": "function",
         "function": {
             "name": "literature_note_export",
@@ -337,6 +431,99 @@ def tool_profile(root: Path) -> str:
     return TOOL_PROFILE if is_literature_project(root) else "workmode"
 
 
+def seed_literature_session(session_id: str) -> dict[str, Any] | None:
+    """Give a newly created literature session one durable assistant introduction."""
+    from . import storage
+
+    if storage.read_messages(session_id, limit=0):
+        return None
+    return storage.append_message(
+        session_id,
+        role="assistant",
+        content=LITERATURE_SESSION_INTRODUCTION,
+        meta={"event": "literature_session_introduction"},
+    )
+
+
+def _paper_event_rows(root: Path, paper_ids: list[str]) -> list[dict[str, str]]:
+    paper_by_id = {str(item["id"]): item for item in _catalog(root)["papers"]}
+    rows: list[dict[str, str]] = []
+    for raw_id in paper_ids:
+        paper_id = str(raw_id or "").strip()
+        if not paper_id or any(item["paper_id"] == paper_id for item in rows):
+            continue
+        paper = paper_by_id.get(paper_id)
+        filename = str((paper or {}).get("original_filename") or paper_id)
+        rows.append({"paper_id": paper_id, "filename": filename})
+    return rows
+
+
+def literature_import_event_content(root: Path, paper_ids: list[str]) -> str:
+    rows = _paper_event_rows(root, paper_ids)
+    if not rows:
+        return ""
+    return "用户刚刚导入了以下文献：\n" + "\n".join(f"- {item['filename']}" for item in rows)
+
+
+def literature_selection_event_content(root: Path, paper_ids: list[str]) -> str:
+    rows = _paper_event_rows(root, paper_ids)
+    if not rows:
+        return "用户已取消当前文献选择。"
+    return "用户当前选择了以下文献：\n" + "\n".join(f"- {item['filename']}" for item in rows)
+
+
+def pending_literature_context_events(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return imported context events not yet followed by a user turn."""
+    last_user_index = -1
+    for index, message in enumerate(history):
+        if message.get("role") == "user":
+            last_user_index = index
+    return [
+        message
+        for message in history[last_user_index + 1 :]
+        if message.get("role") == "system"
+        and (message.get("meta") or {}).get("event") == "literature_import_confirmed"
+    ]
+
+
+def append_literature_selection_event(
+    root: Path,
+    session_id: str,
+    active_context: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Persist a paper-selection change while avoiding one event per repeated turn."""
+    from . import storage
+
+    paper_ids = list(
+        dict.fromkeys(
+            str(item.get("id") or "").strip()
+            for item in active_context
+            if item.get("kind") == "paper" and str(item.get("id") or "").strip()
+        )
+    )
+    previous: list[str] | None = None
+    for message in reversed(storage.read_messages(session_id, limit=0)):
+        meta = message.get("meta") or {}
+        if message.get("role") == "system" and meta.get("event") == "literature_selection_changed":
+            previous = [str(item) for item in (meta.get("paper_ids") or [])]
+            break
+        if message.get("role") == "user":
+            previous = [
+                str(item.get("id"))
+                for item in (meta.get("active_context") or [])
+                if item.get("kind") == "paper" and item.get("id")
+            ]
+            break
+    if previous == paper_ids or (previous is None and not paper_ids):
+        return None
+    return storage.append_message(
+        session_id,
+        role="system",
+        content=literature_selection_event_content(root, paper_ids),
+        meta={"event": "literature_selection_changed", "paper_ids": paper_ids},
+    )
+
+
 def describe_active_context(root: Path, items: list[dict[str, Any]]) -> str:
     if not items:
         return ""
@@ -391,12 +578,18 @@ def describe_imported_papers(root: Path, paper_ids: list[str]) -> str:
     if not records:
         return ""
     return (
-        "<LITERATURE_IMPORT_EVENT>\n"
-        "The user explicitly confirmed these PDFs for import into the current literature library. "
-        "They are already registered records; do not ask for local paths or call literature_import again. "
-        "When the user says to continue, use the paper IDs below and call literature_process if processing is still needed.\n"
+        literature_import_event_content(root, paper_ids)
+        + "\n<LITERATURE_REFERENCE_IDS>\n"
         + json.dumps(records, ensure_ascii=False, indent=2)
-        + "\n</LITERATURE_IMPORT_EVENT>"
+        + "\n</LITERATURE_REFERENCE_IDS>"
+    )
+
+
+def describe_selected_papers(root: Path, paper_ids: list[str]) -> str:
+    records = _paper_event_rows(root, paper_ids)
+    return (
+        literature_selection_event_content(root, paper_ids)
+        + ("\n<LITERATURE_REFERENCE_IDS>\n" + json.dumps(records, ensure_ascii=False) + "\n</LITERATURE_REFERENCE_IDS>" if records else "")
     )
 
 
@@ -416,72 +609,124 @@ def literature_paper(root: Path, paper_id: str) -> dict[str, Any]:
     return _paper(root.expanduser().resolve(), paper_id)
 
 
+def list_deleted_literature_papers(root: Path) -> list[dict[str, Any]]:
+    root = root.expanduser().resolve()
+    if not is_literature_project(root):
+        raise LiteratureProjectError("Current project is not a literature-library project")
+    trash_root = root / "papers" / ".trash"
+    if not trash_root.exists():
+        return []
+    entries: list[dict[str, Any]] = []
+    for entry in trash_root.iterdir():
+        if not entry.is_dir():
+            continue
+        manifest = _read_json(entry / "manifest.json")
+        paper = manifest.get("paper")
+        if manifest.get("schema_version") != 1 or not isinstance(paper, dict) or not isinstance(paper.get("id"), str):
+            raise LiteratureProjectError(f"Invalid paper recycle manifest: {entry.name}")
+        moved_paths = manifest.get("moved_paths")
+        entries.append(
+            {
+                "trash_id": entry.name,
+                "deleted_at": str(manifest.get("deleted_at") or ""),
+                "paper": paper,
+                "file_count": len(moved_paths) if isinstance(moved_paths, list) else 0,
+            }
+        )
+    entries.sort(key=lambda item: (item["deleted_at"], item["trash_id"]), reverse=True)
+    return entries
+
+
+def _catalog_lock(root: Path) -> threading.RLock:
+    key = os.path.normcase(os.path.realpath(os.fspath(root.expanduser().resolve())))
+    with _CATALOG_LOCKS_GUARD:
+        return _CATALOG_LOCKS.setdefault(key, threading.RLock())
+
+
 def update_literature_paper(root: Path, paper_id: str, **updates: Any) -> dict[str, Any]:
     allowed = {
         "title", "authors", "first_author_surname", "year", "journal",
         "journal_abbreviation", "doi", "paper_type", "status", "archive_location",
         "archive_filename", "metadata_source", "metadata_trust", "tag_ids", "focus",
-        "summary", "paths", "verification_status", "stage", "error",
+        "summary", "paths", "verification_status", "stage", "error", "metadata_issue",
     }
     unexpected = set(updates) - allowed
     if unexpected:
         raise LiteratureProjectError(f"Unsupported paper fields: {', '.join(sorted(unexpected))}")
-    catalog = _catalog(root)
-    paper = _find_paper(catalog, paper_id)
-    paper.update(updates)
-    paper["updated_at"] = utc_now()
-    _write_catalog(root, catalog)
-    return paper
+    with _catalog_lock(root):
+        catalog = _catalog(root)
+        paper = _find_paper(catalog, paper_id)
+        paper.update(updates)
+        paper["updated_at"] = utc_now()
+        _write_catalog(root, catalog)
+        return paper
+
+
+def normalize_journal_abbreviation(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    normalized = re.sub(r"[^A-Za-z0-9]+", "", raw)
+    if not normalized:
+        raise LiteratureProjectError(
+            "Journal abbreviation must include at least one letter or digit; "
+            "dots, spaces and punctuation are removed automatically"
+        )
+    return normalized
 
 
 def apply_literature_metadata(root: Path, paper_id: str, metadata: dict[str, Any]) -> dict[str, Any]:
-    catalog = _catalog(root)
-    paper = _find_paper(catalog, paper_id)
-    surname = str(metadata.get("first_author_surname") or "").strip()
-    abbreviation = str(metadata.get("journal_abbreviation") or "").strip()
-    year = metadata.get("year")
-    if not surname or not re.fullmatch(r"[A-Za-z][A-Za-z'-]*", surname):
-        raise LiteratureProjectError("Cannot build standard filename: invalid first author surname")
-    if not isinstance(year, int) or not (1000 <= year <= 3000):
-        raise LiteratureProjectError("Cannot build standard filename: invalid year")
-    if not abbreviation or not re.fullmatch(r"[A-Za-z0-9]+", abbreviation):
-        raise LiteratureProjectError("Cannot build standard filename: journal abbreviation must contain only letters and digits")
-    base = f"{surname}_{year}_{abbreviation}"
-    used = {
-        str(item.get("archive_filename") or "").casefold()
-        for item in catalog["papers"]
-        if item.get("id") != paper_id
-    }
-    filename = f"{base}.pdf"
-    suffix = 2
-    while filename.casefold() in used:
-        filename = f"{base}_{suffix}.pdf"
-        suffix += 1
+    with _catalog_lock(root):
+        catalog = _catalog(root)
+        paper = _find_paper(catalog, paper_id)
+        surname = str(metadata.get("first_author_surname") or "").strip()
+        abbreviation = normalize_journal_abbreviation(metadata.get("journal_abbreviation"))
+        year = metadata.get("year")
+        if not surname or not re.fullmatch(r"[A-Za-z][A-Za-z'-]*", surname):
+            raise LiteratureProjectError("Cannot build standard filename: invalid first author surname")
+        if not isinstance(year, int) or not (1000 <= year <= 3000):
+            raise LiteratureProjectError("Cannot build standard filename: invalid year")
+        if not abbreviation:
+            raise LiteratureProjectError("Cannot build standard filename: journal abbreviation is missing")
+        metadata = dict(metadata)
+        metadata["journal_abbreviation"] = abbreviation
+        base = f"{surname}_{year}_{abbreviation}"
+        used = {
+            str(item.get("archive_filename") or "").casefold()
+            for item in catalog["papers"]
+            if item.get("id") != paper_id
+        }
+        filename = f"{base}.pdf"
+        suffix = 2
+        while filename.casefold() in used:
+            filename = f"{base}_{suffix}.pdf"
+            suffix += 1
 
-    paths = dict(paper.get("paths") or {})
-    current_rel = str(paths.get("pdf") or "")
-    if not current_rel:
-        raise LiteratureProjectError("Paper PDF path is missing")
-    current = _resolve(root, current_rel)
-    target = root / "papers/unprocessed/pdf" / filename
-    if current.resolve() != target.resolve():
-        if target.exists():
-            raise LiteratureProjectError(f"Standard PDF target already exists: {target.relative_to(root).as_posix()}")
-        current.replace(target)
-    paths["pdf"] = target.relative_to(root).as_posix()
-    normalized_source = "layout_json" if metadata.get("metadata_source") == "layout_json_fallback" else metadata.get("metadata_source")
-    for key in (
-        "title", "authors", "first_author_surname", "year", "journal",
-        "journal_abbreviation", "doi", "paper_type",
-    ):
-        paper[key] = metadata.get(key) if metadata.get(key) is not None else ""
-    paper["archive_filename"] = filename
-    paper["metadata_source"] = normalized_source or "pending"
-    paper["metadata_trust"] = "complete"
-    paper["paths"] = paths
-    paper["updated_at"] = utc_now()
-    _write_catalog(root, catalog)
-    return paper
+        paths = dict(paper.get("paths") or {})
+        current_rel = str(paths.get("pdf") or "")
+        if not current_rel:
+            raise LiteratureProjectError("Paper PDF path is missing")
+        current = _resolve(root, current_rel)
+        target = root / "papers/unprocessed/pdf" / filename
+        if current.resolve() != target.resolve():
+            if target.exists():
+                raise LiteratureProjectError(f"Standard PDF target already exists: {target.relative_to(root).as_posix()}")
+            current.replace(target)
+        paths["pdf"] = target.relative_to(root).as_posix()
+        normalized_source = "layout_json" if metadata.get("metadata_source") == "layout_json_fallback" else metadata.get("metadata_source")
+        for key in (
+            "title", "authors", "first_author_surname", "year", "journal",
+            "journal_abbreviation", "doi", "paper_type",
+        ):
+            paper[key] = metadata.get(key) if metadata.get(key) is not None else ""
+        paper["archive_filename"] = filename
+        paper["metadata_source"] = normalized_source or "pending"
+        paper["metadata_trust"] = "complete"
+        paper["metadata_issue"] = ""
+        paper["paths"] = paths
+        paper["updated_at"] = utc_now()
+        _write_catalog(root, catalog)
+        return paper
 
 
 def verify_literature_archive(root: Path, paper_id: str) -> dict[str, Any]:
@@ -579,6 +824,7 @@ def register_staged_pdf(root: Path, staged_path: Path, *, original_filename: str
         "archive_filename": None,
         "metadata_source": "pending",
         "metadata_trust": "pending",
+        "metadata_issue": "",
         "tag_ids": [],
         "focus": "",
         "summary": "",
@@ -616,9 +862,12 @@ def execute_literature_tool(
             "literature_update_record": _update_record,
             "literature_update_cross_relation": _update_cross_relation,
             "literature_archive": _archive,
+            "literature_delete": _delete_paper,
+            "literature_restore": _restore_paper,
             "literature_note_search": _note_search,
             "literature_note_read": _note_read,
             "literature_note_upsert": _note_upsert,
+            "literature_note_delete": _note_delete,
             "literature_note_export": _note_export,
         }
         if name == "literature_process":
@@ -726,6 +975,54 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
 
 
 def _read(
+    root: Path,
+    args: dict[str, Any],
+    *,
+    cancel_event: threading.Event | None = None,
+) -> ProjectToolResult:
+    raw_ids = args.get("paper_ids")
+    if raw_ids is None:
+        return _read_one(root, args, cancel_event=cancel_event)
+    if not isinstance(raw_ids, list) or not raw_ids or len(raw_ids) > 20:
+        raise LiteratureProjectError("paper_ids must be an array with 1 to 20 paper IDs")
+    paper_ids = list(dict.fromkeys(str(item or "").strip() for item in raw_ids))
+    if any(not paper_id for paper_id in paper_ids):
+        raise LiteratureProjectError("paper_ids cannot contain empty IDs")
+    for paper_id in paper_ids:
+        _paper(root, paper_id)
+
+    def read_one(paper_id: str) -> dict[str, Any]:
+        try:
+            result = _read_one(
+                root,
+                {**args, "paper_id": paper_id, "paper_ids": None},
+                cancel_event=cancel_event,
+            )
+        except Exception as exc:
+            return {"ok": False, "paper_id": paper_id, "message": str(exc)}
+        try:
+            payload = json.loads(result.content)
+        except json.JSONDecodeError:
+            payload = {"ok": result.ok, "message": result.content}
+        return {"paper_id": paper_id, **payload}
+
+    with ThreadPoolExecutor(max_workers=min(LITERATURE_READ_CONCURRENCY, len(paper_ids))) as pool:
+        results = list(pool.map(read_one, paper_ids))
+    successes = [item for item in results if item.get("ok")]
+    failures = [item for item in results if not item.get("ok")]
+    return _json_result(
+        {
+            "ok": not failures,
+            "operation": "literature_read",
+            "paper_ids": paper_ids,
+            "succeeded_count": len(successes),
+            "failed_count": len(failures),
+            "results": results,
+        }
+    )
+
+
+def _read_one(
     root: Path,
     args: dict[str, Any],
     *,
@@ -843,6 +1140,7 @@ def _import_pdf(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             "archive_filename": None,
             "metadata_source": "pending",
             "metadata_trust": "pending",
+            "metadata_issue": "",
             "tag_ids": [],
             "focus": "",
             "summary": "",
@@ -867,14 +1165,55 @@ def _process(
 ) -> ProjectToolResult:
     from .literature_pipeline import run_literature_pipeline
 
-    paper_id = _require_string(args, "paper_id")
-    _paper(root, paper_id)
-    result = run_literature_pipeline(root, paper_id, cancel_event=cancel_event)
-    changed = ["catalog.json", *result.get("changed_files", [])]
-    return _json_result(
-        {"ok": True, "operation": "literature_process", "paper_id": paper_id, **result},
-        changed_paths=list(dict.fromkeys(changed)),
-    )
+    raw_ids = args.get("paper_ids")
+    if raw_ids is None:
+        paper_ids = [_require_string(args, "paper_id")]
+    else:
+        if not isinstance(raw_ids, list) or not raw_ids or len(raw_ids) > 50:
+            raise LiteratureProjectError("paper_ids must be an array with 1 to 50 paper IDs")
+        paper_ids = []
+        for raw_id in raw_ids:
+            paper_id = str(raw_id or "").strip()
+            if not paper_id:
+                raise LiteratureProjectError("paper_ids cannot contain empty IDs")
+            if paper_id not in paper_ids:
+                paper_ids.append(paper_id)
+    for paper_id in paper_ids:
+        _paper(root, paper_id)
+
+    def run_one(paper_id: str) -> dict[str, Any]:
+        try:
+            result = run_literature_pipeline(root, paper_id, cancel_event=cancel_event)
+            return {"ok": True, "paper_id": paper_id, **result}
+        except Exception as exc:
+            return {
+                "ok": False,
+                "paper_id": paper_id,
+                "error": str(exc)[:1000] or exc.__class__.__name__,
+                "changed_files": [],
+            }
+
+    with ThreadPoolExecutor(max_workers=min(LITERATURE_PROCESS_CONCURRENCY, len(paper_ids))) as pool:
+        results = list(pool.map(run_one, paper_ids))
+
+    successes = [item for item in results if item["ok"]]
+    failures = [item for item in results if not item["ok"]]
+    changed = ["catalog.json"]
+    for item in successes:
+        changed.extend(str(path) for path in item.get("changed_files", []))
+    payload: dict[str, Any] = {
+        "ok": not failures,
+        "operation": "literature_process",
+        "paper_ids": paper_ids,
+        "concurrency": LITERATURE_PROCESS_CONCURRENCY,
+        "succeeded_count": len(successes),
+        "failed_count": len(failures),
+        "results": results,
+        "changed_files": list(dict.fromkeys(changed)),
+    }
+    if len(results) == 1:
+        payload.update({key: value for key, value in results[0].items() if key != "ok"})
+    return _json_result(payload, changed_paths=list(dict.fromkeys(changed)))
 
 
 def _update_record(root: Path, args: dict[str, Any]) -> ProjectToolResult:
@@ -883,6 +1222,12 @@ def _update_record(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     paper = _find_paper(catalog, paper_id)
     changed_fields: list[str] = []
     changed_paths = ["catalog.json"]
+
+    normalized_args = dict(args)
+    if "journal_abbreviation" in normalized_args and normalized_args["journal_abbreviation"] is not None:
+        normalized_args["journal_abbreviation"] = normalize_journal_abbreviation(
+            normalized_args["journal_abbreviation"]
+        )
 
     scalar_fields = (
         "focus",
@@ -898,10 +1243,12 @@ def _update_record(root: Path, args: dict[str, Any]) -> ProjectToolResult:
         "metadata_source",
     )
     for key in scalar_fields:
-        if key in args and args[key] is not None:
-            paper[key] = args[key]
+        if key in normalized_args and normalized_args[key] is not None:
+            paper[key] = normalized_args[key]
             changed_fields.append(key)
 
+    registry: dict[str, Any] | None = None
+    proposed_tag_ids: list[str] | None = None
     if "tags" in args:
         raw_tags = args.get("tags")
         if not isinstance(raw_tags, list):
@@ -912,16 +1259,63 @@ def _update_record(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             if not isinstance(raw_tag, dict):
                 raise LiteratureProjectError("each tag must be an object")
             tag_ids.append(_upsert_tag(registry, raw_tag))
-        paper["tag_ids"] = list(dict.fromkeys(tag_ids))
-        paper["updated_at"] = utc_now()
-        _write_tags(root, registry)
+        proposed_tag_ids = list(dict.fromkeys(tag_ids))
+        paper["tag_ids"] = proposed_tag_ids
         changed_fields.append("tag_ids")
         changed_paths.append("tags.json")
 
     if not changed_fields:
         raise LiteratureProjectError("No writable record fields were supplied")
+    bibliographic_fields = {
+        "title", "authors", "first_author_surname", "year", "journal",
+        "journal_abbreviation", "doi", "paper_type", "metadata_source",
+    }
+    if bibliographic_fields.intersection(changed_fields):
+        missing = [
+            label
+            for key, label in (
+                ("title", "title"),
+                ("authors", "authors"),
+                ("first_author_surname", "first author surname"),
+                ("year", "year"),
+                ("journal", "journal"),
+                ("journal_abbreviation", "journal abbreviation"),
+            )
+            if paper.get(key) in {None, ""}
+        ]
+        if missing:
+            paper["metadata_trust"] = "partial"
+            paper["metadata_issue"] = f"Manual metadata is still missing: {', '.join(missing)}"
+            changed_fields.extend(["metadata_trust", "metadata_issue"])
+        else:
+            metadata = {
+                key: paper.get(key)
+                for key in (
+                    "title", "authors", "first_author_surname", "year", "journal",
+                    "journal_abbreviation", "doi", "paper_type", "metadata_source",
+                )
+            }
+            if metadata.get("metadata_source") in {None, "", "pending"}:
+                metadata["metadata_source"] = "manual"
+            # Standard naming validates and renames before this function commits any
+            # other proposed record/tag changes. A failed tool call therefore leaves
+            # catalog.json and tags.json untouched.
+            current = apply_literature_metadata(root, paper_id, metadata)
+            catalog = _catalog(root)
+            paper = _find_paper(catalog, paper_id)
+            for key in ("focus", "summary"):
+                if key in normalized_args and normalized_args[key] is not None:
+                    paper[key] = normalized_args[key]
+            if proposed_tag_ids is not None:
+                paper["tag_ids"] = proposed_tag_ids
+            changed_fields.extend(["archive_filename", "metadata_trust", "metadata_issue", "paths"])
+            pdf_path = str((current.get("paths") or {}).get("pdf") or "")
+            if pdf_path:
+                changed_paths.append(pdf_path)
     paper["updated_at"] = utc_now()
     _write_catalog(root, catalog)
+    if registry is not None:
+        _write_tags(root, registry)
     return _json_result(
         {
             "ok": True,
@@ -1007,6 +1401,187 @@ def _archive(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     )
 
 
+def _paper_trash_entry(root: Path, trash_id: str) -> Path:
+    if Path(trash_id).name != trash_id or not re.fullmatch(r"[A-Za-z0-9._-]+", trash_id):
+        raise LiteratureProjectError("Invalid paper recycle-bin ID")
+    trash_root = (root / "papers" / ".trash").resolve()
+    target = (trash_root / trash_id).resolve()
+    try:
+        target.relative_to(trash_root)
+    except ValueError as exc:
+        raise LiteratureProjectError("Paper recycle-bin path escapes the fixed directory") from exc
+    return target
+
+
+def _paper_material_sources(root: Path, paper: dict[str, Any]) -> list[tuple[str, Path]]:
+    paths = paper.get("paths") or {}
+    if not isinstance(paths, dict):
+        raise LiteratureProjectError("Paper paths must be an object")
+    raw_paths = [str(value).strip() for value in paths.values() if isinstance(value, str) and str(value).strip()]
+    paper_id = str(paper.get("id") or "")
+    raw_paths.extend(
+        [
+            f"papers/unprocessed/extracted/{paper_id}",
+            f"papers/processed/extracted/{paper_id}",
+        ]
+    )
+    allowed_roots = [
+        (root / "papers" / "unprocessed" / "pdf").resolve(),
+        (root / "papers" / "unprocessed" / "extracted").resolve(),
+        (root / "papers" / "processed" / "pdf").resolve(),
+        (root / "papers" / "processed" / "extracted").resolve(),
+    ]
+    candidates: dict[str, Path] = {}
+    for raw in raw_paths:
+        path = _resolve(root, raw)
+        if not any(allowed in path.parents for allowed in allowed_roots):
+            raise LiteratureProjectError(f"Paper material path is outside fixed paper directories: {raw}")
+        if path.exists():
+            rel = path.relative_to(root).as_posix()
+            candidates[rel] = path
+    selected: list[tuple[str, Path]] = []
+    for rel, path in sorted(candidates.items(), key=lambda item: (len(item[1].parts), item[0])):
+        if any(parent == path or parent in path.parents for _, parent in selected):
+            continue
+        selected.append((rel, path))
+    return selected
+
+
+def _rollback_moves(moves: list[tuple[Path, Path]]) -> None:
+    for source, target in reversed(moves):
+        if not target.exists() or source.exists():
+            continue
+        source.parent.mkdir(parents=True, exist_ok=True)
+        target.replace(source)
+
+
+def _delete_paper(root: Path, args: dict[str, Any]) -> ProjectToolResult:
+    paper_id = _require_string(args, "paper_id")
+    with _catalog_lock(root):
+        catalog = _catalog(root)
+        original_catalog = copy.deepcopy(catalog)
+        paper_index = next((index for index, item in enumerate(catalog["papers"]) if item.get("id") == paper_id), None)
+        if paper_index is None:
+            raise LiteratureProjectError(f"Unknown paper_id: {paper_id}")
+        paper = copy.deepcopy(catalog["papers"][paper_index])
+        sources = _paper_material_sources(root, paper)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        trash_id = f"{stamp}--{paper_id}"
+        entry = _paper_trash_entry(root, trash_id)
+        if entry.exists():
+            raise LiteratureProjectError(f"Paper recycle entry already exists: {trash_id}")
+        moved_paths = [rel for rel, _ in sources]
+        destinations = [(source, entry / "files" / Path(rel)) for rel, source in sources]
+        for _, target in destinations:
+            if target.exists():
+                raise LiteratureProjectError(f"Paper recycle target already exists: {target.relative_to(root).as_posix()}")
+        entry.mkdir(parents=True)
+        _atomic_write_json(
+            entry / "manifest.json",
+            {
+                "schema_version": 1,
+                "trash_id": trash_id,
+                "deleted_at": utc_now(),
+                "original_index": paper_index,
+                "paper": paper,
+                "moved_paths": moved_paths,
+            },
+        )
+        moved: list[tuple[Path, Path]] = []
+        try:
+            for source, target in destinations:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source.replace(target)
+                moved.append((source, target))
+            catalog["papers"].pop(paper_index)
+            _write_catalog(root, catalog)
+            _rebuild_processed_index(root, catalog)
+        except Exception:
+            _rollback_moves(moved)
+            _write_catalog(root, original_catalog)
+            _rebuild_processed_index(root, original_catalog)
+            if entry.exists() and not any(target.exists() for _, target in moved):
+                shutil.rmtree(entry)
+            raise
+        trash_rel = entry.relative_to(root).as_posix()
+        changed = ["catalog.json", "processed-index.md", *moved_paths, trash_rel]
+        return _json_result(
+            {
+                "ok": True,
+                "operation": "literature_delete",
+                "paper_id": paper_id,
+                "trash_id": trash_id,
+                "trash_path": trash_rel,
+                "changed_files": changed,
+            },
+            changed_paths=changed,
+        )
+
+
+def _restore_paper(root: Path, args: dict[str, Any]) -> ProjectToolResult:
+    trash_id = _require_string(args, "trash_id")
+    with _catalog_lock(root):
+        entry = _paper_trash_entry(root, trash_id)
+        if not entry.exists() or not entry.is_dir():
+            raise LiteratureProjectError(f"Unknown paper recycle-bin ID: {trash_id}")
+        manifest = _read_json(entry / "manifest.json")
+        paper = manifest.get("paper")
+        moved_paths = manifest.get("moved_paths")
+        if manifest.get("schema_version") != 1 or not isinstance(paper, dict) or not isinstance(paper.get("id"), str):
+            raise LiteratureProjectError(f"Invalid paper recycle manifest: {trash_id}")
+        if not isinstance(moved_paths, list) or not all(isinstance(item, str) for item in moved_paths):
+            raise LiteratureProjectError(f"Invalid moved path list in paper recycle manifest: {trash_id}")
+        catalog = _catalog(root)
+        original_catalog = copy.deepcopy(catalog)
+        paper_id = str(paper["id"])
+        if any(item.get("id") == paper_id for item in catalog["papers"]):
+            raise LiteratureProjectError(f"Paper is already active: {paper_id}")
+        moves: list[tuple[Path, Path]] = []
+        for rel in moved_paths:
+            target = _resolve(root, rel)
+            source = (entry / "files" / Path(rel)).resolve()
+            try:
+                source.relative_to((entry / "files").resolve())
+            except ValueError as exc:
+                raise LiteratureProjectError("Paper recycle manifest contains an unsafe path") from exc
+            if not source.exists():
+                raise LiteratureProjectError(f"Paper recycle material is missing: {rel}")
+            if target.exists():
+                raise LiteratureProjectError(f"Restore target already exists: {rel}")
+            moves.append((source, target))
+        restored: list[tuple[Path, Path]] = []
+        try:
+            for source, target in moves:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source.replace(target)
+                restored.append((source, target))
+            raw_index = manifest.get("original_index")
+            index = raw_index if isinstance(raw_index, int) else len(catalog["papers"])
+            catalog["papers"].insert(min(max(index, 0), len(catalog["papers"])), paper)
+            _write_catalog(root, catalog)
+            _rebuild_processed_index(root, catalog)
+        except Exception:
+            for source, target in reversed(restored):
+                if target.exists() and not source.exists():
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    target.replace(source)
+            _write_catalog(root, original_catalog)
+            _rebuild_processed_index(root, original_catalog)
+            raise
+        shutil.rmtree(entry)
+        changed = ["catalog.json", "processed-index.md", *moved_paths, entry.relative_to(root).as_posix()]
+        return _json_result(
+            {
+                "ok": True,
+                "operation": "literature_restore",
+                "trash_id": trash_id,
+                "paper": paper,
+                "changed_files": changed,
+            },
+            changed_paths=changed,
+        )
+
+
 def _note_search(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     query = _require_string(args, "query").casefold()
     limit = min(max(int(args.get("limit") or 20), 1), 100)
@@ -1053,6 +1628,31 @@ def _note_upsert(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     return _json_result(
         {"ok": True, "operation": "literature_note_upsert", "changed_files": [rel]},
         changed_paths=[rel],
+    )
+
+
+def _note_delete(root: Path, args: dict[str, Any]) -> ProjectToolResult:
+    path = _note_path(root, _require_string(args, "filename"))
+    if path.name.casefold() == "readme.md":
+        raise LiteratureProjectError("The notes README is part of the fixed project structure")
+    if not path.exists() or not path.is_file():
+        raise LiteratureProjectError(f"Note does not exist: {path.name}")
+    trash_dir = root / "notes" / ".trash"
+    trash_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    target = _safe_child(trash_dir, f"{stamp}--{path.name}")
+    path.replace(target)
+    source_rel = path.relative_to(root).as_posix()
+    trash_rel = target.relative_to(root).as_posix()
+    return _json_result(
+        {
+            "ok": True,
+            "operation": "literature_note_delete",
+            "filename": path.name,
+            "trash_path": trash_rel,
+            "changed_files": [source_rel, trash_rel],
+        },
+        changed_paths=[source_rel, trash_rel],
     )
 
 

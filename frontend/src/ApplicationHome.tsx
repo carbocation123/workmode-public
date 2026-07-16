@@ -47,7 +47,6 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
       const url = await prepareLiteratureWorkbench(window.location.href, {
         projects,
         activeProject,
-        onProjectCreated: refreshProjects,
       })
       if (url) window.location.assign(url)
     } catch (reason) {
@@ -83,12 +82,6 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
         </div>
       </header>
 
-      <section className="mode-hub-intro">
-        <span className="mode-hub-eyebrow">CHOOSE YOUR WORKFLOW</span>
-        <h1>今天想怎么和 AI 一起工作？</h1>
-        <p>完整工作台保留全部自由度；特化模块把固定科研流程收进更轻、更熟悉的界面。</p>
-      </section>
-
       <section className="mode-hub-grid" aria-label="功能入口">
         <button
           type="button"
@@ -99,7 +92,7 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
           <span className="mode-card-index">01 / POWER USER</span>
           <span className="mode-card-icon">⌘</span>
           <strong>科研工作台</strong>
-          <p>项目文件、自由对话、工具调用、代码与数据分析。适合重度用户和开放式任务。</p>
+          <p>定制你自己的AI工作流</p>
           <span className="mode-card-meta">完整 Workmode · {projects.filter((project) => project.project_type !== 'literature-library').length} 个普通项目</span>
           <span className="mode-card-enter">进入工作台 →</span>
         </button>
@@ -115,7 +108,7 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
           <span className="mode-card-icon">文</span>
           <strong>文献智库</strong>
           <p>拖入 PDF、结构化处理、标签筛选、文献讨论与笔记整理。适合轻量、固定的文献工作流。</p>
-          <span className="mode-card-meta">首个特化模块 · {literatureProjects.length} 个文献项目</span>
+          <span className="mode-card-meta">文献特化模块 · {literatureProjects.length} 个文献项目</span>
           <span className="mode-card-enter">{openingLiterature ? '正在打开…' : '进入文献智库 →'}</span>
         </button>
       </section>

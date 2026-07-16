@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { openExternalUrl } from '../desktop'
+import { MINERU_SETUP } from '../onboarding'
 import { Icon } from './Icon'
 import {
   LITERATURE_ONBOARDING_STEPS,
@@ -28,10 +30,10 @@ const CONTENT = [
     points: ['取消确认不会写入项目', '入库事件作为系统上下文记录，不制造模拟对话', 'PDF 有文本层时，AI 无需等待 MinerU 也能直接阅读正文'],
   },
   {
-    eyebrow: 'MINERU',
-    title: 'MinerU 不是必须的，但推荐配置',
-    body: '不配置 MinerU 时，AI 仍能直接读取带文本层的 PDF；配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性。扫描件或纯图片 PDF 没有文本层，仍需要 MinerU/OCR。',
-    points: ['在设置中填写 MinerU Token', '可选择 pipeline 或 vlm 与文献语言', '工具结果会标明正文来自 MinerU 还是 PDF 文本层'],
+    eyebrow: 'READ',
+    title: '默认直接阅读，需要时再增强',
+    body: '导入 PDF 不会自动启动耗时流水线。提问后，AI 会按需读取带文本层的 PDF；需要更精确地识别表格、公式或复杂版面时，可以再到设置中配置 MinerU 并要求增强解析。',
+    points: ['普通阅读不要求配置 MinerU', '扫描件或纯图片 PDF 仍需要 MinerU/OCR', '增强解析是可选操作，每篇文献通常需要几分钟', '工具结果会标明正文来自 MinerU 还是 PDF 文本层'],
     configure: true,
   },
   {
@@ -77,16 +79,25 @@ export function LiteratureOnboarding({ onConfigureMineru }: LiteratureOnboarding
             {content.points.map((point) => <li key={point}><Icon name="check" /><span>{point}</span></li>)}
           </ul>
           {'configure' in content && content.configure && (
-            <button
-              type="button"
-              className="literature-onboarding-configure"
-              onClick={() => {
-                commit(setLiteratureOnboardingStep(state, state.step))
-                onConfigureMineru()
-              }}
-            >
-              打开设置配置 MinerU
-            </button>
+            <div className="literature-onboarding-configure-row">
+              <button
+                type="button"
+                className="literature-onboarding-configure"
+                onClick={() => void openExternalUrl(MINERU_SETUP.manageUrl)}
+              >
+                打开 MinerU 高级配置说明 ↗
+              </button>
+              <button
+                type="button"
+                className="literature-onboarding-configure"
+                onClick={() => {
+                  commit(setLiteratureOnboardingStep(state, state.step))
+                  onConfigureMineru()
+                }}
+              >
+                打开设置粘贴 Token
+              </button>
+            </div>
           )}
         </div>
         <footer>

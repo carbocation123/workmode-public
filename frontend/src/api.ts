@@ -12,6 +12,7 @@ export interface Project {
   archived_at?: string | null
   project_type?: string
   tool_profile?: string
+  storage_mode?: 'managed' | 'external'
 }
 
 export interface Session {
@@ -220,9 +221,15 @@ export const api = {
       body: JSON.stringify(payload)
     })
   },
-  async createLiteratureProject(payload: { name: string; root_path: string }) {
+  async createLiteratureProject(payload: { name: string; root_path?: string }) {
     return request<{ project: Project; session: Session }>('/work/literature-projects', {
       method: 'POST',
+      body: JSON.stringify(payload)
+    })
+  },
+  async updateProject(slug: string, payload: { name?: string; description?: string }) {
+    return request<{ project: Project }>(`/work/projects/${encodeURIComponent(slug)}`, {
+      method: 'PATCH',
       body: JSON.stringify(payload)
     })
   },

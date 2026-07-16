@@ -60,6 +60,23 @@ def _default_data_dir() -> Path:
     return (Path.home() / ".workmode-public").resolve()
 
 
+def managed_projects_dir() -> Path:
+    """Return the user-visible root for app-managed project folders.
+
+    Windows installations prefer D:\\workmode when a D: drive exists. Machines
+    without that drive fall back to ~/workmode. The environment override keeps
+    development, portable installations and tests deterministic.
+    """
+    override = os.getenv("WORKMODE_MANAGED_PROJECTS_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+    if os.name == "nt":
+        d_drive = Path("D:/")
+        if d_drive.exists() and d_drive.is_dir():
+            return (d_drive / "workmode").resolve()
+    return (Path.home() / "workmode").resolve()
+
+
 def _allowed_origins() -> tuple[str, ...]:
     raw = os.getenv("WORKMODE_ALLOWED_ORIGINS")
     if raw:

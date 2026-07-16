@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { Icon } from './Icon'
 import { LiteratureOnboarding } from './LiteratureOnboarding'
 import { EMPTY_RUNTIME_SESSION } from './runtimeState'
-import { applicationHomeUrl, workbenchSettingsUrl } from '../literatureNavigation'
+import { LITERATURE_PROJECT_KEY, applicationHomeUrl, workbenchSettingsUrl } from '../literatureNavigation'
 import { SKIN_RUNTIME_GUARD_KEY, skinUsesChrome, type ActiveCustomSkin } from '../customSkin'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 import { PdfViewer } from '../PdfViewer'
 import { SkinChrome } from '../SkinChrome'
 import { THEMES, type ThemeId } from '../theme'
+import { isNearBottom } from '../conversation'
+import { projectRefreshTargets, type ProjectRefreshTarget } from '../projectChanges'
 import {
   chatActionMessageForEvent,
   createLiveChatState,
@@ -18,20 +20,30 @@ import {
   type LiteratureChatMessage as ChatMessage,
 } from './chatStream'
 import {
+  activateBackendLiteratureProject,
   checkLiteratureBackend,
   chatWithLiterature,
   compactBackendSession,
+  createBackendLiteratureProject,
   createBackendSession,
+  deleteBackendPaper,
+  deleteBackendNote,
   getBackendProjectInfo,
   getBackendMemory,
   getFactReport,
   listBackendPapers,
+  listDeletedBackendPapers,
   listBackendSessions,
   listBackendNotes,
+  listBackendLiteratureProjects,
   listBackendTags,
   mapBackendPaper,
   paperPdfUrl,
   recordImportedPapers,
+  removeBackendProject,
+  renameBackendProject,
+  renameBackendSession,
+  restoreBackendPaper,
   saveBackendPaperReview,
   saveBackendNote,
   saveCrossLiterature,
@@ -43,6 +55,7 @@ import {
   type BackendNote,
   type BackendSession,
   type BackendTag,
+  type DeletedBackendPaper,
   type WorkmodeProject,
 } from './literatureApi'
 import {
@@ -188,6 +201,17 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
   const [backendError, setBackendError] = useState('')
   const [projectInfo, setProjectInfo] = useState<WorkmodeProject | null>(null)
+  const [projectOptions, setProjectOptions] = useState<WorkmodeProject[]>([])
+  const [projectManagerOpen, setProjectManagerOpen] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [editingProjectSlug, setEditingProjectSlug] = useState<string | null>(null)
+  const [editingProjectName, setEditingProjectName] = useState('')
+  const [projectActionBusy, setProjectActionBusy] = useState(false)
+  const [projectManagerError, setProjectManagerError] = useState('')
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [deletedPapers, setDeletedPapers] = useState<DeletedBackendPaper[]>([])
+  const [trashBusyId, setTrashBusyId] = useState('')
+  const [trashError, setTrashError] = useState('')
   const [tagRegistry, setTagRegistry] = useState<BackendTag[]>([])
   const [search, setSearch] = useState('')
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
@@ -199,6 +223,9 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [dragActive, setDragActive] = useState(false)
   const [pendingImportFiles, setPendingImportFiles] = useState<File[]>([])
   const [importingPapers, setImportingPapers] = useState(false)
+  const [renameSessionOpen, setRenameSessionOpen] = useState(false)
+  const [renameSessionTitle, setRenameSessionTitle] = useState('')
+  const [renamingSession, setRenamingSession] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [activeNoteId, setActiveNoteId] = useState('')
@@ -215,20 +242,109 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [streaming, setStreaming] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const notePreviewRef = useRef<HTMLDivElement>(null)
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const messageStreamRef = useRef<HTMLDivElement>(null)
+  const followingLatestRef = useRef(true)
+  const refreshTargetsRef = useRef<Set<ProjectRefreshTarget>>(new Set())
+  const refreshTimerRef = useRef<number | null>(null)
+  const [showBackToLatest, setShowBackToLatest] = useState(false)
   const dragDepthRef = useRef(0)
   const streamAbortRef = useRef<AbortController | null>(null)
   const stopRequestedRef = useRef(false)
 
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? sessions[0]
 
+  function scrollToLatest(behavior: ScrollBehavior = 'auto') {
+    const viewport = messageStreamRef.current
+    if (!viewport) return
+    followingLatestRef.current = true
+    setShowBackToLatest(false)
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+  }
+
+  function handleMessageStreamScroll() {
+    const viewport = messageStreamRef.current
+    if (!viewport) return
+    const nearBottom = isNearBottom(viewport)
+    followingLatestRef.current = nearBottom
+    setShowBackToLatest(!nearBottom)
+  }
+
+  async function refreshProjection(targets: Set<ProjectRefreshTarget>) {
+    const jobs: Promise<void>[] = []
+    if (targets.has('papers')) {
+      jobs.push(listBackendPapers().then((records) => {
+        const mapped = records.map(mapBackendPaper)
+        const availablePaperIds = new Set(mapped.map((paper) => paper.id))
+        setPapers(mapped)
+        setPdfUrls(Object.fromEntries(mapped.map((paper) => [paper.id, paperPdfUrl(paper.pdfPath)])))
+        setSessions((current) => current.map((session) => ({
+          ...session,
+          attachedPaperIds: session.attachedPaperIds.filter((id) => availablePaperIds.has(id)),
+        })))
+        setDetailPaperId((current) => current && availablePaperIds.has(current) ? current : null)
+      }))
+    }
+    if (targets.has('tags')) {
+      jobs.push(listBackendTags().then(setTagRegistry))
+    }
+    if (targets.has('notes')) {
+      jobs.push(listBackendNotes().then((storedNotes) => {
+        const mapped = storedNotes.map(mapBackendNote)
+        setNotes(mapped)
+        setActiveNoteId((current) => (
+          mapped.some((note) => note.id === current) ? current : mapped[0]?.id || ''
+        ))
+      }))
+    }
+    await Promise.all(jobs)
+  }
+
+  function scheduleProjectionRefresh(changedPaths: string[]) {
+    const targets = projectRefreshTargets(changedPaths)
+    for (const target of targets) refreshTargetsRef.current.add(target)
+    if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = window.setTimeout(() => {
+      const pending = new Set(refreshTargetsRef.current)
+      refreshTargetsRef.current.clear()
+      refreshTimerRef.current = null
+      void refreshProjection(pending).catch((error) => {
+        setActionMessage(`项目内容刷新失败：${error instanceof Error ? error.message : '未知错误'}`)
+      })
+    }, 120)
+  }
+
+  function reconcileProjection() {
+    return refreshProjection(new Set<ProjectRefreshTarget>(['papers', 'tags', 'notes']))
+  }
+
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth', block: 'end' })
+    followingLatestRef.current = true
+    setShowBackToLatest(false)
+  }, [activeSessionId])
+
+  useEffect(() => {
+    if (!followingLatestRef.current) return
+    const frame = window.requestAnimationFrame(() => scrollToLatest())
+    return () => window.cancelAnimationFrame(frame)
   }, [activeSession.messages])
+
+  useEffect(() => () => {
+    if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
+  }, [])
 
   useEffect(() => {
     let active = true
     async function connectBackend() {
+      const projects = await listBackendLiteratureProjects()
+      if (!active) return
+      setProjectOptions(projects)
+      if (!projects.length) {
+        setProjectInfo(null)
+        setBackendError('还没有文献项目。请新建一个项目后开始使用。')
+        setBackendMode('unavailable')
+        setProjectManagerOpen(true)
+        return
+      }
       const connected = await checkLiteratureBackend()
       if (!active) return
       if (!connected) {
@@ -258,7 +374,11 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       setMemoryState({
         projectMemory: memoryRulesFromMarkdown(storedMemory),
       })
-      setSessions(availableSessions.map(mapBackendSession))
+      const availablePaperIds = new Set(mapped.map((paper) => paper.id))
+      setSessions(availableSessions.map(mapBackendSession).map((session) => ({
+        ...session,
+        attachedPaperIds: session.attachedPaperIds.filter((id) => availablePaperIds.has(id)),
+      })))
       setActiveSessionId(availableSessions[0].id)
       setPdfUrls(Object.fromEntries(mapped.map((paper) => [paper.id, paperPdfUrl(paper.pdfPath)])))
       setBackendError('')
@@ -361,6 +481,107 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     updateActiveSession((session) => ({ ...session, attachedNoteIds: nextNoteIds }))
   }
 
+  async function openProjectManager() {
+    setProjectManagerError('')
+    setProjectManagerOpen(true)
+    try {
+      setProjectOptions(await listBackendLiteratureProjects())
+    } catch (error) {
+      setProjectManagerError(`项目列表读取失败：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  async function openPaperTrash() {
+    if (backendMode !== 'connected') return
+    setTrashOpen(true)
+    setTrashError('')
+    try {
+      setDeletedPapers(await listDeletedBackendPapers())
+    } catch (error) {
+      setTrashError(`回收站读取失败：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  async function createManagedProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const name = newProjectName.trim()
+    if (!name || projectActionBusy) return
+    setProjectActionBusy(true)
+    setProjectManagerError('')
+    try {
+      await createBackendLiteratureProject(name)
+      window.location.reload()
+    } catch (error) {
+      setProjectManagerError(`项目创建失败：${error instanceof Error ? error.message : '未知错误'}`)
+      setProjectActionBusy(false)
+    }
+  }
+
+  async function switchLiteratureProject(slug: string) {
+    if (projectActionBusy || slug === projectInfo?.slug) {
+      if (slug === projectInfo?.slug) setProjectManagerOpen(false)
+      return
+    }
+    setProjectActionBusy(true)
+    setProjectManagerError('')
+    try {
+      await activateBackendLiteratureProject(slug)
+      window.location.reload()
+    } catch (error) {
+      setProjectManagerError(`项目切换失败：${error instanceof Error ? error.message : '未知错误'}`)
+      setProjectActionBusy(false)
+    }
+  }
+
+  function startProjectRename(project: WorkmodeProject) {
+    setEditingProjectSlug(project.slug)
+    setEditingProjectName(project.name)
+    setProjectManagerError('')
+  }
+
+  async function commitProjectRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const name = editingProjectName.trim()
+    if (!editingProjectSlug || !name || projectActionBusy) return
+    setProjectActionBusy(true)
+    setProjectManagerError('')
+    try {
+      const updated = await renameBackendProject(editingProjectSlug, name)
+      setProjectOptions((current) => current.map((project) => project.slug === updated.slug ? updated : project))
+      if (projectInfo?.slug === updated.slug) setProjectInfo(updated)
+      setEditingProjectSlug(null)
+      setEditingProjectName('')
+      setActionMessage('文献项目名称已修改。')
+    } catch (error) {
+      setProjectManagerError(`项目重命名失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setProjectActionBusy(false)
+    }
+  }
+
+  async function removeLiteratureProject(project: WorkmodeProject) {
+    if (projectActionBusy || streaming) return
+    const confirmed = window.confirm(
+      `从 Workmode 中移除文献项目“${project.name}”？\n\n项目文件不会删除：\n${project.root_path}\n\n如需删除实体文件夹，请稍后在文件管理器中手动处理。`,
+    )
+    if (!confirmed) return
+    setProjectActionBusy(true)
+    setProjectManagerError('')
+    try {
+      await removeBackendProject(project.slug)
+      const remaining = projectOptions.filter((item) => item.slug !== project.slug)
+      if (remaining.length) {
+        await activateBackendLiteratureProject(remaining[0].slug)
+      } else {
+        window.sessionStorage.removeItem(LITERATURE_PROJECT_KEY)
+      }
+      window.location.reload()
+    } catch (error) {
+      setProjectManagerError(`项目移除失败：${error instanceof Error ? error.message : '未知错误'}`)
+      setProjectActionBusy(false)
+    }
+  }
+
   function createSession() {
     if (backendMode !== 'connected') {
       setActionMessage('后端未连接，不能创建 session。')
@@ -377,6 +598,31 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
         text: `创建持久会话失败：${error instanceof Error ? error.message : '未知错误'}`,
       }])
     })
+  }
+
+  function openSessionRename() {
+    setRenameSessionTitle(activeSession.name)
+    setRenameSessionOpen(true)
+  }
+
+  async function renameActiveSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const title = renameSessionTitle.trim()
+    if (!title || renamingSession) return
+    setRenamingSession(true)
+    try {
+      const savedTitle = await renameBackendSession(activeSession.id, title)
+      setSessions((current) => updateSessionById(current, activeSession.id, (session) => ({
+        ...session,
+        name: savedTitle,
+      })))
+      setRenameSessionOpen(false)
+      setActionMessage('会话名称已修改')
+    } catch (error) {
+      setActionMessage(`会话重命名失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setRenamingSession(false)
+    }
   }
 
   function updatePaper(id: string, updater: (paper: PaperRecord) => PaperRecord) {
@@ -441,6 +687,32 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     }
   }
 
+  async function deleteActiveNote() {
+    if (!activeNote || backendMode !== 'connected') return
+    const isDraft = activeNote.id.startsWith('draft-')
+    if (!isDraft && !window.confirm(`删除笔记“${activeNote.title}”？\n\n笔记会移入项目 notes/.trash，可从项目文件夹中恢复。`)) {
+      return
+    }
+    try {
+      let trashPath = ''
+      if (!isDraft) {
+        const result = await deleteBackendNote(activeNote.filename)
+        trashPath = result.trash_path
+      }
+      const remaining = notes.filter((note) => note.id !== activeNote.id)
+      const nextNotes = remaining.length ? remaining : [blankNote(1)]
+      setNotes(nextNotes)
+      setActiveNoteId(nextNotes[0].id)
+      setSessions((current) => current.map((session) => ({
+        ...session,
+        attachedNoteIds: session.attachedNoteIds.filter((id) => id !== activeNote.id),
+      })))
+      setActionMessage(isDraft ? '未保存的笔记草稿已移除。' : `笔记已移入回收目录：${trashPath}`)
+    } catch (error) {
+      setActionMessage(`笔记删除失败：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
   async function confirmPaperReview() {
     if (!detailPaper || backendMode !== 'connected') return
     const names = reviewTagsDraft
@@ -496,6 +768,55 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       setActionMessage('归档完成：PDF、MinerU 产物、事实报告与处理结果索引已同步。')
     } catch (error) {
       setActionMessage(`归档失败：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  async function deleteDetailPaper() {
+    if (!detailPaper || backendMode !== 'connected' || streaming) return
+    const paper = detailPaper
+    if (!window.confirm(`将文献“${paper.title}”移入回收站？\n\nPDF、解析产物和目录记录会一起移入项目回收站；历史对话不会被改写。`)) return
+    setTrashBusyId(paper.id)
+    try {
+      await deleteBackendPaper(paper.id)
+      setPapers((current) => current.filter((item) => item.id !== paper.id))
+      setSessions((current) => current.map((session) => ({
+        ...session,
+        attachedPaperIds: session.attachedPaperIds.filter((id) => id !== paper.id),
+      })))
+      setPdfUrls((current) => {
+        const next = { ...current }
+        delete next[paper.id]
+        return next
+      })
+      setFactReportMarkdowns((current) => {
+        const next = { ...current }
+        delete next[paper.id]
+        return next
+      })
+      setDetailPaperId(null)
+      setActionMessage('文献已移入回收站，可从文献库顶部的回收站恢复。')
+    } catch (error) {
+      setActionMessage(`文献删除失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setTrashBusyId('')
+    }
+  }
+
+  async function restoreDeletedPaper(entry: DeletedBackendPaper) {
+    if (trashBusyId) return
+    setTrashBusyId(entry.trash_id)
+    setTrashError('')
+    try {
+      const restored = await restoreBackendPaper(entry.trash_id)
+      const mapped = mapBackendPaper(restored)
+      setPapers((current) => current.some((paper) => paper.id === mapped.id) ? current : [...current, mapped])
+      setPdfUrls((current) => ({ ...current, [mapped.id]: paperPdfUrl(mapped.pdfPath) }))
+      setDeletedPapers((current) => current.filter((item) => item.trash_id !== entry.trash_id))
+      setActionMessage(`已恢复文献：${mapped.title}`)
+    } catch (error) {
+      setTrashError(`文献恢复失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setTrashBusyId('')
     }
   }
 
@@ -574,10 +895,6 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     const uniqueImportedIds = [...new Set(importedIds)]
     let contextRecorded = false
     if (uniqueImportedIds.length) {
-      updateActiveSession((session) => ({
-        ...session,
-        attachedPaperIds: attachPapers(session.attachedPaperIds, uniqueImportedIds),
-      }))
       try {
         await recordImportedPapers(activeSessionId, uniqueImportedIds)
         contextRecorded = true
@@ -606,6 +923,8 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     const controller = new AbortController()
     streamAbortRef.current = controller
     stopRequestedRef.current = false
+    followingLatestRef.current = true
+    setShowBackToLatest(false)
     setInput('')
     setStreaming(true)
     setActionMessage('')
@@ -640,6 +959,10 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             }
           : session))
         setActionMessage((current) => chatActionMessageForEvent(current, event))
+        if (event.type === 'tool_result') {
+          const changedPaths = Array.isArray(event.changed_paths) ? event.changed_paths : []
+          if (changedPaths.length) scheduleProjectionRefresh(changedPaths)
+        }
       },
       controller.signal,
     ).then((result) => {
@@ -650,11 +973,8 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
         attachedPaperIds: session.attachedPaperIds,
         attachedNoteIds: session.attachedNoteIds,
       } : session))
-      void Promise.all([listBackendPapers(), listBackendTags()]).then(([records, tags]) => {
-        setPapers(records.map(mapBackendPaper))
-        setTagRegistry(tags)
-      }).catch((error) => {
-        setActionMessage(`对话已完成，但文献列表刷新失败：${error instanceof Error ? error.message : '未知错误'}`)
+      void reconcileProjection().catch((error) => {
+        setActionMessage(`对话已完成，但项目内容刷新失败：${error instanceof Error ? error.message : '未知错误'}`)
       })
     }).catch((error) => {
       if (stopRequestedRef.current || controller.signal.aborted) {
@@ -671,6 +991,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               }
             : session))
         }).catch(() => undefined)
+        void reconcileProjection().catch(() => undefined)
         return
       }
       setActionMessage('')
@@ -679,6 +1000,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
         role: 'assistant',
         text: `真实文献对话失败：${error instanceof Error ? error.message : '未知错误'}`,
       }])
+      void reconcileProjection().catch(() => undefined)
     }).finally(() => {
       if (streamAbortRef.current === controller) streamAbortRef.current = null
       setStreaming(false)
@@ -790,10 +1112,11 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <strong>WORKMODE / LITERA</strong>
           <span>轻量文献智库工作台</span>
         </div>
-        <div className="project-heading">
+        <button className="project-heading" type="button" onClick={() => void openProjectManager()} title="切换或新建文献项目">
           <span className="eyebrow">当前项目</span>
           <strong>{projectInfo?.name || '等待文献项目'}</strong>
-        </div>
+          <span className="project-heading-action">管理项目</span>
+        </button>
         <div className="topbar-spacer" />
       </header>
 
@@ -804,7 +1127,11 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               <span className="eyebrow">LIBRARY</span>
               <h1>文献库</h1>
             </div>
-            <span className="count-badge">{papers.length}</span>
+            <div className="library-heading-actions">
+              <span className="count-badge">{papers.length}</span>
+              <button type="button" onClick={() => void openPaperTrash()} title="文献回收站" aria-label="打开文献回收站"><Icon name="trash" /></button>
+              <button type="button" onClick={() => void openProjectManager()} title="新建或切换文献项目" aria-label="管理文献项目"><Icon name="layers" /></button>
+            </div>
           </div>
 
           <label className="search-box">
@@ -917,10 +1244,10 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   </button>
                   <div className="paper-main">
                     <h2>{paper.title}</h2>
-                    <p className={`paper-filename${paper.archiveFilename ? '' : ' pending-name'}`}>
-                      {paper.archiveFilename ?? '标准命名待确认'}
-                    </p>
-                    {paper.archiveFilename !== paper.filename && <p className="original-filename">导入名：{paper.filename}</p>}
+                    <p className="paper-filename">{paper.filename}</p>
+                    {paper.archiveFilename && paper.archiveFilename !== paper.filename && (
+                      <p className="original-filename">标准名：{paper.archiveFilename}</p>
+                    )}
                     <div className="card-tags">
                       {paper.tagIds.slice(0, 4).map((tagId) => {
                         const tag = tagRegistry.find((item) => item.id === tagId)
@@ -928,12 +1255,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                       })}
                       {paper.tagIds.length > 4 && <span className="tag-overflow">+{paper.tagIds.length - 4}</span>}
                     </div>
-                    <div className="status-line">
-                      <StatusDot status={paper.status} />
-                      <span>{statusLabel(paper.status)}</span>
-                      <span className="archive-location">{paper.archiveLocation.replace('文献/', '')}</span>
-                      <span className="card-year">{paper.year ?? '年份待识别'}</span>
-                    </div>
+                    {(paper.year || paper.journal) && (
+                      <div className="status-line">
+                        {paper.journal && <span>{paper.journal}</span>}
+                        {paper.year && <span className="card-year">{paper.year}</span>}
+                      </div>
+                    )}
                   </div>
                 </article>
               )
@@ -950,14 +1277,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <div className="conversation-header" data-skin-slot="chat-header">
             <div>
               <span className="eyebrow">RESEARCH CONVERSATION</span>
-              <h2>和文献一起讨论</h2>
             </div>
             <div className="session-switcher">
               <span>SESSION</span>
               <select value={activeSessionId} onChange={(event) => setActiveSessionId(event.target.value)} disabled={streaming}>
                 {sessions.map((session) => <option value={session.id} key={session.id}>{session.name}</option>)}
               </select>
-              <button onClick={createSession} aria-label="新建 session" title="新建 session" disabled={backendMode !== 'connected' || streaming}>＋</button>
+              <button className="session-rename-button" onClick={openSessionRename} aria-label="重命名当前会话" title="重命名当前会话" disabled={backendMode !== 'connected' || streaming}>✎</button>
+              <button className="session-new-button" onClick={createSession} aria-label="新建 session" title="新建 session" disabled={backendMode !== 'connected' || streaming}>＋</button>
             </div>
             <div className="context-meter" title="正式 Workmode 上下文预算占用估算">
               <div className="context-copy"><span>上下文</span><strong>{activeSession.contextPercent}%</strong></div>
@@ -977,7 +1304,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             </button>
           </div>
 
-          <div className="message-stream" data-skin-slot="message-stream">
+          <div
+            className="message-stream"
+            data-skin-slot="message-stream"
+            ref={messageStreamRef}
+            onScroll={handleMessageStreamScroll}
+          >
             <div className="date-divider"><span>当前会话</span></div>
             {backendMode === 'unavailable' && (
               <div className="backend-error-state" role="alert">
@@ -1066,8 +1398,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 )}
               </div>
             ))}
-            <div ref={chatEndRef} />
           </div>
+          {showBackToLatest && (
+            <button type="button" className="literature-back-to-latest" onClick={() => scrollToLatest('smooth')}>
+              回到最新 ↓
+            </button>
+          )}
 
           <div className="composer-wrap" data-skin-slot="composer">
             {actionMessage && <div className="action-message" role="status">{actionMessage}</div>}
@@ -1133,6 +1469,153 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
       </main>
 
+      {projectManagerOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (projectOptions.length && !projectActionBusy) setProjectManagerOpen(false)
+        }}>
+          <section
+            aria-labelledby="literature-project-manager-title"
+            aria-modal="true"
+            className="literature-project-manager-modal"
+            data-skin-slot="literature-project-manager"
+            role="dialog"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">LIBRARIES</span><h2 id="literature-project-manager-title">文献项目</h2></div>
+              <button
+                disabled={!projectOptions.length || projectActionBusy}
+                onClick={() => setProjectManagerOpen(false)}
+                aria-label="关闭项目管理"
+              ><Icon name="close" /></button>
+            </header>
+            <div className="literature-project-manager-body">
+              <div className="literature-project-list">
+                {projectOptions.map((project) => (
+                  <article className={project.slug === projectInfo?.slug ? 'active' : ''} key={project.slug}>
+                    {editingProjectSlug === project.slug ? (
+                      <form className="literature-project-rename" onSubmit={(event) => void commitProjectRename(event)}>
+                        <input
+                          value={editingProjectName}
+                          maxLength={120}
+                          autoFocus
+                          onChange={(event) => setEditingProjectName(event.target.value)}
+                        />
+                        <button type="submit" disabled={projectActionBusy || !editingProjectName.trim()}>保存</button>
+                        <button type="button" disabled={projectActionBusy} onClick={() => setEditingProjectSlug(null)}>取消</button>
+                      </form>
+                    ) : (
+                      <>
+                        <button className="literature-project-open" type="button" onClick={() => void switchLiteratureProject(project.slug)}>
+                          <span><strong>{project.name}</strong><small>{project.root_path}</small></span>
+                          <em>{project.storage_mode === 'managed' ? '托管项目' : '旧版外部项目'}</em>
+                        </button>
+                        <div className="literature-project-row-actions">
+                          <button type="button" disabled={projectActionBusy} onClick={() => startProjectRename(project)}>重命名</button>
+                          <button type="button" className="danger" disabled={projectActionBusy || streaming} onClick={() => void removeLiteratureProject(project)}>移除</button>
+                        </div>
+                      </>
+                    )}
+                  </article>
+                ))}
+                {!projectOptions.length && <p className="literature-project-empty">还没有文献项目。输入名称即可创建，无需选择文件夹。</p>}
+              </div>
+
+              <form className="literature-project-create" onSubmit={(event) => void createManagedProject(event)}>
+                <label htmlFor="literature-project-name">新建文献项目</label>
+                <div>
+                  <input
+                    id="literature-project-name"
+                    value={newProjectName}
+                    maxLength={120}
+                    placeholder="例如：EPR 缺陷化学文献库"
+                    autoFocus={!projectOptions.length}
+                    onChange={(event) => setNewProjectName(event.target.value)}
+                  />
+                  <button type="submit" disabled={projectActionBusy || !newProjectName.trim()}>{projectActionBusy ? '处理中…' : '创建'}</button>
+                </div>
+                <small>Windows 默认保存在 D:\workmode\项目名；没有 D 盘时自动使用用户目录。旧版外部项目保持原位置。</small>
+              </form>
+              {projectManagerError && <p className="literature-project-manager-error" role="alert">{projectManagerError}</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {renameSessionOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (!renamingSession) setRenameSessionOpen(false)
+        }}>
+          <section
+            aria-labelledby="rename-session-title"
+            aria-modal="true"
+            className="session-rename-modal"
+            data-skin-slot="session-rename"
+            role="dialog"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">SESSION</span><h2 id="rename-session-title">重命名会话</h2></div>
+              <button disabled={renamingSession} onClick={() => setRenameSessionOpen(false)} aria-label="关闭重命名窗口"><Icon name="close" /></button>
+            </header>
+            <form className="session-rename-form" onSubmit={(event) => void renameActiveSession(event)}>
+              <label htmlFor="literature-session-title">会话名称</label>
+              <input
+                id="literature-session-title"
+                value={renameSessionTitle}
+                maxLength={80}
+                autoFocus
+                onChange={(event) => setRenameSessionTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && !renamingSession) setRenameSessionOpen(false)
+                }}
+              />
+              <small>{renameSessionTitle.trim().length}/80</small>
+              <div className="session-rename-actions">
+                <button type="button" disabled={renamingSession} onClick={() => setRenameSessionOpen(false)}>取消</button>
+                <button type="submit" disabled={renamingSession || !renameSessionTitle.trim()}>{renamingSession ? '保存中…' : '保存'}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {trashOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (!trashBusyId) setTrashOpen(false)
+        }}>
+          <section
+            aria-labelledby="literature-trash-title"
+            aria-modal="true"
+            className="literature-trash-modal"
+            data-skin-slot="literature-trash"
+            role="dialog"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">RECYCLE BIN</span><h2 id="literature-trash-title">文献回收站</h2></div>
+              <button disabled={Boolean(trashBusyId)} onClick={() => setTrashOpen(false)} aria-label="关闭文献回收站"><Icon name="close" /></button>
+            </header>
+            <div className="literature-trash-body">
+              {deletedPapers.length ? deletedPapers.map((entry) => (
+                <article key={entry.trash_id}>
+                  <Icon name="file" />
+                  <div>
+                    <strong>{entry.paper.title}</strong>
+                    <span>{entry.paper.original_filename}</span>
+                    <small>删除于 {entry.deleted_at ? new Date(entry.deleted_at).toLocaleString() : '未知时间'} · {entry.file_count} 组材料</small>
+                  </div>
+                  <button disabled={Boolean(trashBusyId)} onClick={() => void restoreDeletedPaper(entry)}>
+                    <Icon name="restore" />{trashBusyId === entry.trash_id ? '恢复中…' : '恢复'}
+                  </button>
+                </article>
+              )) : <div className="literature-trash-empty"><Icon name="trash" /><strong>回收站是空的</strong><span>移除的文献会连同 PDF 与解析产物一起保存在这里。</span></div>}
+              {trashError && <p className="literature-trash-error" role="alert">{trashError}</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
       {detailPaper && (
         <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => setDetailPaperId(null)}>
           <section
@@ -1148,7 +1631,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 <span className="eyebrow">PAPER RECORD</span>
                 <h2>{detailPaper.archiveFilename ?? detailPaper.filename}</h2>
               </div>
-              <button onClick={() => setDetailPaperId(null)} aria-label="关闭文献详情"><Icon name="close" /></button>
+              <div className="paper-detail-header-actions">
+                <button className="paper-delete-button" disabled={streaming || trashBusyId === detailPaper.id} onClick={() => void deleteDetailPaper()}>
+                  <Icon name="trash" />{trashBusyId === detailPaper.id ? '处理中…' : '移入回收站'}
+                </button>
+                <button onClick={() => setDetailPaperId(null)} aria-label="关闭文献详情"><Icon name="close" /></button>
+              </div>
             </header>
             <nav className="paper-detail-tabs" aria-label="文献详情页签">
               <button className={detailTab === 'overview' ? 'active' : ''} onClick={() => setDetailTab('overview')}>概览与提炼</button>
@@ -1162,6 +1650,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   <span className={`status-badge status-${detailPaper.status}`}><StatusDot status={detailPaper.status} /> {statusLabel(detailPaper.status)}</span>
                   <h1>{detailPaper.title}</h1>
                   <p>{detailPaper.authors}</p>
+                  {detailPaper.metadataTrust !== 'complete' && (
+                    <div className="metadata-review-notice" role="status">
+                      <strong>元数据待人工确认</strong>
+                      <span>{detailPaper.metadataIssue || '首页没有找到可逐字核验的 Cite This 元数据。客观事实报告仍会继续生成；请在下方补齐作者、年份和期刊后完成标准命名。'}</span>
+                    </div>
+                  )}
                   <div className="detail-metadata">
                     <span className={!detailPaper.archiveFilename ? 'metadata-pending' : ''}>
                       <strong>标准档名</strong>{detailPaper.archiveFilename ?? '等待首页元数据确认'}
@@ -1371,7 +1865,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               ><Icon name="close" /></button>
             </header>
             <div className="import-confirm-body">
-              <p>以下 PDF 将写入当前文献项目，并自动加入当前 session 的对话资料：</p>
+              <p>以下 PDF 将写入当前文献项目。PDF 只会加入文献库，不会自动解析或加入当前对话：</p>
               <ul>
                 {pendingImportFiles.map((file, index) => (
                   <li key={`${file.name}-${file.size}-${index}`}>
@@ -1483,6 +1977,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   </div>
                   <button onClick={downloadActiveNoteMarkdown}>导出 MD</button>
                   <button className="pdf-export-button" onClick={exportActiveNotePdf}>导出 PDF</button>
+                  <button className="note-delete-button" onClick={() => void deleteActiveNote()}>删除笔记</button>
                   <button className="note-save-button" onClick={() => void saveActiveNote()}>保存</button>
                 </div>
 
@@ -1506,12 +2001,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
         </div>
       )}
 
-      <LiteratureOnboarding
+      {projectInfo && <LiteratureOnboarding
         onConfigureMineru={() => {
           localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
           window.location.assign(workbenchSettingsUrl(window.location.href, 'literature'))
         }}
-      />
+      />}
 
       {dragActive && (
         <div className="drop-overlay">

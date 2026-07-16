@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import html
 import ipaddress
 import json
 import socket
 import threading
-import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Any, Callable
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qs, unquote, urljoin, urlsplit, urlunsplit
 
 import httpx
 
@@ -23,11 +23,7 @@ MAX_HTTP_BYTES = 2 * 1024 * 1024
 MAX_REDIRECTS = 5
 WEB_TIMEOUT_SECONDS = 20
 USER_AGENT = "WorkmodePublic/0.2 (+https://github.com/carbocation123/workmode-public)"
-# Bing's RSS endpoint currently keeps the /search route for this generic
-# non-browser agent. A full desktop Chrome UA is redirected to the Bing home
-# page even when format=rss is present.
-SEARCH_USER_AGENT = "Mozilla/5.0"
-BING_CN_SEARCH_URL = "https://cn.bing.com/search"
+DUCKDUCKGO_SEARCH_URL = "https://html.duckduckgo.com/html/"
 SYNTHETIC_PROXY_NETWORK = ipaddress.ip_network("198.18.0.0/15")
 
 
@@ -137,8 +133,8 @@ def run_web_search(
 ) -> dict[str, Any]:
     cleaned = _clean_items(queries, MAX_QUERIES, "queries")
     max_results = min(max(1, int(max_results_per_query)), MAX_RESULTS_PER_QUERY)
-    worker = search_one or _bing_cn_search_one
-    engine = "custom" if search_one else "bing-cn-rss"
+    worker = search_one or _duckduckgo_search_one
+    engine = "custom" if search_one else "duckduckgo-html"
     results: list[dict[str, str]] = []
     errors: list[dict[str, str]] = []
 
@@ -237,41 +233,30 @@ def validate_public_web_url(
     return urlunsplit((parsed.scheme.lower(), netloc, parsed.path or "/", parsed.query, ""))
 
 
-def parse_bing_rss(source: str, *, max_results: int) -> list[dict[str, str]]:
-    try:
-        root = ET.fromstring(source)
-    except ET.ParseError as exc:
-        raise WebToolError("Bing 中国返回的 RSS 格式无效") from exc
-
+def parse_duckduckgo_html(source: str, *, max_results: int) -> list[dict[str, str]]:
+    parser = _DuckDuckGoParser()
+    parser.feed(source)
     results: list[dict[str, str]] = []
-    for item in root.findall(".//item"):
-        title = _collapse(item.findtext("title") or "")
-        url = _collapse(item.findtext("link") or "")
-        snippet = _html_to_text(item.findtext("description") or "")
+    for raw in parser.raw_results:
+        title = _collapse(raw["title"])
+        snippet = _collapse(raw["snippet"])
+        url = _decode_duckduckgo_url(raw["url"])
         parsed = urlsplit(url)
         if not title or parsed.scheme not in {"http", "https"} or not parsed.hostname:
             continue
-        results.append({"title": title, "url": url, "snippet": snippet})
+        results.append({"title": html.unescape(title), "url": url, "snippet": html.unescape(snippet)})
         if len(results) >= max_results:
             break
     return results
 
 
-def _bing_cn_search_one(query: str, max_results: int) -> list[dict[str, str]]:
-    headers = {
-        "User-Agent": SEARCH_USER_AGENT,
-        "Accept": "application/rss+xml,application/xml,text/xml;q=0.9,*/*;q=0.1",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    }
-    # cn.bing.com appends cc=cn during its redirect. Supplying cc/mkt twice can
-    # make Bing redirect to the home page instead of returning RSS.
-    params = {"q": query, "format": "rss", "mkt": "zh-CN"}
-    with httpx.Client(timeout=WEB_TIMEOUT_SECONDS, follow_redirects=True, headers=headers) as client:
-        response = client.get(BING_CN_SEARCH_URL, params=params)
+def _duckduckgo_search_one(query: str, max_results: int) -> list[dict[str, str]]:
+    with httpx.Client(timeout=WEB_TIMEOUT_SECONDS, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
+        response = client.get(DUCKDUCKGO_SEARCH_URL, params={"q": query})
         response.raise_for_status()
         if len(response.content) > MAX_HTTP_BYTES:
             raise WebToolError("搜索响应超过 2MB 上限")
-        return parse_bing_rss(response.text, max_results=max_results)
+        return parse_duckduckgo_html(response.text, max_results=max_results)
 
 
 def _fetch_one_url(url: str, max_chars: int) -> dict[str, Any]:
@@ -374,8 +359,51 @@ def _raise_if_cancelled(cancel_event: threading.Event | None) -> None:
         raise WebToolError("用户已停止本轮对话")
 
 
+def _decode_duckduckgo_url(raw: str) -> str:
+    url = html.unescape(raw.strip())
+    if url.startswith("//"):
+        url = "https:" + url
+    parsed = urlsplit(url)
+    if parsed.hostname and parsed.hostname.endswith("duckduckgo.com"):
+        target = parse_qs(parsed.query).get("uddg", [""])[0]
+        if target:
+            return unquote(target)
+    return url
+
+
 def _collapse(value: str) -> str:
     return " ".join(value.split())
+
+
+class _DuckDuckGoParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.raw_results: list[dict[str, str]] = []
+        self._capture: str | None = None
+        self._depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {key: value or "" for key, value in attrs}
+        classes = set(values.get("class", "").split())
+        if "result__a" in classes:
+            self.raw_results.append({"title": "", "url": values.get("href", ""), "snippet": ""})
+            self._capture = "title"
+            self._depth = 1
+        elif "result__snippet" in classes and self.raw_results:
+            self._capture = "snippet"
+            self._depth = 1
+        elif self._capture:
+            self._depth += 1
+
+    def handle_endtag(self, _tag: str) -> None:
+        if self._capture:
+            self._depth -= 1
+            if self._depth <= 0:
+                self._capture = None
+
+    def handle_data(self, data: str) -> None:
+        if self._capture and self.raw_results:
+            self.raw_results[-1][self._capture] += data
 
 
 class _VisibleTextParser(HTMLParser):

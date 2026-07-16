@@ -52,6 +52,7 @@ LITERATURE_NAVIGATION_SOURCE = ROOT / "frontend" / "src" / "literatureNavigation
 LITERATURE_LAUNCHER_SOURCE = ROOT / "frontend" / "src" / "literatureLauncher.ts"
 PDF_VIEWER_SOURCE = ROOT / "frontend" / "src" / "PdfViewer.tsx"
 APPLICATION_HOME_SOURCE = ROOT / "frontend" / "src" / "ApplicationHome.tsx"
+APPLICATION_HOME_STYLES = ROOT / "frontend" / "src" / "applicationHome.css"
 FRONTEND_MAIN_SOURCE = ROOT / "frontend" / "src" / "main.tsx"
 BACKEND_MAIN_SOURCE = ROOT / "backend" / "app" / "main.py"
 BACKEND_ROUTES_SOURCE = ROOT / "backend" / "app" / "routes.py"
@@ -69,15 +70,27 @@ class DesktopUiContractTest(unittest.TestCase):
         literature_launcher = LITERATURE_LAUNCHER_SOURCE.read_text(encoding="utf-8")
         pdf_viewer = PDF_VIEWER_SOURCE.read_text(encoding="utf-8")
         application_home = APPLICATION_HOME_SOURCE.read_text(encoding="utf-8")
+        application_home_styles = APPLICATION_HOME_STYLES.read_text(encoding="utf-8")
         frontend_main = FRONTEND_MAIN_SOURCE.read_text(encoding="utf-8")
         backend_main = BACKEND_MAIN_SOURCE.read_text(encoding="utf-8")
 
         self.assertNotIn("openLiteratureWorkbench", app)
         self.assertNotIn('title="文献智库"', app)
         self.assertIn("title={activePanel === 'settings'", app)
-        self.assertIn("createLiteratureProject", literature_launcher)
+        self.assertNotIn("createLiteratureProject", literature_launcher)
+        self.assertNotIn("pickDirectory", literature_launcher)
+        self.assertNotIn("root_path:", literature_launcher)
         self.assertIn("科研工作台", application_home)
         self.assertIn("文献智库", application_home)
+        self.assertNotIn("今天想怎么和 AI 一起工作？", application_home)
+        self.assertNotIn("完整工作台保留全部自由度", application_home)
+        self.assertIn("定制你自己的AI工作流", application_home)
+        self.assertIn("文献特化模块 ·", application_home)
+        self.assertNotIn("首个特化模块 ·", application_home)
+        self.assertIn(".mode-hub-shell > .mode-hub-grid { grid-row: 2 / 4; }", application_home_styles)
+        self.assertIn(".mode-hub-shell > .mode-hub-footer { grid-row: 4; }", application_home_styles)
+        self.assertIn("align-self: center;", application_home_styles)
+        self.assertIn("height: min(520px, calc(100% - 48px));", application_home_styles)
         self.assertIn("resolveApplicationSurface", frontend_main)
         self.assertIn("<ApplicationHome themeId={initialThemeId}", frontend_main)
         self.assertIn("literature/index.html", vite)
@@ -85,6 +98,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("功能大厅", literature_app)
         self.assertIn("workbenchSettingsUrl", literature_app)
         self.assertIn("打开全局设置", literature_app)
+        self.assertNotIn("和文献一起讨论", literature_app)
         self.assertIn('data-skin-slot="literature-shell"', literature_app)
         self.assertIn('className="activity-bar"', literature_app)
         self.assertIn('data-skin-slot="activity-navigation"', literature_app)
@@ -107,6 +121,11 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("workmode-public-api-base", literature_navigation)
         self.assertIn("workmode-public-literature-project", literature_navigation)
         self.assertIn('target / "index.html"', backend_main)
+        self.assertIn("createBackendLiteratureProject", literature_app)
+        self.assertIn("removeBackendProject", literature_app)
+        self.assertIn("新建文献项目", literature_app)
+        self.assertIn("deleteBackendNote", literature_app)
+        self.assertIn("删除笔记", literature_app)
 
     def test_literature_pdf_drop_requires_confirmation_without_fake_chat_messages(self) -> None:
         literature_app = LITERATURE_APP_SOURCE.read_text(encoding="utf-8")
@@ -147,8 +166,8 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("literature_project_contract_version", launcher)
         self.assertIn("ConvertFrom-Json", launcher)
         self.assertIn("incompatible Workmode backend", launcher)
-        self.assertIn("$ExpectedLiteratureContractVersion = 3", launcher)
-        self.assertIn('"literature_project_contract_version": 3', routes)
+        self.assertIn("$ExpectedLiteratureContractVersion = 5", launcher)
+        self.assertIn('"literature_project_contract_version": 5', routes)
 
     def test_source_launcher_returns_only_the_backend_python_path(self) -> None:
         launcher = SOURCE_LAUNCHER.read_text(encoding="utf-8")
@@ -252,6 +271,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertEqual(allowed_urls, {
             "https://platform.deepseek.com/*",
             "https://api-docs.deepseek.com/*",
+            "https://mineru.net/*",
             "mailto:*",
         })
 
@@ -332,6 +352,12 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn(".workmode-skin", theme_panel)
         self.assertIn(".settings-open .side-panel", css)
         self.assertIn("grid-column: 2 / -1", css)
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", css)
+        self.assertIn(".settings-open .achievement-grid", css)
+        self.assertRegex(
+            app_source,
+            r'settings-section-memory[\s\S]+在聊天顶部显示工作记忆[\s\S]+</section>',
+        )
         self.assertIn(".custom-skin-loader", css)
         self.assertIn("customSkin={customSkin}", app_source)
         self.assertIn("skinUsesChrome", app_source)

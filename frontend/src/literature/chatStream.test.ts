@@ -85,6 +85,34 @@ describe('literature live chat timeline', () => {
     expect(state.messages).toEqual([])
   })
 
+  it('inserts persisted system context before the optimistic user message', () => {
+    let state = createLiveChatState([{
+      id: 'local-user',
+      role: 'user',
+      text: '介绍一下',
+    }], 'run-system', 0)
+
+    state = reduceLiveChatEvent(state, {
+      type: 'system_message',
+      message: {
+        id: 'selection-event',
+        role: 'system',
+        content: '用户当前选择了以下文献：\n- source.pdf',
+        ts: '2026-07-15T00:00:00Z',
+        meta: {
+          event: 'literature_selection_changed',
+          paper_ids: ['paper-1'],
+        },
+      },
+    })
+
+    expect(state.messages.map((message) => message.role)).toEqual(['system', 'user'])
+    expect(state.messages[0]).toMatchObject({
+      text: '用户当前选择了以下文献：\n- source.pdf',
+      paperIds: ['paper-1'],
+    })
+  })
+
   it('clears the transient next-round notice when the turn finishes', () => {
     const continuing = chatActionMessageForEvent('', { type: 'loop_continue', round: 2 })
     const finished = chatActionMessageForEvent(continuing, { type: 'done' })
