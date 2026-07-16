@@ -3,3 +3,4 @@ uvicorn[standard]>=0.29,<1.0
 pydantic>=2,<3
 httpx>=0.27,<1.0
 pypdf>=6.1,<7
+dashscope>=1.26,<2

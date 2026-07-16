@@ -57,6 +57,12 @@ export async function generateDesktopBugReport(report: string): Promise<DesktopB
   return bundle
 }
 
+export async function revealLocalItem(path: string): Promise<boolean> {
+  if (!isDesktopApp()) return false
+  await revealItemInDir(path)
+  return true
+}
+
 export async function openExternalUrl(url: string) {
   if (isDesktopApp()) {
     await openUrl(url)

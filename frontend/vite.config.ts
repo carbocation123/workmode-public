@@ -8,7 +8,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        literature: 'literature/index.html'
+        literature: 'literature/index.html',
+        transcription: 'transcription/index.html'
       }
     }
   },

@@ -842,6 +842,7 @@ pre {
   grid-template-columns: repeat(2, minmax(320px, 1fr));
   grid-template-areas:
     "model mineru"
+    "dashscope dashscope"
     "theme theme"
     "support onboarding"
     "connection onboarding"
@@ -864,6 +865,7 @@ pre {
 
 .settings-open .settings-section-model { grid-area: model; }
 .settings-open .settings-section-mineru { grid-area: mineru; }
+.settings-open .settings-section-dashscope { grid-area: dashscope; }
 .settings-open .settings-section-theme { grid-area: theme; }
 .settings-open .settings-section-support { grid-area: support; }
 .settings-open .settings-section-onboarding { grid-area: onboarding; }
@@ -880,6 +882,10 @@ pre {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.settings-open .settings-section-dashscope {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .settings-open .settings-section-model > .settings-label,
 .settings-open .settings-section-model > details,
 .settings-open .settings-section-model > .settings-hint,
@@ -890,6 +896,10 @@ pre {
 .settings-open .settings-section-mineru > .settings-hint,
 .settings-open .settings-section-mineru > .settings-toggle,
 .settings-open .settings-section-mineru > button,
+.settings-open .settings-section-dashscope > .settings-label,
+.settings-open .settings-section-dashscope > .settings-hint,
+.settings-open .settings-section-dashscope > .settings-toggle,
+.settings-open .settings-section-dashscope > button,
 .settings-open .settings-field-wide {
   grid-column: 1 / -1;
 }
@@ -908,6 +918,7 @@ pre {
     grid-template-areas:
       "model"
       "mineru"
+      "dashscope"
       "theme"
       "support"
       "onboarding"

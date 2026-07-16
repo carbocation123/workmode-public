@@ -113,6 +113,11 @@ class MineruSettingsUpdate(BaseModel):
     mineru_timeout_seconds: int | None = Field(default=None, ge=60, le=1800)
 
 
+class DashscopeSettingsUpdate(BaseModel):
+    dashscope_api_key: str | None = Field(default=None, max_length=10000)
+    clear_api_key: bool = False
+
+
 class Message(BaseModel):
     id: str
     role: Literal["user", "assistant", "system", "tool"]

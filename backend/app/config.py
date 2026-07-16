@@ -77,6 +77,13 @@ def managed_projects_dir() -> Path:
     return (Path.home() / "workmode").resolve()
 
 
+def transcription_workspace_dir() -> Path:
+    override = os.getenv("WORKMODE_TRANSCRIPTION_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+    return (managed_projects_dir() / "meeting-transcription").resolve()
+
+
 def _allowed_origins() -> tuple[str, ...]:
     raw = os.getenv("WORKMODE_ALLOWED_ORIGINS")
     if raw:
@@ -127,6 +134,8 @@ class Settings:
     mineru_model_version: str
     mineru_language: str
     mineru_timeout_seconds: int
+    dashscope_api_key: str | None
+    transcription_workspace_dir: Path
 
 
 def load_settings() -> Settings:
@@ -153,6 +162,12 @@ def load_settings() -> Settings:
         mineru_timeout_seconds=_bounded_env_int(
             "WORKMODE_MINERU_TIMEOUT_SECONDS", 180, 60, 1800
         ),
+        dashscope_api_key=(
+            os.getenv("WORKMODE_DASHSCOPE_API_KEY")
+            or os.getenv("DASHSCOPE_API_KEY")
+            or None
+        ),
+        transcription_workspace_dir=transcription_workspace_dir(),
     )
 
 

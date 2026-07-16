@@ -32,6 +32,7 @@ describe('literature onboarding', () => {
     expect(literature).toContain('<LiteratureOnboarding')
     expect(workbench).toContain('settings-section-mineru')
     expect(workbench).toContain('重新播放文献模式引导')
-    expect(workbench).toContain("settingsReturnSurface !== 'literature' && <FirstRunWizard")
+    expect(workbench).toContain('settingsReturnSurface === null && <FirstRunWizard')
+    expect(workbench).toContain("settingsReturnSurface === null && onboardingProgress.stage === 'tour'")
   })
 })

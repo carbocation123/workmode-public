@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type Project } from './api'
 import { skinUsesChrome, type ActiveCustomSkin } from './customSkin'
 import { prepareLiteratureWorkbench } from './literatureLauncher'
-import { workbenchUrl } from './literatureNavigation'
+import { transcriptionWorkbenchUrl, workbenchUrl } from './literatureNavigation'
 import { SkinChrome } from './SkinChrome'
 import { THEMES, type ThemeId } from './theme'
 
@@ -111,11 +111,25 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
           <span className="mode-card-meta">文献特化模块 · {literatureProjects.length} 个文献项目</span>
           <span className="mode-card-enter">{openingLiterature ? '正在打开…' : '进入文献智库 →'}</span>
         </button>
+
+        <button
+          type="button"
+          className="mode-card mode-card-transcription"
+          data-skin-slot="feature-card"
+          onClick={() => window.location.assign(transcriptionWorkbenchUrl(window.location.href))}
+        >
+          <span className="mode-card-index">03 / FILE TOOL</span>
+          <span className="mode-card-icon">声</span>
+          <strong>会议录音转文字</strong>
+          <p>批量上传录音，使用 Fun-ASR 区分说话人，并集中查看与导出转写结果。</p>
+          <span className="mode-card-meta">独立文件工具 · 不创建项目或对话</span>
+          <span className="mode-card-enter">打开转写工具 →</span>
+        </button>
       </section>
 
       <footer className="mode-hub-footer">
-        <span>本地优先 · 所有入口共享 Workmode 会话内核</span>
-        <span>更多特化科研模块将作为同级入口加入</span>
+        <span>本地文件优先 · 项目会话仅由工作台管理</span>
+        <span>转写工具只读取自己的 input / output 目录</span>
       </footer>
       {error && <div className="mode-hub-error" role="alert">{error}</div>}
     </main>

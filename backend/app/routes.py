@@ -29,6 +29,7 @@ from .models import (
     FileWriteRequest,
     MemoryUpdate,
     MineruSettingsUpdate,
+    DashscopeSettingsUpdate,
     ModelConnectionTest,
     ModelSettingsUpdate,
     ProjectCreate,
@@ -108,6 +109,8 @@ def _settings_payload() -> dict[str, object]:
         "mineru_model_version": current.mineru_model_version,
         "mineru_language": current.mineru_language,
         "mineru_timeout_seconds": current.mineru_timeout_seconds,
+        "dashscope_api_key_set": bool(current.dashscope_api_key),
+        "transcription_workspace_dir": str(current.transcription_workspace_dir),
     }
 
 
@@ -131,6 +134,18 @@ def update_mineru_settings(payload: MineruSettingsUpdate) -> dict[str, object]:
     if payload.mineru_timeout_seconds is not None:
         updates["WORKMODE_MINERU_TIMEOUT_SECONDS"] = str(payload.mineru_timeout_seconds)
 
+    update_env_file(updates)
+    return {"settings": _settings_payload()}
+
+
+@router.put("/settings/dashscope")
+def update_dashscope_settings(payload: DashscopeSettingsUpdate) -> dict[str, object]:
+    updates: dict[str, str] = {}
+    if payload.clear_api_key:
+        updates["WORKMODE_DASHSCOPE_API_KEY"] = ""
+        updates["DASHSCOPE_API_KEY"] = ""
+    elif payload.dashscope_api_key is not None and payload.dashscope_api_key.strip():
+        updates["WORKMODE_DASHSCOPE_API_KEY"] = payload.dashscope_api_key.strip()
     update_env_file(updates)
     return {"settings": _settings_payload()}
 

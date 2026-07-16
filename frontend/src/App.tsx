@@ -74,6 +74,7 @@ import {
 import {
   applicationHomeUrl,
   literatureWorkbenchUrl,
+  transcriptionWorkbenchUrl,
   resolveSettingsReturnSurface,
   resolveWorkbenchPanel,
 } from './literatureNavigation'
@@ -224,6 +225,9 @@ export default function App() {
   })
   const [mineruSaving, setMineruSaving] = useState(false)
   const [clearMineruApiKey, setClearMineruApiKey] = useState(false)
+  const [dashscopeDraft, setDashscopeDraft] = useState({ dashscope_api_key: '' })
+  const [dashscopeSaving, setDashscopeSaving] = useState(false)
+  const [clearDashscopeApiKey, setClearDashscopeApiKey] = useState(false)
   const [rightWidth, setRightWidth] = useState(() => Number(localStorage.getItem('workmode-file-width') || '460'))
   const [newProject, setNewProject] = useState({ name: '', root_path: '', description: '' })
   const [streaming, setStreaming] = useState(false)
@@ -489,6 +493,7 @@ export default function App() {
       mineru_language: payload.settings.mineru_language,
       mineru_timeout_seconds: String(payload.settings.mineru_timeout_seconds)
     })
+    setDashscopeDraft({ dashscope_api_key: '' })
   }
 
   useEffect(() => {
@@ -690,6 +695,25 @@ export default function App() {
       setError(String(exc))
     } finally {
       setMineruSaving(false)
+    }
+  }
+
+  async function saveDashscopeSettings() {
+    setDashscopeSaving(true)
+    setError('')
+    try {
+      const payload = await api.saveDashscopeSettings({
+        dashscope_api_key: dashscopeDraft.dashscope_api_key.trim() || undefined,
+        clear_api_key: clearDashscopeApiKey
+      })
+      setSettings(payload.settings)
+      setDashscopeDraft({ dashscope_api_key: '' })
+      setClearDashscopeApiKey(false)
+      setStatus('DashScope 设置已保存，下一次 Fun-ASR 转写立即生效')
+    } catch (exc) {
+      setError(String(exc))
+    } finally {
+      setDashscopeSaving(false)
     }
   }
 
@@ -1069,6 +1093,11 @@ export default function App() {
       window.location.assign(literatureWorkbenchUrl(window.location.href))
       return
     }
+    if (settingsReturnSurface === 'transcription') {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      window.location.assign(transcriptionWorkbenchUrl(window.location.href))
+      return
+    }
     setActivePanel('project')
   }
 
@@ -1117,7 +1146,9 @@ export default function App() {
             type="button"
             className={`activity-btn ${activePanel === 'settings' ? 'active' : ''}`}
             title={activePanel === 'settings'
-              ? settingsReturnSurface === 'literature' ? '返回文献智库' : '返回项目工作区'
+              ? settingsReturnSurface === 'literature'
+                ? '返回文献智库'
+                : settingsReturnSurface === 'transcription' ? '返回会议转写' : '返回项目工作区'
               : '设置'}
             onClick={toggleSettingsPanel}
           >
@@ -1619,6 +1650,40 @@ export default function App() {
                 {mineruSaving ? '保存中…' : '保存 MinerU 设置'}
               </button>
             </section>
+            <section className="settings-section settings-section-dashscope">
+              <div className="settings-label">DashScope 会议转写</div>
+              <p className="settings-hint">
+                会议录音转文字固定使用 Fun-ASR 与说话人区分。API Key 只保存在本机配置中，不会写入录音目录、转写结果或错误日志。
+              </p>
+              <label className="settings-field settings-field-wide">
+                <span>DashScope API Key</span>
+                <input
+                  className="project-create-input"
+                  type="password"
+                  value={dashscopeDraft.dashscope_api_key}
+                  onChange={(event) => setDashscopeDraft({ dashscope_api_key: event.target.value })}
+                  placeholder={settings?.dashscope_api_key_set ? '已配置；留空则不修改' : '未配置'}
+                  disabled={clearDashscopeApiKey}
+                />
+              </label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={clearDashscopeApiKey}
+                  onChange={(event) => setClearDashscopeApiKey(event.target.checked)}
+                />
+                清空当前 DashScope API Key
+              </label>
+              <div className="settings-hint">转写目录：{settings?.transcription_workspace_dir || '正在读取…'}</div>
+              <button
+                type="button"
+                className="project-create-submit"
+                onClick={saveDashscopeSettings}
+                disabled={dashscopeSaving}
+              >
+                {dashscopeSaving ? '保存中…' : '保存 DashScope 设置'}
+              </button>
+            </section>
             <section className="settings-section settings-section-theme">
               <div className="settings-label">外观与皮肤</div>
               <ThemePanel
@@ -1904,7 +1969,7 @@ export default function App() {
         <span className="status-segment status-segment-meta">{status}</span>
       </footer>
 
-      {settingsReturnSurface !== 'literature' && <FirstRunWizard
+      {settingsReturnSurface === null && <FirstRunWizard
         stage={onboardingProgress.stage}
         draft={{
           model_base_url: settingsDraft.model_base_url,
@@ -1928,7 +1993,7 @@ export default function App() {
         onChooseProject={chooseOwnProjectFromOnboarding}
       />}
 
-      {settingsReturnSurface !== 'literature' && onboardingProgress.stage === 'tour' && (
+      {settingsReturnSurface === null && onboardingProgress.stage === 'tour' && (
         <GuidedTour
           step={onboardingProgress.tourStep}
           onStep={(tourStep) => setOnboardingProgress((previous) => ({ ...previous, tourStep }))}

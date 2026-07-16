@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import APP_NAME, APP_VERSION, settings
 from .history_repair import repair_stale_tool_runs
 from .literature_routes import router as literature_router
+from .transcription.routes import recover_transcription_jobs, router as transcription_router
 from .routes import router
 from .storage import data_dir, ensure_data_dirs, sessions_dir
 
@@ -62,6 +63,7 @@ async def local_security_boundary(request: Request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     ensure_data_dirs()
+    recover_transcription_jobs()
     report = repair_stale_tool_runs(
         sessions_dir(),
         data_dir() / "backups" / "history-repair",
@@ -79,6 +81,7 @@ def startup() -> None:
 
 app.include_router(router)
 app.include_router(literature_router)
+app.include_router(transcription_router)
 
 
 FRONTEND_DIST = settings.static_dir

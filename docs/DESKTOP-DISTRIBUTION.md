@@ -12,7 +12,7 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 0.7.0 起 GitHub Release 只包含安装器、更新签名、更新清单和校验文件，不再附带 `.workmode-skin`。用户取得维护者手动发放的奖励皮肤后，可在「设置 → 外观与皮肤」中选择一个或多个包导入；皮肤不需要复制进安装目录，也不需要重新安装应用。
 
-安装器包含 React 主工作台与文献智库页面、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。两个前端页面由同一个 Vite 构建输出到 `frontend/dist`，Tauri 将整份目录打入应用；文献智库不需要额外端口、Node 进程或第二个安装包。目标电脑不需要 Node.js、Python 或 Rust，默认按当前用户安装，不要求管理员权限。
+安装器包含 React 功能大厅/主工作台、文献智库和会议转写页面、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。三个 Vite 页面由同一次构建输出到 `frontend/dist`，Tauri 将整份目录打入应用；文献智库和会议转写都不需要额外端口、Node 进程或第二个安装包。Python staging 会从 `backend/requirements.txt` 安装 DashScope SDK，因此目标电脑仍不需要预装 Node.js、Python 或 Rust；应用默认按当前用户安装，不要求管理员权限。
 
 首次启动会显示可跳过的新手向导：模型草稿先做连接探测，成功后才落本机配置；DeepSeek 新用户可从向导打开官方注册、充值和 API Key 页面，并一键填入官方 V4 Pro/Flash 配置；随后用户选择教程或自己的项目，并通过六步界面高亮开始工作。外部链接由 Tauri Opener 在系统浏览器打开，capability 仅允许 DeepSeek 官方平台和文档域名。引导、教程任务和成就状态保存在桌面 WebView 本地存储，不写进用户项目或模型上下文。
 

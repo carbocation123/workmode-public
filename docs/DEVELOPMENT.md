@@ -74,9 +74,9 @@ npx --yes npm@10.9.4 ci --ignore-scripts --no-audit --no-fund
 Pop-Location
 ```
 
-打开 `http://127.0.0.1:5173` 进入应用级功能大厅，选择「科研工作台」或「文献智库」。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库。三个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不再启动独立的 5176 前端。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
+打开 `http://127.0.0.1:5173` 进入应用级功能大厅。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库，`http://127.0.0.1:5173/transcription/` 是无 session 的会议转写工具。四个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不启动额外前端服务。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
 
-`vite.config.ts` 的多页面 `input` 必须保持为相对 frontend root 的 `index.html` 与 `literature/index.html`。Vite 8/Rolldown 在 Windows 上会拒绝把绝对盘符路径直接作为生成资产名；修改入口后必须在 Windows 上执行一次 `npm run build`，不能只验证 dev server。
+`vite.config.ts` 的多页面 `input` 必须保持为相对 frontend root 的 `index.html`、`literature/index.html` 与 `transcription/index.html`。Vite 8/Rolldown 在 Windows 上会拒绝把绝对盘符路径直接作为生成资产名；修改入口后必须在 Windows 上执行一次 `npm run build`，不能只验证 dev server。
 
 ```powershell
 npm ci --prefix desktop
@@ -103,6 +103,19 @@ WORKMODE_MINERU_TIMEOUT_SECONDS=180
 文献 session 的默认交互契约是：新 session 先持久化一条 assistant 自我介绍；确认上传只写项目文件和 `literature_import_confirmed` system 事件，不调用模型、不自动选择文献；下一次聊天开始时通过 `system_message` SSE 显示尚未跟随用户消息的导入事件。论文选择变化由共享 chat route 写入 `literature_selection_changed`，相同选择不重复记录，取消全部选择会留下明确事件。调试这些行为时同时检查 session JSONL、`build_llm_messages()` 输出与文献时间线，不要只看 React 临时 state。
 
 两个模式的会话重命名都必须调用共享 `api.updateSession()` / `PATCH /api/work/sessions/{id}`，不得在文献模块另建标题存储。修改后应验证工作台行内编辑和文献 session 选择器即时显示新名称，并确认对应 JSONL 没有被重写。
+
+## DashScope Fun-ASR 会议转写
+
+会议转写不是第三套 Workmode 项目或对话。默认工作目录是 `D:\workmode\meeting-transcription`（没有 D 盘时为 `~/workmode/meeting-transcription`），可以用 `WORKMODE_TRANSCRIPTION_DIR` 覆盖；目录协议只有 `tools/`、`input/` 与 `output/`。列表只能扫描 `output/<任务 ID>/meta.json`，根目录中由通用工作台增加的 `WORKMODE.md`、笔记或其它文件必须被忽略。
+
+在共享设置页保存密钥，或在本地 `.env` 设置：
+
+```text
+WORKMODE_DASHSCOPE_API_KEY=
+WORKMODE_TRANSCRIPTION_DIR=
+```
+
+API 上传使用流式请求暂存原始文件，不把大音频读入内存；单工作线程依次执行 Files API、`fun-asr` 异步任务和结果下载。签名 URL 只存在调用栈，`meta.json` 只保存模型、远端 task ID、状态与相对路径。未完成任务在后端启动时从 `meta.json` 恢复。新增或修改该模块时至少验证：多文件列表、无关根文件隔离、远端 task ID 恢复、失败重试、标题修改、输入输出成对软删除与无覆盖恢复、前端构建，以及未配置 Key 时不写入输入文件。
 
 文献项目的新建入口只提交项目名称，默认托管根目录规则为：显式 `WORKMODE_MANAGED_PROJECTS_DIR` 优先；否则 Windows 有 D 盘时使用 `D:\workmode`，其余环境使用 `~/workmode`。后端负责安全目录名和同名序号，不允许前端拼接绝对路径。旧客户端仍可传 `root_path`；旧注册项目保持原地，访问文献投影时只幂等补齐缺失结构。相关回归必须覆盖名称创建、同名冲突、旧路径不搬迁、缺失结构补齐以及项目软删除不碰实体目录。
 

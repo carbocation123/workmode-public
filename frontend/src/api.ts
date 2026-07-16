@@ -83,6 +83,8 @@ export interface AppSettings {
   mineru_model_version: 'pipeline' | 'vlm'
   mineru_language: 'ch' | 'en' | 'ch_server' | 'japan'
   mineru_timeout_seconds: number
+  dashscope_api_key_set: boolean
+  transcription_workspace_dir: string
 }
 
 export interface ModelSettingsUpdate {
@@ -129,6 +131,11 @@ export interface MineruSettingsUpdate {
   mineru_model_version?: 'pipeline' | 'vlm'
   mineru_language?: 'ch' | 'en' | 'ch_server' | 'japan'
   mineru_timeout_seconds?: number
+}
+
+export interface DashscopeSettingsUpdate {
+  dashscope_api_key?: string
+  clear_api_key?: boolean
 }
 
 export interface ActiveContextItem {
@@ -217,6 +224,12 @@ export const api = {
   },
   async saveMineruSettings(payload: MineruSettingsUpdate) {
     return request<{ settings: AppSettings }>('/settings/mineru', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    })
+  },
+  async saveDashscopeSettings(payload: DashscopeSettingsUpdate) {
+    return request<{ settings: AppSettings }>('/settings/dashscope', {
       method: 'PUT',
       body: JSON.stringify(payload)
     })

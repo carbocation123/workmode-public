@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from app.transcription.dashscope_fun_asr import Segment, TranscriptionResult
-from app.transcription.workspace import TranscriptionWorkspace
+from app.transcription.workspace import TranscriptionWorkspace, WorkspaceError
 
 
 class _FakeTranscriber:
@@ -105,6 +105,20 @@ class TranscriptionWorkspaceTests(unittest.TestCase):
         self.assertEqual([item["speaker"] for item in transcript], ["Speaker 1", "Speaker 2"])
         self.assertIn("Speaker 1：第一句。", (output_dir / "transcript.txt").read_text(encoding="utf-8"))
         self.assertNotIn("api_key", json.dumps(completed).lower())
+
+    def test_tampered_metadata_cannot_escape_the_fixed_input_and_output_folders(self) -> None:
+        untouched = self.root / "workbench-note.md"
+        untouched.write_text("must survive", encoding="utf-8")
+        job = self.workspace.create_job(filename="meeting.wav", source=io.BytesIO(b"audio"), start=False)
+        meta_path = self.root / job["output_path"] / "meta.json"
+        tampered = json.loads(meta_path.read_text(encoding="utf-8"))
+        tampered["input_path"] = "workbench-note.md"
+        meta_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+        self.assertEqual(self.workspace.list_jobs(), [])
+        with self.assertRaises(WorkspaceError):
+            self.workspace.delete_job(job["id"])
+        self.assertEqual(untouched.read_text(encoding="utf-8"), "must survive")
 
     def test_title_update_and_recoverable_delete_move_only_the_selected_job(self) -> None:
         keep = self.root / "通用工作台笔记.md"
