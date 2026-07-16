@@ -20,6 +20,8 @@ class ModelSettingsApiTest(unittest.TestCase):
                 "WORKMODE_MINERU_MODEL_VERSION",
                 "WORKMODE_MINERU_LANGUAGE",
                 "WORKMODE_MINERU_TIMEOUT_SECONDS",
+                "WORKMODE_DASHSCOPE_API_KEY",
+                "DASHSCOPE_API_KEY",
             )
         }
         os.environ["WORKMODE_ENV_FILE"] = os.path.join(self.tmp.name, ".env")
@@ -30,6 +32,8 @@ class ModelSettingsApiTest(unittest.TestCase):
         os.environ.pop("WORKMODE_MINERU_MODEL_VERSION", None)
         os.environ.pop("WORKMODE_MINERU_LANGUAGE", None)
         os.environ.pop("WORKMODE_MINERU_TIMEOUT_SECONDS", None)
+        os.environ.pop("WORKMODE_DASHSCOPE_API_KEY", None)
+        os.environ.pop("DASHSCOPE_API_KEY", None)
 
         from app import config
         from app.main import app
@@ -120,6 +124,20 @@ class ModelSettingsApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 422)
+
+    def test_dashscope_settings_are_persisted_without_echoing_the_secret(self) -> None:
+        response = self.client.put(
+            "/api/settings/dashscope",
+            json={"dashscope_api_key": "dashscope-secret"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        settings = response.json()["settings"]
+        self.assertTrue(settings["dashscope_api_key_set"])
+        self.assertNotIn("dashscope_api_key", settings)
+        with open(os.environ["WORKMODE_ENV_FILE"], encoding="utf-8") as handle:
+            env_text = handle.read()
+        self.assertIn("WORKMODE_DASHSCOPE_API_KEY=dashscope-secret", env_text)
 
     def test_invalid_manual_mineru_environment_falls_back_to_safe_defaults(self) -> None:
         from app import config
