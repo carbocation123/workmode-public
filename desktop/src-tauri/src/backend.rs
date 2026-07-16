@@ -31,9 +31,18 @@ impl BackendLaunchSpec {
         env.insert("WORKMODE_APP_VERSION".to_string(), app_version.to_string());
         env.insert("WORKMODE_HOST".to_string(), "127.0.0.1".to_string());
         env.insert("WORKMODE_PORT".to_string(), port.to_string());
+        let allowed_origins = if cfg!(debug_assertions) {
+            concat!(
+                "tauri://localhost,http://tauri.localhost,https://tauri.localhost,",
+                "http://127.0.0.1:5173,http://localhost:5173,",
+                "http://127.0.0.1:5174,http://localhost:5174"
+            )
+        } else {
+            "tauri://localhost,http://tauri.localhost,https://tauri.localhost"
+        };
         env.insert(
             "WORKMODE_ALLOWED_ORIGINS".to_string(),
-            "tauri://localhost,http://tauri.localhost,https://tauri.localhost".to_string(),
+            allowed_origins.to_string(),
         );
         env.insert("PYTHONUTF8".to_string(), "1".to_string());
         env.insert("PYTHONDONTWRITEBYTECODE".to_string(), "1".to_string());

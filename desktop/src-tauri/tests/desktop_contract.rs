@@ -90,7 +90,9 @@ fn debug_backend_launch_allows_local_vite_origins() {
         .get("WORKMODE_ALLOWED_ORIGINS")
         .expect("allowed origins");
 
-    assert!(origins.split(',').any(|origin| origin == "tauri://localhost"));
+    assert!(origins
+        .split(',')
+        .any(|origin| origin == "tauri://localhost"));
     assert!(origins
         .split(',')
         .any(|origin| origin == "http://127.0.0.1:5173"));

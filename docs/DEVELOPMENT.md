@@ -83,6 +83,8 @@ npm ci --prefix desktop
 npm --prefix desktop run dev
 ```
 
+桌面 debug 构建会在正式 Tauri 来源之外额外允许本机 Vite 的 `127.0.0.1:5173/5174` 与对应 `localhost` 来源访问动态后端，便于端口冲突时切换开发端口。release 构建仍只允许 `tauri://localhost`、`http://tauri.localhost` 与 `https://tauri.localhost`，不会把开发来源带入安装包。
+
 ## MinerU 与 PDF 直接阅读
 
 MinerU 是用户明确选择的高级增强解析，不是文献入库、选择或普通对话的默认步骤。设置页「MinerU 文献解析」可保存 Token、`pipeline`/`vlm`、文献语言和 60–1800 秒超时；也可直接在 `.env` 设置：

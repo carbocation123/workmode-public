@@ -193,7 +193,7 @@ docs/                架构、开发、发行与产品路线图
 
 PDF 拖入后先显示文件清单，只有用户点击「确认入库」才通过正式项目投影接口流式写入 `papers/unprocessed/pdf/`，并以 SHA-256 去重。成功记录只进入项目文献库，不会自动加入当前选择，也不会调用模型或处理流水线；后端在当前 session 中追加一条仅包含真实文件名和 paper ID 元数据的确认入库 system 事件。该事件在下一次用户发送消息前进入模型上下文并显示在正式时间线中，之后永久保留。文献选择变化同样在对应 session 中保存 system 事件；同一选择连续对话不会重复写入。`literature_read(part="full_text")` 优先读取 MinerU `full.md`；若 MinerU 未配置、失败或结果不存在，则直接读取原 PDF 的本地文本层并明确标记来源。MinerU 不是必需项，只有用户明确要求增强解析、结构化事实或归档，或普通文本层不足以回答时才使用；配置后会明显提高多栏正文、表格、公式和版面顺序的识别准确性，扫描件或纯图片 PDF 仍需 MinerU/OCR。`literature_process` 在同一高级工具调用中运行 MinerU、首页元数据抽取、标准命名和六段客观事实报告；传入 `paper_ids` 时最多并发处理 3 篇并逐篇返回结果。元数据请求使用 JSON object 响应约束并校验 `Cite This`/`layout.json` 证据是否真实存在；解析失败只修复一次，仍失败则把问题写入论文记录并继续生成事实报告。设置页可保存 MinerU Token、`pipeline`/`vlm`、语言和 60–1800 秒超时，默认 180 秒。事实报告保存为 `papers/unprocessed/extracted/<paper-id>/objective-facts.md`；归档会先检查 PDF 与解析目录的全部目标位置，再同步移动产物并重建 `processed-index.md`，目标冲突不会留下只移动了一半的 PDF。
 
-源码一键启动器会验证 `backend/.venv` 中的 Python 是否仍可执行；若系统 Python 被移动或卸载导致虚拟环境失效，会在安全校验路径后自动重建。安装依赖时的 pip 输出只写到终端，不再混入后续 `Start-Process` 的可执行文件路径；启动器也会规范化 Windows 环境中的 `Path`/`PATH` 重复项。
+源码一键启动器会验证 `backend/.venv` 中的 Python 是否仍可执行；若系统 Python 被移动或卸载导致虚拟环境失效，会在安全校验路径后自动重建。安装依赖时的 pip 输出只写到终端，不再混入后续 `Start-Process` 的可执行文件路径；启动器也会规范化 Windows 环境中的 `Path`/`PATH` 重复项。Tauri debug 构建允许本机 Vite 的 5173/5174 来源访问动态后端，正式 release 构建仍只允许 Tauri 自身来源。
 
 开发机上的 `.run/` 只保存 PID、临时发行配置、可重建 smoke 目录和项目自带开发工具。奖励皮肤维护库及其他不能提交的本地参考材料放在 `local-reference/`，其内容默认被 Git 忽略；公开应用构建与测试不得依赖这些本地文件。
 
