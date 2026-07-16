@@ -39,6 +39,7 @@ AMETHYST_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "amethyst-observatory.workmode
 CONSOLE_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "midnight-console.workmode-skin.json"
 GEM_TECH_SKIN_EXAMPLE = LEGACY_SKIN_EXAMPLE_DIR / "cryo-gem-tech.workmode-skin.json"
 DESKTOP_SOURCE = ROOT / "frontend" / "src" / "desktop.ts"
+DESKTOP_LIB_SOURCE = ROOT / "desktop" / "src-tauri" / "src" / "lib.rs"
 DESKTOP_CAPABILITIES = ROOT / "desktop" / "src-tauri" / "capabilities" / "default.json"
 TAURI_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.conf.json"
 ICON_SOURCE = ROOT / "desktop" / "src-tauri" / "icons" / "icon-source.png"
@@ -1024,6 +1025,20 @@ class DesktopUiContractTest(unittest.TestCase):
         )
         allowed_urls = [item["url"] for item in opener["allow"]]
         self.assertIn("mailto:*", allowed_urls)
+
+    def test_bug_report_generates_a_local_zip_and_reveals_it_without_uploading(self) -> None:
+        desktop = DESKTOP_SOURCE.read_text(encoding="utf-8")
+        desktop_lib = DESKTOP_LIB_SOURCE.read_text(encoding="utf-8")
+        dialog = BUG_REPORT_DIALOG_SOURCE.read_text(encoding="utf-8")
+        capabilities = json.loads(DESKTOP_CAPABILITIES.read_text(encoding="utf-8"))
+
+        self.assertIn("desktop_generate_bug_report", desktop)
+        self.assertIn("desktop_generate_bug_report", desktop_lib)
+        self.assertIn("revealItemInDir", desktop)
+        self.assertIn("一键生成错误报告", dialog)
+        self.assertIn("opener:allow-reveal-item-in-dir", capabilities["permissions"])
+        self.assertNotIn("fetch(", dialog)
+        self.assertNotIn("upload", dialog.lower())
 
     @unittest.skipUnless(PRIVATE_LEGACY_EXAMPLES_AVAILABLE, "private legacy skin fixtures are not present")
     def test_skin_lab_representative_examples_keep_their_baseline_recipes(self) -> None:
