@@ -80,6 +80,39 @@ fn backend_launch_spec_uses_dynamic_port_and_user_owned_paths() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
+fn debug_backend_launch_allows_local_vite_origins() {
+    let root = temp_dir("debug-backend-origins");
+    let paths = DesktopPaths::new(root.join("app-data"), root.join("resources"));
+    let spec = BackendLaunchSpec::new(&paths, 43123, "0.2.0");
+    let origins = spec
+        .env
+        .get("WORKMODE_ALLOWED_ORIGINS")
+        .expect("allowed origins");
+
+    assert!(origins.split(',').any(|origin| origin == "tauri://localhost"));
+    assert!(origins
+        .split(',')
+        .any(|origin| origin == "http://127.0.0.1:5173"));
+    assert!(origins
+        .split(',')
+        .any(|origin| origin == "http://127.0.0.1:5174"));
+}
+
+#[test]
+#[cfg(not(debug_assertions))]
+fn release_backend_launch_keeps_tauri_only_origins() {
+    let root = temp_dir("release-backend-origins");
+    let paths = DesktopPaths::new(root.join("app-data"), root.join("resources"));
+    let spec = BackendLaunchSpec::new(&paths, 43123, "0.2.0");
+
+    assert_eq!(
+        spec.env.get("WORKMODE_ALLOWED_ORIGINS").map(String::as_str),
+        Some("tauri://localhost,http://tauri.localhost,https://tauri.localhost")
+    );
+}
+
+#[test]
 fn selected_backend_port_can_be_bound_immediately() {
     let port = select_free_port().expect("select port");
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("bind selected port");
