@@ -27,6 +27,7 @@ fn desktop_paths_keep_user_data_outside_install_resources() {
     assert_eq!(paths.data_dir, app_data.join("data"));
     assert_eq!(paths.env_file, app_data.join("config").join(".env"));
     assert_eq!(paths.logs_dir, app_data.join("logs"));
+    assert_eq!(paths.reports_dir, app_data.join("reports"));
     assert_eq!(paths.backend_dir, resources.join("backend"));
     assert_eq!(
         paths.python_exe,
@@ -56,7 +57,8 @@ fn backend_launch_spec_uses_dynamic_port_and_user_owned_paths() {
             "--host",
             "127.0.0.1",
             "--port",
-            "43123"
+            "43123",
+            "--no-access-log"
         ]
     );
     assert_eq!(
