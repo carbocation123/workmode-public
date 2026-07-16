@@ -198,6 +198,31 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .transcription-error button { border: 0; color: inherit; background: transparent; cursor: pointer; }
 
 .transcription-modal-backdrop { position: fixed !important; inset: 0; z-index: 80 !important; display: grid; place-items: center; padding: 24px; background: var(--ui-overlay-background); backdrop-filter: blur(8px); }
+.transcription-guide-backdrop { position: fixed !important; inset: 0; z-index: 90 !important; display: grid; place-items: center; padding: 24px; background: var(--ui-overlay-background); backdrop-filter: blur(10px); }
+.transcription-guide-dialog { width: min(680px, 100%); border: 1px solid var(--ui-border-strong); border-radius: 18px; overflow: hidden; color: var(--ui-text); background: var(--ui-floating-background); box-shadow: 0 28px 90px var(--ui-shadow); outline: none; }
+.transcription-guide-dialog > header { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 22px 24px; border-bottom: 1px solid var(--ui-border); }
+.transcription-guide-mark { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid var(--ui-primary-border); border-radius: 14px; color: var(--ui-primary); background: var(--ui-primary-soft); font-size: 19px; font-weight: 800; }
+.transcription-guide-dialog header > div:nth-child(2) { min-width: 0; }
+.transcription-guide-dialog header span { color: var(--ui-primary); font: 700 9px "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; }
+.transcription-guide-dialog h2 { margin: 4px 0 0; font-size: 22px; }
+.transcription-guide-dialog header button { border: 0; color: var(--ui-text-muted); background: transparent; cursor: pointer; }
+.transcription-guide-body { padding: 28px 30px 24px; }
+.transcription-guide-body > p { margin: 0; color: var(--ui-text-muted); font-size: 13px; line-height: 1.8; }
+.transcription-guide-body ul { margin: 22px 0 0; padding: 0; display: grid; gap: 11px; list-style: none; }
+.transcription-guide-body li { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: start; gap: 8px; color: var(--ui-text); font-size: 12px; line-height: 1.6; }
+.transcription-guide-body li > span { width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; border-radius: 50%; color: var(--ui-success); background: var(--ui-success-soft); font-size: 10px; }
+.transcription-guide-configure { margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid var(--ui-warning-border); border-radius: 10px; background: var(--ui-warning-soft); }
+.transcription-guide-configure > span { color: var(--ui-warning); font-size: 11px; }
+.transcription-guide-configure > span.configured { color: var(--ui-success); }
+.transcription-guide-configure button { min-height: 32px; padding: 0 12px; border: 1px solid var(--ui-primary-border); border-radius: 7px; color: var(--ui-on-primary); background: var(--ui-primary); cursor: pointer; }
+.transcription-guide-dialog > footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 24px; border-top: 1px solid var(--ui-border); background: var(--ui-panel-background); }
+.transcription-guide-progress { display: flex; gap: 7px; }
+.transcription-guide-progress > span { width: 28px; height: 4px; border-radius: 999px; background: var(--ui-control-background); }
+.transcription-guide-progress > span.active { background: var(--ui-primary); }
+.transcription-guide-progress > span.done { background: var(--ui-success); }
+.transcription-guide-actions { display: flex; gap: 8px; }
+.transcription-guide-actions button { min-height: 34px; padding: 0 15px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text); background: var(--ui-control-background); cursor: pointer; }
+.transcription-guide-actions button:last-child { border-color: var(--ui-primary-border); color: var(--ui-on-primary); background: var(--ui-primary); }
 .transcription-trash-dialog { width: min(700px, 100%); max-height: min(680px, calc(100vh - 48px)); display: grid; grid-template-rows: auto minmax(0, 1fr); border: 1px solid var(--ui-border-strong); border-radius: 16px; overflow: hidden; background: var(--ui-floating-background); box-shadow: 0 28px 90px var(--ui-shadow); }
 .transcription-trash-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--ui-border); }
 .transcription-trash-dialog header div { display: flex; flex-direction: column; gap: 2px; }
@@ -245,4 +270,11 @@ button:disabled { opacity: .48; cursor: not-allowed; }
   .result-tabs { overflow-x: auto; padding: 0 12px; }
   .result-tabs span { display: none; }
   .transcription-document-body { padding: 22px 18px 50px; }
+  .transcription-guide-backdrop { padding: 12px; }
+  .transcription-guide-dialog > header { grid-template-columns: 42px minmax(0, 1fr); padding: 18px; }
+  .transcription-guide-dialog header > button { grid-column: 1 / -1; justify-self: end; }
+  .transcription-guide-body { padding: 22px 20px; }
+  .transcription-guide-configure { align-items: stretch; flex-direction: column; }
+  .transcription-guide-dialog > footer { align-items: stretch; flex-direction: column; }
+  .transcription-guide-actions { justify-content: flex-end; }
 }

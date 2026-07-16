@@ -82,6 +82,10 @@ import {
   LITERATURE_ONBOARDING_STORAGE_KEY,
   resetLiteratureOnboarding,
 } from './literature/onboarding'
+import {
+  TRANSCRIPTION_ONBOARDING_STORAGE_KEY,
+  resetTranscriptionOnboarding,
+} from './transcription/onboarding'
 
 type ActivePanel = 'project' | 'settings'
 const SUMMARY_PREFIX = '<CONTEXT_SUMMARY>\n\n'
@@ -338,6 +342,19 @@ export default function App() {
       return
     }
     setStatus('文献模式引导已重置，下次进入文献智库时播放')
+  }
+
+  function replayTranscriptionOnboarding() {
+    localStorage.setItem(
+      TRANSCRIPTION_ONBOARDING_STORAGE_KEY,
+      JSON.stringify(resetTranscriptionOnboarding())
+    )
+    if (settingsReturnSurface === 'transcription') {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      window.location.assign(transcriptionWorkbenchUrl(window.location.href))
+      return
+    }
+    setStatus('会议转写引导已重置，下次进入会议转写时播放')
   }
 
   useEffect(() => {
@@ -1701,6 +1718,7 @@ export default function App() {
               <div className="settings-button-row">
                 <button type="button" className="project-create-submit" onClick={replayOnboarding}>重新播放工作台引导</button>
                 <button type="button" className="project-create-submit" onClick={replayLiteratureOnboarding}>重新播放文献模式引导</button>
+                <button type="button" className="project-create-submit" onClick={replayTranscriptionOnboarding}>重新播放会议转写引导</button>
                 <button
                   type="button"
                   className="project-create-cancel"

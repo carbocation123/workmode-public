@@ -29,6 +29,12 @@ import {
   type TranscriptResult,
   type TranscriptionWorkspaceInfo,
 } from './transcriptionApi'
+import { TranscriptionOnboarding } from './TranscriptionOnboarding'
+import {
+  TRANSCRIPTION_ONBOARDING_STORAGE_KEY,
+  parseTranscriptionOnboarding,
+  resetTranscriptionOnboarding,
+} from './onboarding'
 
 
 interface TranscriptionAppProps {
@@ -69,6 +75,9 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
   const [trashOpen, setTrashOpen] = useState(false)
   const [trash, setTrash] = useState<DeletedTranscription[]>([])
   const [dragging, setDragging] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(() =>
+    !parseTranscriptionOnboarding(localStorage.getItem(TRANSCRIPTION_ONBOARDING_STORAGE_KEY)).completed,
+  )
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const selectedJob = useMemo(
@@ -224,6 +233,14 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
     }
   }
 
+  function replayGuide() {
+    localStorage.setItem(
+      TRANSCRIPTION_ONBOARDING_STORAGE_KEY,
+      JSON.stringify(resetTranscriptionOnboarding()),
+    )
+    setGuideOpen(true)
+  }
+
   return (
     <div className={`transcription-shell${hudLayoutActive ? ' hud-layout' : ''}`} data-skin-slot="transcription-shell">
       <div className="skin-background-layer" aria-hidden />
@@ -250,6 +267,7 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
           <span>{workspace?.path || '正在初始化目录…'}</span>
         </div>
         <div className="transcription-header-actions">
+          <button type="button" onClick={replayGuide}>使用指引</button>
           <button type="button" onClick={() => void showTrash()}>回收站</button>
           <button type="button" onClick={() => window.location.assign(workbenchSettingsUrl(window.location.href, 'transcription'))}>设置</button>
           <button type="button" className="primary" onClick={() => fileInputRef.current?.click()} disabled={uploading || !workspace?.dashscope_api_key_set}>
@@ -400,6 +418,14 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
             </div>
           </section>
         </div>
+      )}
+
+      {guideOpen && (
+        <TranscriptionOnboarding
+          dashscopeConfigured={Boolean(workspace?.dashscope_api_key_set)}
+          onConfigure={() => window.location.assign(workbenchSettingsUrl(window.location.href, 'transcription'))}
+          onClose={() => setGuideOpen(false)}
+        />
       )}
     </div>
   )

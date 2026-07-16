@@ -108,6 +108,8 @@ WORKMODE_MINERU_TIMEOUT_SECONDS=180
 
 会议转写不是第三套 Workmode 项目或对话。默认工作目录是 `D:\workmode\meeting-transcription`（没有 D 盘时为 `~/workmode/meeting-transcription`），可以用 `WORKMODE_TRANSCRIPTION_DIR` 覆盖；目录协议只有 `tools/`、`input/` 与 `output/`。列表只能扫描 `output/<任务 ID>/meta.json`，根目录中由通用工作台增加的 `WORKMODE.md`、笔记或其它文件必须被忽略。
 
+转写页使用独立的 `workmode-public-transcription-onboarding-v1` WebView 本地状态提供三步首次指引：配置 DashScope、批量上传、查看与导出。页面右上角和共享设置页都能重置并重播；这个状态不得写入转写根目录，也不得创建 Workmode session。修改步骤或持久化结构时同步更新 `frontend/src/transcription/onboarding.test.ts` 与页面契约测试。
+
 在共享设置页保存密钥，或在本地 `.env` 设置：
 
 ```text
