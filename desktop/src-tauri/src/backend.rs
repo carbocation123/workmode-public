@@ -49,6 +49,7 @@ impl BackendLaunchSpec {
                 "127.0.0.1".to_string(),
                 "--port".to_string(),
                 port.to_string(),
+                "--no-access-log".to_string(),
             ],
             env,
         }

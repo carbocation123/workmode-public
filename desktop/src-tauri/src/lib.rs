@@ -1,4 +1,5 @@
 pub mod backend;
+pub mod diagnostics;
 pub mod migration;
 pub mod paths;
 
@@ -12,6 +13,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use backend::{select_free_port, BackendLaunchSpec};
+use diagnostics::RunDiagnostics;
 use migration::{destination_has_user_data, migrate_legacy_portable};
 use paths::DesktopPaths;
 use serde::Serialize;
@@ -22,6 +24,7 @@ use tauri::{Manager, RunEvent, State};
 struct DesktopRuntime {
     port: u16,
     paths: DesktopPaths,
+    diagnostics: RunDiagnostics,
     child: Mutex<Option<Child>>,
     migration_available: AtomicBool,
 }
@@ -46,11 +49,15 @@ impl DesktopRuntime {
             .map_err(|error| error.to_string())?;
         ensure_env_file(&self.paths).map_err(|error| error.to_string())?;
 
-        let spec = BackendLaunchSpec::new(&self.paths, self.port, app_version);
-        let stdout = open_log(&self.paths.logs_dir.join("backend.out.log"))
-            .map_err(|error| error.to_string())?;
-        let stderr = open_log(&self.paths.logs_dir.join("backend.err.log"))
-            .map_err(|error| error.to_string())?;
+        let mut spec = BackendLaunchSpec::new(&self.paths, self.port, app_version);
+        spec.env.insert(
+            "WORKMODE_RUN_ID".to_string(),
+            self.diagnostics.run_id().to_string(),
+        );
+        let stdout =
+            open_log(&self.diagnostics.backend_stdout_path()).map_err(|error| error.to_string())?;
+        let stderr =
+            open_log(&self.diagnostics.backend_stderr_path()).map_err(|error| error.to_string())?;
         let mut command = Command::new(&spec.program);
         command
             .args(&spec.args)
@@ -68,6 +75,11 @@ impl DesktopRuntime {
             .spawn()
             .map_err(|error| format!("启动本地后端失败：{error}"))?;
         *guard = Some(child);
+        let _ = self.diagnostics.append_desktop_event(
+            "info",
+            "backend_started",
+            "local backend started",
+        );
         Ok(())
     }
 
@@ -88,6 +100,11 @@ impl DesktopRuntime {
             }
             let _ = child.kill();
             let _ = child.wait();
+            let _ = self.diagnostics.append_desktop_event(
+                "info",
+                "backend_stopped",
+                "local backend stopped",
+            );
         }
     }
 }
@@ -99,6 +116,7 @@ struct DesktopBootstrap {
     version: String,
     data_dir: String,
     env_file: String,
+    run_id: String,
     migration_available: bool,
 }
 
@@ -108,6 +126,14 @@ struct DesktopMigrationResult {
     copied_data: bool,
     copied_config: bool,
     relaunch_required: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopBugReport {
+    path: String,
+    file_name: String,
+    run_id: String,
 }
 
 #[tauri::command]
@@ -126,7 +152,43 @@ async fn desktop_bootstrap(
         version: app.package_info().version.to_string(),
         data_dir: runtime.paths.data_dir.to_string_lossy().into_owned(),
         env_file: runtime.paths.env_file.to_string_lossy().into_owned(),
+        run_id: runtime.diagnostics.run_id().to_string(),
         migration_available: runtime.migration_available.load(Ordering::SeqCst),
+    })
+}
+
+#[tauri::command]
+fn desktop_log_event(
+    level: String,
+    category: String,
+    message: String,
+    runtime: State<'_, DesktopRuntime>,
+) -> Result<(), String> {
+    runtime
+        .diagnostics
+        .append_frontend_event(&level, &category, &message)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn desktop_generate_bug_report(
+    report: String,
+    runtime: State<'_, DesktopRuntime>,
+) -> Result<DesktopBugReport, String> {
+    let bundle = runtime
+        .diagnostics
+        .generate_report(&report)
+        .map_err(|error| error.to_string())?;
+    let file_name = bundle
+        .path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Workmode-Public-Error.zip")
+        .to_string();
+    Ok(DesktopBugReport {
+        path: bundle.path.to_string_lossy().into_owned(),
+        file_name,
+        run_id: bundle.run_id,
     })
 }
 
@@ -285,9 +347,15 @@ pub fn run() {
             let resources = resource_root(app)?;
             let paths = DesktopPaths::new(app_data, resources);
             let migration_available = !destination_has_user_data(&paths.app_data_dir)?;
+            let diagnostics = RunDiagnostics::start(
+                &paths.logs_dir,
+                &paths.reports_dir,
+                app.package_info().version.to_string().as_str(),
+            )?;
             let runtime = DesktopRuntime {
                 port: select_free_port()?,
                 paths,
+                diagnostics,
                 child: Mutex::new(None),
                 migration_available: AtomicBool::new(migration_available),
             };
@@ -303,6 +371,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_bootstrap,
+            desktop_log_event,
+            desktop_generate_bug_report,
             migrate_legacy,
             desktop_prepare_update,
             desktop_recover_update
@@ -315,6 +385,7 @@ pub fn run() {
         if matches!(event, RunEvent::Exit | RunEvent::ExitRequested { .. }) {
             if let Some(runtime) = app_handle.try_state::<DesktopRuntime>() {
                 runtime.stop_backend();
+                let _ = runtime.diagnostics.mark_finished();
             }
         }
     });

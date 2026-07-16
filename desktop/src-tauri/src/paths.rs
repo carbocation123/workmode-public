@@ -9,6 +9,7 @@ pub struct DesktopPaths {
     pub config_dir: PathBuf,
     pub env_file: PathBuf,
     pub logs_dir: PathBuf,
+    pub reports_dir: PathBuf,
     pub resource_dir: PathBuf,
     pub backend_dir: PathBuf,
     pub python_exe: PathBuf,
@@ -22,6 +23,7 @@ impl DesktopPaths {
             data_dir: app_data_dir.join("data"),
             env_file: config_dir.join(".env"),
             logs_dir: app_data_dir.join("logs"),
+            reports_dir: app_data_dir.join("reports"),
             backend_dir: resource_dir.join("backend"),
             python_exe: resource_dir
                 .join("runtime")
@@ -42,6 +44,7 @@ impl DesktopPaths {
         fs::create_dir_all(&self.data_dir)?;
         fs::create_dir_all(&self.config_dir)?;
         fs::create_dir_all(&self.logs_dir)?;
+        fs::create_dir_all(&self.reports_dir)?;
         Ok(())
     }
 

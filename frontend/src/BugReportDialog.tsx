@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import supportQr from './assets/support-public-account-qr.jpg'
 import { buildSupportMailto, SUPPORT_EMAIL } from './bugReport'
-import { openExternalUrl } from './desktop'
+import { generateDesktopBugReport, isDesktopApp, openExternalUrl } from './desktop'
 
 interface BugReportDialogProps {
   report: string
@@ -26,6 +26,26 @@ async function copyText(value: string) {
 
 export function BugReportDialog({ report, onClose }: BugReportDialogProps) {
   const [status, setStatus] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const desktop = isDesktopApp()
+
+  async function generateReport() {
+    setGenerating(true)
+    setStatus('正在生成本次运行的脱敏错误报告……')
+    try {
+      const bundle = await generateDesktopBugReport(report)
+      if (!bundle) {
+        await copyText(report)
+        setStatus('当前浏览器模式不生成本地 ZIP，诊断信息已复制。')
+        return
+      }
+      setStatus(`已生成 ${bundle.fileName}，可从文件管理器直接拖拽发送。`)
+    } catch (error) {
+      setStatus(`生成错误报告失败：${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   async function copyReport() {
     try {
@@ -52,15 +72,18 @@ export function BugReportDialog({ report, onClose }: BugReportDialogProps) {
         <div className="bug-report-copy">
           <small>WORKMODE SUPPORT</small>
           <h2 id="bug-report-title">快速反馈 Bug</h2>
-          <p>扫码关注“研天雪”公众号后私信，发送问题描述、截图和诊断信息；也可以直接发邮件。</p>
+          <p>生成本次运行的脱敏错误报告后，文件管理器会自动定位 ZIP；可直接拖入微信、邮件或其它反馈渠道。</p>
           <div className="bug-report-actions">
+            <button type="button" className="project-create-submit" onClick={generateReport} disabled={generating}>
+              {generating ? '正在生成……' : desktop ? '一键生成错误报告' : '复制诊断信息'}
+            </button>
             <button type="button" className="project-create-submit" onClick={copyReport}>复制诊断信息</button>
             <button type="button" className="project-create-cancel" onClick={sendEmail}>发送邮件</button>
           </div>
           <a className="bug-report-email" href={buildSupportMailto(report)} onClick={(event) => { event.preventDefault(); sendEmail() }}>{SUPPORT_EMAIL}</a>
           {status && <div className="bug-report-status" role="status">{status}</div>}
           <details className="bug-report-preview">
-            <summary>查看将复制的诊断模板</summary>
+            <summary>查看报告说明模板</summary>
             <pre>{report}</pre>
           </details>
         </div>

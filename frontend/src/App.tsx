@@ -1426,9 +1426,9 @@ export default function App() {
               <div className="settings-support-content">
                 <div>
                   <strong>问题反馈</strong>
-                  <p className="settings-hint">遇到异常时可关注研天雪公众号后私信，或发送邮件。诊断模板不会读取用户内容或本地目录。</p>
+                  <p className="settings-hint">遇到异常时可生成本次运行的脱敏错误报告 ZIP；文件管理器会自动定位文件，方便拖入微信或邮件。</p>
                 </div>
-                <button type="button" className="project-create-submit" onClick={() => setShowBugReport(true)}>快速反馈 Bug</button>
+                <button type="button" className="project-create-submit" onClick={() => setShowBugReport(true)}>一键生成错误报告</button>
               </div>
             </section>
             <section className="settings-section settings-section-model">

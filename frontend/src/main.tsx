@@ -8,7 +8,12 @@ import {
   disableStoredActiveSkin,
   readStoredAppearance,
 } from './appearanceBootstrap'
-import { initializeDesktop } from './desktop'
+import {
+  generateDesktopBugReport,
+  initializeDesktop,
+  isDesktopApp,
+  logDesktopFrontendEvent,
+} from './desktop'
 import {
   CUSTOM_SKIN_STORAGE_KEY,
   LEGACY_CUSTOM_SKIN_STORAGE_KEY,
@@ -51,6 +56,20 @@ const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches 
 applyStoredAppearance(document.documentElement, initialAppearance, prefersDark)
 const initialThemeId = resolveTheme(initialAppearance.theme.selection, prefersDark)
 const initialSurface = resolveApplicationSurface(window.location.href)
+
+function frontendErrorText(value: unknown) {
+  if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ''}`
+  return String(value)
+}
+
+if (isDesktopApp()) {
+  window.addEventListener('error', (event) => {
+    void logDesktopFrontendEvent('error', 'window_error', frontendErrorText(event.error || event.message)).catch(() => undefined)
+  })
+  window.addEventListener('unhandledrejection', (event) => {
+    void logDesktopFrontendEvent('error', 'unhandled_rejection', frontendErrorText(event.reason)).catch(() => undefined)
+  })
+}
 if (initialSurface === 'home') {
   void refreshSkinAssetRuntime(document.documentElement, initialAppearance.activeSkin).catch(() => {
     disableStoredActiveSkin(localStorage, initialAppearance)
@@ -73,11 +92,30 @@ async function bootstrap() {
       </React.StrictMode>
     )
   } catch (error) {
+    const startupError = frontendErrorText(error)
+    void logDesktopFrontendEvent('error', 'desktop_startup', startupError).catch(() => undefined)
     root.render(
       <div className="desktop-startup-error">
         <h1>Workmode Public 启动失败</h1>
         <p>{error instanceof Error ? error.message : String(error)}</p>
-        <p>请重新启动应用；详细信息位于用户数据目录的 logs 文件夹。</p>
+        <p>可以生成本次启动的脱敏错误报告；文件管理器会自动定位 ZIP。</p>
+        <button
+          type="button"
+          onClick={async (event) => {
+            const button = event.currentTarget
+            button.disabled = true
+            button.textContent = '正在生成……'
+            try {
+              const bundle = await generateDesktopBugReport(`# Workmode Public 启动失败\n\n${startupError}`)
+              button.textContent = bundle ? `已生成 ${bundle.fileName}` : '仅桌面版支持生成 ZIP'
+            } catch (reportError) {
+              button.textContent = `生成失败：${reportError instanceof Error ? reportError.message : String(reportError)}`
+              button.disabled = false
+            }
+          }}
+        >
+          一键生成错误报告
+        </button>
       </div>
     )
   }

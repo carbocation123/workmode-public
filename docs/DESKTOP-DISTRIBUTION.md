@@ -22,14 +22,15 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 应用在皮肤加载阶段写入 boot guard，稳定三秒后清除；异常退出后下次启动自动停用该皮肤。运行时资源错误也会回退基础主题。`Ctrl+Alt+Shift+R` 仅清除皮肤选择并刷新应用，不删除用户数据。奖励皮肤维护库位于被 Git 忽略的 `local-reference/reward-skin-library/`；Release 构建脚本完全不读取 `local-reference/` 或 `.release-secrets/official-skin-ed25519.pem`，GitHub Actions 只上传 `release/desktop-<version>/` 根目录中的应用产物。
 
-设置页“快速反馈 Bug”使用安装包内置的公众号二维码，并允许用户复制脱敏诊断模板或通过系统默认邮件客户端写信给 `yantianxue_skye@qq.com`。打开反馈弹窗不会上传数据；Tauri Opener 仅放行 `mailto:*`，邮件发送必须由用户在邮件客户端中确认。模板不读取项目名、路径、会话正文或 API Key。
+设置页「一键生成错误报告」使用安装包内置的公众号二维码，并可把本次桌面运行打包成脱敏 ZIP。Tauri 每次启动在 `logs\runs\<run-id>\` 建立独立目录，只保留最近 20 次运行；点击按钮后只读取当前目录，截取每个日志文件末尾最多 512 KiB，对 Token、API Key、密码和 Windows 本地路径再次脱敏，再将 `report.md`、`manifest.json` 与 `current-run.log` 写入 `reports\`。Opener 的 `reveal_item_in_dir` 只负责让系统文件管理器选中成品，应用不上传、不代发，生成后的 ZIP 由用户自行拖入公众号私信、邮件或其它渠道，也由用户自行删除。
 
 用户状态位于 `%LOCALAPPDATA%\WorkmodePublic`，不放进安装目录：
 
 ```text
 config\.env
 data\
-logs\
+logs\runs\<run-id>\
+reports\
 ```
 
 因此正常覆盖安装、应用内升级和卸载程序文件不会主动删除项目注册、会话、工作记忆或 API 配置。

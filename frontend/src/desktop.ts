@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { openUrl } from '@tauri-apps/plugin-opener'
+import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type DownloadEvent } from '@tauri-apps/plugin-updater'
 import { runDesktopUpdateFlow } from './desktopUpdateFlow'
@@ -10,7 +10,14 @@ export interface DesktopInfo {
   version: string
   dataDir: string
   envFile: string
+  runId: string
   migrationAvailable: boolean
+}
+
+export interface DesktopBugReport {
+  path: string
+  fileName: string
+  runId: string
 }
 
 export interface DesktopUpdateInfo {
@@ -36,6 +43,18 @@ export async function initializeDesktop(): Promise<DesktopInfo | null> {
 
 export function getDesktopInfo() {
   return desktopInfo
+}
+
+export async function logDesktopFrontendEvent(level: string, category: string, message: string) {
+  if (!isDesktopApp()) return
+  await invoke('desktop_log_event', { level, category, message })
+}
+
+export async function generateDesktopBugReport(report: string): Promise<DesktopBugReport | null> {
+  if (!isDesktopApp()) return null
+  const bundle = await invoke<DesktopBugReport>('desktop_generate_bug_report', { report })
+  await revealItemInDir(bundle.path)
+  return bundle
 }
 
 export async function openExternalUrl(url: string) {

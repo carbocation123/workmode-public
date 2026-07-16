@@ -53,13 +53,8 @@ fn report_zip_contains_only_the_current_run_and_redacts_sensitive_values() {
     )
     .unwrap();
 
-    let diagnostics = RunDiagnostics::start_with_run_id(
-        &logs_dir,
-        &reports_dir,
-        "0.8.4",
-        "run-current",
-    )
-    .unwrap();
+    let diagnostics =
+        RunDiagnostics::start_with_run_id(&logs_dir, &reports_dir, "0.8.4", "run-current").unwrap();
     fs::write(
         diagnostics.backend_stdout_path(),
         "CURRENT_RUN_MARKER token=super-secret D:\\private\\paper.pdf\n",
@@ -74,14 +69,22 @@ fn report_zip_contains_only_the_current_run_and_redacts_sensitive_values() {
         .append_frontend_event(
             "error",
             "unhandledrejection",
-            "Authorization: Bearer another-secret at C:\\Users\\Alice\\project\\app.tsx",
+            "Authorization: Bearer another-secret at C:\\Users\\Alice\\project\\app.tsx and D:/private/source.ts",
         )
         .unwrap();
+    let stored_frontend_log = fs::read_to_string(
+        logs_dir
+            .join("runs")
+            .join("run-current")
+            .join("frontend.log"),
+    )
+    .unwrap();
+    assert!(!stored_frontend_log.contains("another-secret"));
+    assert!(!stored_frontend_log.contains("C:\\Users\\Alice"));
+    assert!(!stored_frontend_log.contains("D:/private"));
 
     let bundle = diagnostics
-        .generate_report(
-            "# Error report\nX-Workmode-Token: report-secret\nD:\\private\\notes.md",
-        )
+        .generate_report("# Error report\nX-Workmode-Token: report-secret\nD:\\private\\notes.md")
         .unwrap();
 
     assert!(bundle.path.is_file());
@@ -124,4 +127,26 @@ fn invalid_run_ids_are_rejected_before_creating_directories() {
 
     assert!(result.is_err());
     assert!(!temp.path.join("escape").exists());
+}
+
+#[test]
+fn old_run_logs_are_bounded_but_user_generated_reports_are_preserved() {
+    let temp = TempDir::new("diagnostics-retention");
+    let logs_dir = temp.path.join("logs");
+    let reports_dir = temp.path.join("reports");
+    fs::create_dir_all(logs_dir.join("runs")).unwrap();
+    fs::create_dir_all(&reports_dir).unwrap();
+    for index in 0..22 {
+        fs::create_dir_all(logs_dir.join("runs").join(format!("run-old-{index:02}"))).unwrap();
+    }
+    let user_report = reports_dir.join("keep-this-report.zip");
+    fs::write(&user_report, b"user managed").unwrap();
+
+    let diagnostics =
+        RunDiagnostics::start_with_run_id(&logs_dir, &reports_dir, "0.8.4", "run-current").unwrap();
+
+    let run_count = fs::read_dir(logs_dir.join("runs")).unwrap().count();
+    assert_eq!(run_count, 20);
+    assert!(diagnostics.backend_stdout_path().is_file());
+    assert!(user_report.is_file());
 }
