@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applicationHomeUrl,
   literatureWorkbenchUrl,
+  transcriptionWorkbenchUrl,
   resolveApplicationSurface,
   resolveSettingsReturnSurface,
   resolveWorkbenchPanel,
@@ -19,6 +20,11 @@ describe('literature workbench navigation', () => {
   it('keeps the application home separate from the heavy workbench', () => {
     expect(applicationHomeUrl('http://tauri.localhost/literature/')).toBe('http://tauri.localhost/index.html')
     expect(workbenchUrl('http://tauri.localhost/index.html')).toBe('http://tauri.localhost/index.html?surface=workbench')
+  })
+
+  it('opens meeting transcription as a sessionless sibling surface', () => {
+    expect(transcriptionWorkbenchUrl('http://tauri.localhost/')).toBe('http://tauri.localhost/transcription/index.html')
+    expect(transcriptionWorkbenchUrl('http://127.0.0.1:5173/index.html')).toBe('http://127.0.0.1:5173/transcription/index.html')
   })
 
   it('opens on the application home and restores the explicit workbench surface', () => {
