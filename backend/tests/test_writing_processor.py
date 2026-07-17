@@ -34,6 +34,7 @@ class ArticleProcessorTests(unittest.TestCase):
         self.assertIn("不得新增、删除或改变事实", prompts)
         self.assertIn("Unicode", prompts)
         self.assertIn("H₂O", prompts)
+        self.assertIn("Skill: academic-language-polish", prompts)
         self.assertIn(source, prompts)
 
     def test_long_audit_maps_chunks_then_synthesizes_cross_document_findings(self) -> None:
@@ -64,6 +65,7 @@ class ArticleProcessorTests(unittest.TestCase):
         self.assertIn("证据链", final_prompt)
         self.assertIn("表述一致性", final_prompt)
         self.assertIn("不得联网补充证据", "\n".join(completion.calls[-1]))
+        self.assertIn("Skill: article-vulnerability-audit", "\n".join(completion.calls[-1]))
 
     def test_empty_text_and_unknown_mode_are_rejected_without_model_calls(self) -> None:
         completion = _CompletionRecorder([])
