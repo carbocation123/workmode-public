@@ -7,6 +7,7 @@ function read(relativePath: string): string {
 
 describe('article processing surface contract', () => {
   const app = read('./WritingApp.tsx')
+  const styles = read('./styles.css')
   const home = read('../ApplicationHome.tsx')
   const vite = read('../../vite.config.ts')
 
@@ -44,5 +45,12 @@ describe('article processing surface contract', () => {
     expect(app).toContain('10⁻³')
     expect(app).not.toContain('SUP:')
     expect(app).not.toContain('SUB:')
+  })
+
+  it('keeps the application-home navigation visible in HUD layouts', () => {
+    expect(app).toContain('applicationHomeUrl(window.location.href)')
+    expect(app).toContain('功能大厅')
+    expect(styles).not.toContain('.writing-shell.hud-layout > .writing-header { display: none; }')
+    expect(styles).toContain('.writing-shell.hud-layout > .writing-header { grid-row: 2; }')
   })
 })
