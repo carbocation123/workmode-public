@@ -5,6 +5,7 @@ import { applicationHomeUrl, workbenchSettingsUrl } from '../literatureNavigatio
 import { SkinChrome } from '../SkinChrome'
 import { THEMES, type ThemeId } from '../theme'
 import {
+  createFreshWritingTask,
   historyDate,
   historyPreview,
   historySummary,
@@ -143,6 +144,17 @@ export default function WritingApp({ themeId, customSkin }: WritingAppProps) {
     }
   }
 
+  function startNewTask() {
+    const fresh = createFreshWritingTask(mode)
+    setMode(fresh.mode)
+    setSelectedId(fresh.selectedId)
+    setInputText(fresh.inputText)
+    setOutputText(fresh.outputText)
+    setShowTrash(false)
+    setError('')
+    setNotice('已创建新任务')
+  }
+
   return (
     <main className={`writing-shell${hudLayoutActive ? ' hud-layout' : ''}`} data-skin-slot="app-shell">
       <div className="skin-background-layer" aria-hidden />
@@ -255,6 +267,9 @@ export default function WritingApp({ themeId, customSkin }: WritingAppProps) {
             </div>
             <div className="writing-toolbar-actions">
               <span>自动使用 Unicode 上下标：H₂O · 10⁻³ · R²</span>
+              <button type="button" className="writing-secondary-button" disabled={processing} onClick={startNewTask}>
+                新任务
+              </button>
               {selectedRecord && (
                 <button type="button" className="writing-secondary-button" disabled={processing} onClick={() => void runProcessing()}>
                   重新处理

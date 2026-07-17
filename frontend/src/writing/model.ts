@@ -31,6 +31,22 @@ export interface DeletedWritingHistory {
   record: WritingHistorySummary
 }
 
+export interface FreshWritingTask {
+  mode: WritingMode
+  selectedId: null
+  inputText: ''
+  outputText: ''
+}
+
+export function createFreshWritingTask(mode: WritingMode): FreshWritingTask {
+  return {
+    mode,
+    selectedId: null,
+    inputText: '',
+    outputText: '',
+  }
+}
+
 export function modeLabel(mode: WritingMode): string {
   return mode === 'polish' ? '文字润色' : '查找漏洞'
 }
