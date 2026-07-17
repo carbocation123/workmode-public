@@ -199,19 +199,29 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 
 .transcription-modal-backdrop { position: fixed !important; inset: 0; z-index: 80 !important; display: grid; place-items: center; padding: 24px; background: var(--ui-overlay-background); backdrop-filter: blur(8px); }
 .transcription-guide-backdrop { position: fixed !important; inset: 0; z-index: 90 !important; display: grid; place-items: center; padding: 24px; background: var(--ui-overlay-background); backdrop-filter: blur(10px); }
-.transcription-guide-dialog { width: min(680px, 100%); border: 1px solid var(--ui-border-strong); border-radius: 18px; overflow: hidden; color: var(--ui-text); background: var(--ui-floating-background); box-shadow: 0 28px 90px var(--ui-shadow); outline: none; }
+.transcription-guide-dialog { width: min(760px, 100%); max-height: min(820px, calc(100vh - 48px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border: 1px solid var(--ui-border-strong); border-radius: 18px; overflow: hidden; color: var(--ui-text); background: var(--ui-floating-background); box-shadow: 0 28px 90px var(--ui-shadow); outline: none; }
 .transcription-guide-dialog > header { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 22px 24px; border-bottom: 1px solid var(--ui-border); }
 .transcription-guide-mark { width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid var(--ui-primary-border); border-radius: 14px; color: var(--ui-primary); background: var(--ui-primary-soft); font-size: 19px; font-weight: 800; }
 .transcription-guide-dialog header > div:nth-child(2) { min-width: 0; }
 .transcription-guide-dialog header span { color: var(--ui-primary); font: 700 9px "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; }
 .transcription-guide-dialog h2 { margin: 4px 0 0; font-size: 22px; }
 .transcription-guide-dialog header button { border: 0; color: var(--ui-text-muted); background: transparent; cursor: pointer; }
-.transcription-guide-body { padding: 28px 30px 24px; }
+.transcription-guide-body { min-height: 0; overflow-y: auto; padding: 28px 30px 24px; }
 .transcription-guide-body > p { margin: 0; color: var(--ui-text-muted); font-size: 13px; line-height: 1.8; }
 .transcription-guide-body ul { margin: 22px 0 0; padding: 0; display: grid; gap: 11px; list-style: none; }
 .transcription-guide-body li { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: start; gap: 8px; color: var(--ui-text); font-size: 12px; line-height: 1.6; }
 .transcription-guide-body li > span { width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; border-radius: 50%; color: var(--ui-success); background: var(--ui-success-soft); font-size: 10px; }
+.transcription-guide-setup-list { margin: 22px 0 0; padding: 0; display: grid; gap: 10px; list-style: none; counter-reset: none; }
+.transcription-guide-setup-list li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 13px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-control-background); }
+.transcription-guide-setup-list li > span { width: 24px; height: 24px; color: var(--ui-on-primary); background: var(--ui-primary); font-weight: 800; }
+.transcription-guide-setup-list strong { display: block; font-size: 12px; }
+.transcription-guide-setup-list p { margin: 4px 0 0; color: var(--ui-text-muted); font-size: 11px; line-height: 1.65; }
+.transcription-guide-setup-actions { margin-top: 18px; display: grid; gap: 10px; }
+.transcription-guide-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.transcription-guide-links button { min-height: 32px; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 7px; color: var(--ui-primary); background: var(--ui-control-background); cursor: pointer; }
+.transcription-guide-links button:hover { border-color: var(--ui-primary-border); background: var(--ui-control-hover); }
 .transcription-guide-configure { margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid var(--ui-warning-border); border-radius: 10px; background: var(--ui-warning-soft); }
+.transcription-guide-setup-actions .transcription-guide-configure { margin-top: 0; }
 .transcription-guide-configure > span { color: var(--ui-warning); font-size: 11px; }
 .transcription-guide-configure > span.configured { color: var(--ui-success); }
 .transcription-guide-configure button { min-height: 32px; padding: 0 12px; border: 1px solid var(--ui-primary-border); border-radius: 7px; color: var(--ui-on-primary); background: var(--ui-primary); cursor: pointer; }
@@ -274,6 +284,8 @@ button:disabled { opacity: .48; cursor: not-allowed; }
   .transcription-guide-dialog > header { grid-template-columns: 42px minmax(0, 1fr); padding: 18px; }
   .transcription-guide-dialog header > button { grid-column: 1 / -1; justify-self: end; }
   .transcription-guide-body { padding: 22px 20px; }
+  .transcription-guide-setup-list li { padding: 10px; }
+  .transcription-guide-links { flex-direction: column; }
   .transcription-guide-configure { align-items: stretch; flex-direction: column; }
   .transcription-guide-dialog > footer { align-items: stretch; flex-direction: column; }
   .transcription-guide-actions { justify-content: flex-end; }

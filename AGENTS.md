@@ -15,3 +15,18 @@
   masquerading as ordinary editable objects.
 - Add or update regression tests before changing behavior, then run the
   relevant backend, frontend, and packaging checks.
+
+## User guidance standard
+
+- Write every user-facing guide for a complete beginner. Do not assume the
+  user already knows the vendor, account, prerequisite, console, credential,
+  billing model, or where a setting is located.
+- A setup guide must say where to go, what to click, what to choose or enter,
+  what success looks like, and how to resume or replay the guide. Include
+  direct official links when an external service is involved.
+- Call out region constraints, one-time secrets, possible charges, free-quota
+  limits, and the safest cost-control option. Verify unstable vendor steps
+  against current official documentation before changing the guide.
+- Keep guide progress outside project and domain data. A guide must not create
+  a project, session, history record, or tool output merely because it was
+  viewed or completed.
