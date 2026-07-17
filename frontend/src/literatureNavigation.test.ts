@@ -4,6 +4,7 @@ import {
   applicationHomeUrl,
   literatureWorkbenchUrl,
   transcriptionWorkbenchUrl,
+  writingWorkbenchUrl,
   resolveApplicationSurface,
   resolveSettingsReturnSurface,
   resolveWorkbenchPanel,
@@ -25,6 +26,11 @@ describe('literature workbench navigation', () => {
   it('opens meeting transcription as a sessionless sibling surface', () => {
     expect(transcriptionWorkbenchUrl('http://tauri.localhost/')).toBe('http://tauri.localhost/transcription/index.html')
     expect(transcriptionWorkbenchUrl('http://127.0.0.1:5173/index.html')).toBe('http://127.0.0.1:5173/transcription/index.html')
+  })
+
+  it('opens article processing as a sessionless sibling surface', () => {
+    expect(writingWorkbenchUrl('http://tauri.localhost/')).toBe('http://tauri.localhost/writing/index.html')
+    expect(writingWorkbenchUrl('http://127.0.0.1:5173/index.html')).toBe('http://127.0.0.1:5173/writing/index.html')
   })
 
   it('opens on the application home and restores the explicit workbench surface', () => {
