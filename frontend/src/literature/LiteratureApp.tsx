@@ -1463,7 +1463,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 }}
               />
             </div>
-            <div className="composer-hint"><span>Ctrl + Enter 发送</span><span>{backendMode === 'connected' ? 'PDF 写入当前固定结构 Workmode 文献项目' : '等待真实后端连接，不提供静态预览或模拟回复'}</span></div>
+            <div className="composer-hint"><span>Ctrl + Enter 发送</span><span>{backendMode === 'connected' ? '选中一篇后说“精读这篇”，默认逐图讲解' : '等待真实后端连接，不提供静态预览或模拟回复'}</span></div>
           </div>
         </section>
 

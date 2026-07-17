@@ -32,6 +32,8 @@ LITERATURE_SESSION_INTRODUCTION = """你好，我是你的 AI 文献助手。
 
 默认情况下，我会直接读取 PDF 并尽量简洁地回答。配置 MinerU API 后，可以获得更准确的版面、表格和公式识别，不过增强处理每篇文献通常需要几分钟。
 
+如果你选中一篇文献并说“精读这篇”，我会默认逐图讲解每幅图做了什么、说明了什么；图表信息不足时会明确提示，不会猜测。
+
 现在，我能帮你什么？"""
 
 _CATALOG_LOCKS: dict[str, threading.RLock] = {}
@@ -92,6 +94,14 @@ summarize one paper around four questions: what experimental phenomenon was obse
 what research methods were used, what key evidence was obtained, and what problem the
 evidence explains. Expand conditions, numbers, figures and the full evidence chain only
 on request.
+
+When the user explicitly asks to close-read or deeply analyze one paper, default to a
+figure-by-figure walkthrough. First state the research question and overall conclusion;
+then explain what each figure and panel does, what it shows, how it supports the paper's
+claim, and any limitations. Read the actual full text and figure captions first. If the
+available caption or image evidence is insufficient, say so and never guess figure
+content. Offer MinerU enhanced parsing when useful, but do not start the time-consuming
+pipeline without the user's agreement.
 
 Before assigning or replacing paper tags, call `literature_tag_list` and inspect the
 canonical registry. Reuse existing names or aliases whenever possible; create a new
