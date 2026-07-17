@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from pathlib import Path
@@ -10,6 +11,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
+from .ai_processing import (
+    TranscriptionAiError,
+    build_transcription_ai_processor,
+)
 from .dashscope_fun_asr import DashScopeFunAsrTranscriber
 from .workspace import (
     SUPPORTED_EXTENSIONS,
@@ -53,11 +58,17 @@ def get_transcription_runner() -> TranscriptionRunner:
     return _runner
 
 
+def get_transcription_ai_processor():
+    return build_transcription_ai_processor(get_settings())
+
+
 def recover_transcription_jobs() -> None:
     get_transcription_runner().recover()
 
 
 def _handle_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, TranscriptionAiError):
+        return HTTPException(status_code=502, detail=str(exc))
     if isinstance(exc, WorkspaceNotFound):
         return HTTPException(status_code=404, detail=str(exc))
     if isinstance(exc, WorkspaceConflict):
@@ -80,10 +91,13 @@ def _public_job(workspace: TranscriptionWorkspace, job: dict[str, Any]) -> dict[
 @router.get("/workspace")
 def workspace_info() -> dict[str, object]:
     workspace = get_transcription_workspace()
+    current = get_settings()
     return {
         "path": str(workspace.root),
-        "dashscope_api_key_set": bool(get_settings().dashscope_api_key),
+        "dashscope_api_key_set": bool(current.dashscope_api_key),
         "model": "fun-asr",
+        "model_api_configured": bool(current.model_base_url and current.model_api_key),
+        "model_name": current.model_name,
         "supported_extensions": sorted(SUPPORTED_EXTENSIONS),
     }
 
@@ -169,14 +183,64 @@ def read_transcript(job_id: str) -> dict[str, object]:
         raise _handle_error(exc) from exc
 
 
+@router.get("/jobs/{job_id}/ai")
+def read_ai_results(job_id: str) -> dict[str, object]:
+    workspace = get_transcription_workspace()
+    try:
+        return workspace.read_ai_results(job_id)
+    except Exception as exc:
+        raise _handle_error(exc) from exc
+
+
+@router.post("/jobs/{job_id}/ai/{kind}")
+def generate_ai_result(job_id: str, kind: str) -> dict[str, object]:
+    if kind not in {"polish", "summary"}:
+        raise HTTPException(status_code=404, detail="不支持的 AI 处理类型")
+    current = get_settings()
+    if not current.model_base_url or not current.model_api_key:
+        raise HTTPException(status_code=503, detail="请先在设置中配置 AI 模型地址和 API Key")
+    workspace = get_transcription_workspace()
+    try:
+        job, transcript = workspace.read_transcript_source(job_id)
+        source_sha256 = hashlib.sha256(transcript.encode("utf-8")).hexdigest()
+        processor = get_transcription_ai_processor()
+        content = processor.generate(kind=kind, title=str(job["title"]), transcript=transcript)
+        return workspace.save_ai_result(
+            job_id,
+            kind=kind,
+            content=content,
+            model=processor.model_name,
+            expected_source_sha256=source_sha256,
+        )
+    except Exception as exc:
+        raise _handle_error(exc) from exc
+
+
+@router.delete("/jobs/{job_id}/ai/{kind}")
+def clear_ai_result(job_id: str, kind: str) -> dict[str, object]:
+    workspace = get_transcription_workspace()
+    try:
+        return workspace.clear_ai_result(job_id, kind=kind)
+    except Exception as exc:
+        raise _handle_error(exc) from exc
+
+
 @router.get("/jobs/{job_id}/files/{kind}")
 def download_transcript(job_id: str, kind: str):
     workspace = get_transcription_workspace()
-    filenames = {"text": "transcript.txt", "markdown": "transcript.md", "json": "transcript.json"}
+    filenames = {
+        "text": "transcript.txt",
+        "markdown": "transcript.md",
+        "json": "transcript.json",
+        "polished": "ai-polished.md",
+        "summary": "ai-summary.md",
+    }
     if kind not in filenames:
         raise HTTPException(status_code=404, detail="不支持的转写文件类型")
     try:
         job = workspace.get_job(job_id)
+        if kind in {"polished", "summary"} and job["status"] != "completed":
+            raise WorkspaceConflict("当前转写尚未完成，旧 AI 结果不可下载")
         path = workspace.root / str(job["output_path"]) / filenames[kind]
         if not path.is_file():
             raise WorkspaceNotFound("转写结果尚未生成")

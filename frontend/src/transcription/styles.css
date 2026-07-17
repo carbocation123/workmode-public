@@ -56,7 +56,9 @@
 .result-actions button,
 .title-editor button,
 .transcription-welcome button,
-.transcription-trash-dialog button {
+.transcription-trash-dialog button,
+.transcription-ai-toolbar button,
+.transcription-ai-dialog button {
   min-height: 34px;
   padding: 0 13px;
   border: 1px solid var(--ui-border);
@@ -166,10 +168,16 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .status-badge.failed { color: var(--ui-danger); background: var(--ui-danger-soft); }
 .status-badge.transcribing { color: var(--ui-primary); background: var(--ui-primary-soft); }
 
-.transcription-document { min-height: 0; display: grid; grid-template-rows: 47px minmax(0, 1fr); }
-.result-tabs { display: flex; align-items: center; gap: 5px; padding: 0 24px; border-bottom: 1px solid var(--ui-border); background: color-mix(in srgb, var(--ui-panel-background) 68%, transparent); }
+.transcription-document { min-height: 0; display: grid; grid-template-rows: auto 47px minmax(0, 1fr); }
+.transcription-ai-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 24px; border-bottom: 1px solid var(--ui-border); background: var(--ui-primary-soft); }
+.transcription-ai-toolbar > div:first-child { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.transcription-ai-toolbar strong { color: var(--ui-primary); font-size: 11px; }
+.transcription-ai-toolbar span { overflow: hidden; color: var(--ui-text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.transcription-ai-toolbar > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.transcription-ai-toolbar button { min-height: 30px; padding: 0 10px; font-size: 10px; }
+.result-tabs { display: flex; align-items: center; gap: 5px; padding: 0 24px; overflow-x: auto; border-bottom: 1px solid var(--ui-border); background: color-mix(in srgb, var(--ui-panel-background) 68%, transparent); }
 .result-tabs button,
-.result-tabs a { padding: 7px 10px; border: 0; border-radius: 7px; color: var(--ui-text-muted); background: transparent; font-size: 10px; text-decoration: none; cursor: pointer; }
+.result-tabs a { flex: 0 0 auto; padding: 7px 10px; border: 0; border-radius: 7px; color: var(--ui-text-muted); background: transparent; font-size: 10px; text-decoration: none; cursor: pointer; }
 .result-tabs button.active { color: var(--ui-primary); background: var(--ui-primary-soft); }
 .result-tabs span { flex: 1; }
 .result-tabs a:hover { color: var(--ui-text); background: var(--ui-control-hover); }
@@ -181,6 +189,10 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .transcript-segment > div span { padding: 2px 6px; border-radius: 5px; color: var(--ui-warning); background: var(--ui-warning-soft); font-size: 8px; }
 .transcript-segment p { margin: 7px 0 0; color: var(--ui-text); font-size: 14px; line-height: 1.9; }
 .transcription-document-body pre { max-width: 920px; min-height: 100%; margin: 0 auto; color: var(--ui-text); font-family: inherit; font-size: 13px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-result-markdown { max-width: 920px; margin: 0 auto; color: var(--ui-text); font-size: 13px; line-height: 1.85; }
+.ai-result-markdown h1 { margin: 0 0 24px; font-size: 24px; }
+.ai-result-markdown h2 { margin: 26px 0 10px; color: var(--ui-primary); font-size: 16px; }
+.ai-result-markdown li { margin: 6px 0; }
 
 .transcription-pending-state,
 .transcription-welcome { min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
@@ -234,6 +246,13 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .transcription-guide-actions button { min-height: 34px; padding: 0 15px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text); background: var(--ui-control-background); cursor: pointer; }
 .transcription-guide-actions button:last-child { border-color: var(--ui-primary-border); color: var(--ui-on-primary); background: var(--ui-primary); }
 .transcription-trash-dialog { width: min(700px, 100%); max-height: min(680px, calc(100vh - 48px)); display: grid; grid-template-rows: auto minmax(0, 1fr); border: 1px solid var(--ui-border-strong); border-radius: 16px; overflow: hidden; background: var(--ui-floating-background); box-shadow: 0 28px 90px var(--ui-shadow); }
+.transcription-ai-dialog { width: min(560px, 100%); padding: 26px; border: 1px solid var(--ui-border-strong); border-radius: 16px; color: var(--ui-text); background: var(--ui-floating-background); box-shadow: 0 28px 90px var(--ui-shadow); }
+.transcription-ai-dialog > span { color: var(--ui-primary); font: 700 9px "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; }
+.transcription-ai-dialog h2 { margin: 7px 0 12px; font-size: 21px; }
+.transcription-ai-dialog p { margin: 0; color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
+.transcription-ai-dialog ul { margin: 18px 0; padding-left: 20px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.8; }
+.transcription-ai-dialog > div { display: flex; justify-content: flex-end; gap: 8px; }
+.transcription-ai-dialog button.primary { border-color: var(--ui-primary-border); color: var(--ui-on-primary); background: var(--ui-primary); }
 .transcription-trash-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--ui-border); }
 .transcription-trash-dialog header div { display: flex; flex-direction: column; gap: 2px; }
 .transcription-trash-dialog header span { color: var(--ui-primary); font: 700 9px "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; }
@@ -280,6 +299,8 @@ button:disabled { opacity: .48; cursor: not-allowed; }
   .result-tabs { overflow-x: auto; padding: 0 12px; }
   .result-tabs span { display: none; }
   .transcription-document-body { padding: 22px 18px 50px; }
+  .transcription-ai-toolbar { align-items: stretch; flex-direction: column; padding: 12px; }
+  .transcription-ai-toolbar > div:last-child { justify-content: flex-start; }
   .transcription-guide-backdrop { padding: 12px; }
   .transcription-guide-dialog > header { grid-template-columns: 42px minmax(0, 1fr); padding: 18px; }
   .transcription-guide-dialog header > button { grid-column: 1 / -1; justify-self: end; }

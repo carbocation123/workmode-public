@@ -56,7 +56,7 @@ FastAPI backend
 - `work_state.py`：项目/全局结构化记忆和当前任务计划。
 - `tutorial_project.py`：官方教程标识、安装、重置、备份和新会话切换。
 - `literature_project.py`、`literature_pipeline.py`、`literature_routes.py`：正式 Workmode 的文献项目识别、固定结构策略、15 个领域工具、MinerU/事实抽取和文献前端投影 API；不复制 session、聊天循环、上下文或压缩器。
-- `transcription/`：无 session 的会议录音文件工具。`workspace.py` 只管理固定 `tools/input/output` 目录、单工作线程、任务恢复和成对回收；`dashscope_fun_asr.py` 适配 Files API、Fun-ASR 异步轮询、说话人分段和结果下载；`routes.py` 提供上传、列表、结果、重试、改名、删除与恢复 API。
+- `transcription/`：无 session 的会议录音文件工具。`workspace.py` 只管理固定 `tools/input/output` 目录、单工作线程、任务恢复、AI 派生文件和成对回收；`dashscope_fun_asr.py` 适配 Files API、Fun-ASR 异步轮询、说话人分段和结果下载；`ai_processing.py` 复用共享 OpenAI-compatible 模型设置，执行忠实润色与分段汇总；`routes.py` 提供上传、列表、结果、重试、改名、AI 生成/读取/清除、下载、删除与恢复 API。
 - `pdf_text.py`：受大小、页数和字符数约束的本地 PDF 文本层抽取；不执行 OCR，不调用外部服务，供文献全文读取在 MinerU Markdown 缺失时降级使用。
 
 `POST /api/settings/model/test` 接受尚未保存的 Base URL、模型名和可选 API Key，执行一个最多 8 token 的非流式 Chat Completions 探测。草稿不会写入 `.env`；前端只在探测成功后调用既有设置保存接口。后端把认证、地址/模型不存在、限流/余额、上游故障、超时和非兼容 JSON 转成面向普通用户的错误说明，不回显 API Key 或上游正文。
@@ -108,10 +108,13 @@ meeting-transcription\
     transcript.json
     transcript.md
     transcript.txt
+    ai-polished.md       用户手动生成时存在
+    ai-summary.md        用户手动生成时存在
+    ai-meta.json         AI 模型、生成时间与源文本指纹；不含密钥
   output\.trash\<回收 ID>\
 ```
 
-任务列表只允许扫描 `output/<任务 ID>/meta.json`，不遍历根目录其它内容。Fun-ASR 签名 URL 不落盘；`meta.json` 保存固定模型名、远端 task ID、状态、错误与相对路径，后端重启时据此恢复 `queued/transcribing` 任务。删除把同 ID 的输入和输出作为一个单位移入 `output/.trash`，恢复前同时检查两个原目标，绝不覆盖。若用户以后把该根目录注册到通用工作台，新增的项目说明、笔记和会话都不会进入转写状态；会话仍由 `storage.py` 保存在应用数据目录。
+任务列表只允许扫描 `output/<任务 ID>/meta.json`，不遍历根目录其它内容。Fun-ASR 签名 URL 不落盘；`meta.json` 保存固定模型名、远端 task ID、状态、错误与相对路径，后端重启时据此恢复 `queued/transcribing` 任务。AI 润色/总结只有在转写完成后才能手动触发，原始 `transcript.*` 和 `asr-result.json` 永不被 AI 写回。长总结采用“分段摘要 → 最终合并”，所有提示都要求缺失信息写为“未明确提及”而不是补写；保存前比较原文 SHA-256，模型运行期间若原文发生变化则丢弃旧结果。重新转写完成后移除旧 AI 文件，未完成状态也拒绝下载旧结果。删除把同 ID 的输入和输出作为一个单位移入 `output/.trash`，恢复前同时检查两个原目标，绝不覆盖。若用户以后把该根目录注册到通用工作台，新增的项目说明、笔记和会话都不会进入转写状态；会话仍由 `storage.py` 保存在应用数据目录。
 
 项目记录只保存路径、显示信息和父项目关系，不复制用户项目。移除项目只归档注册记录，硬盘文件不受影响。会话消息是 append-only JSONL；删除会话只在元数据写入 `deleted_at`。
 
@@ -210,7 +213,7 @@ meeting-transcription\
 
 文献前端调用同一个 `/api/work/sessions/{id}/chat/stream` 并直接消费 `system_message`、`context_usage`、`text_delta`、`tool_call_start`、`tool_result`、`loop_continue`、`cancelled` 与 `done`。用户消息立即进入本地时间线；若本轮前有待显示的文献导入或选择 system 事件，reducer 会把正式事件插在乐观用户消息之前。正文增量逐段增长，工具开始立即建立一张运行中卡片，结果按 `tool_call_id` 更新同一卡片，后续正文另开段落，因此保持“系统背景 → 用户 → 文字 → 工具 → 文字”的真实顺序。`loop_continue` 只更新本轮临时进度提示；收到 `done`、终端错误或最终 session 回读成功后立即清空，停止事件则替换为明确的停止状态。工具结果只要带有真实 `changed_paths`（包括批次部分成功）就会经过 120ms 合并后分类刷新 catalog、tags、notes 与文件投影；终端事件仍执行一次全量校准，避免旧工具结果漏刷新。消息容器只在用户仍接近底部时跟随增量；主动上滚会暂停并显示「回到最新」，与完整工作台一致。本轮结束后重新读取正式 session/JSONL，以持久化记录校准临时流式状态。对话头部的项目笔记控件为 SVG 与数量徽标保留独立的不可收缩 flex 槽位，避免按钮变窄时图标先被压缩。
 
-会议转写前端不调用任何 `/sessions` 接口。左侧列表由 `/api/transcription/jobs` 每次从任务目录重建，当前选中任务 ID 只作为 `localStorage` UI 偏好；切到共享设置或以后用通用工作台打开同一目录再返回时，它只尝试恢复仍存在的 ID，否则选择最新任务。上传支持多文件并逐个流式写入本地输入目录，后端排队后前端轮询固定任务状态；完成后读取说话人分段、纯文本和 Markdown。删除和恢复都调用后端服务，前端不直接移动本地文件。
+会议转写前端不调用任何 `/sessions` 接口。左侧列表由 `/api/transcription/jobs` 每次从任务目录重建，当前选中任务 ID 只作为 `localStorage` UI 偏好；切到共享设置或以后用通用工作台打开同一目录再返回时，它只尝试恢复仍存在的 ID，否则选择最新任务。上传支持多文件并逐个流式写入本地输入目录，后端排队后前端轮询固定任务状态；完成后读取说话人分段、纯文本、Markdown 与已有 AI 派生结果。AI 按钮不会自动调用模型；每次生成或重新生成都先展示费用、隐私与原文不覆盖确认，进行中切换其它文件也不会把返回结果显示到错误任务。删除、恢复和 AI 结果清除都调用后端服务，前端不直接移动或覆盖本地文件。
 
 AI 回复、压缩摘要和 Markdown 文件预览共用 `MarkdownRenderer.tsx`。渲染器启用 `remark-gfm`，把管道表格解析为语义化 HTML；table 外层滚动容器避免宽列撑破聊天布局。聊天气泡为 `ul/ol` 恢复显式左内边距，避免全局 reset 后的 outside marker 落入 Neon 切角或气泡边界。
 

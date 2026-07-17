@@ -108,7 +108,7 @@ WORKMODE_MINERU_TIMEOUT_SECONDS=180
 
 会议转写不是第三套 Workmode 项目或对话。默认工作目录是 `D:\workmode\meeting-transcription`（没有 D 盘时为 `~/workmode/meeting-transcription`），可以用 `WORKMODE_TRANSCRIPTION_DIR` 覆盖；目录协议只有 `tools/`、`input/` 与 `output/`。列表只能扫描 `output/<任务 ID>/meta.json`，根目录中由通用工作台增加的 `WORKMODE.md`、笔记或其它文件必须被忽略。
 
-转写页使用独立的 `workmode-public-transcription-onboarding-v1` WebView 本地状态提供三步首次指引：配置 DashScope、批量上传、查看与导出。DashScope 步骤按完全新手路径依次说明阿里云账号/实名认证、华北2（北京）地域开通、默认业务空间与“全部”权限、只显示一次的新 Key、按量付费与免费额度用完即停、粘贴及成功标志，并只链接阿里云官方控制台和帮助文档。页面右上角和共享设置页都能重置并重播；这个状态不得写入转写根目录，也不得创建 Workmode session。修改步骤、供应商入口或持久化结构时，先核对最新官方文档，再同步更新 `frontend/src/transcription/onboarding.test.ts` 与页面契约测试。
+转写页使用独立的 `workmode-public-transcription-onboarding-v2` WebView 本地状态提供四步首次指引：配置 DashScope、批量上传、查看与导出、可选 AI 润色/总结。DashScope 步骤按完全新手路径依次说明阿里云账号/实名认证、华北2（北京）地域开通、默认业务空间与“全部”权限、只显示一次的新 Key、按量付费与免费额度用完即停、粘贴及成功标志，并只链接阿里云官方控制台和帮助文档。AI 步骤必须说明该功能完全可选，模型地址/名称/Key 与连接测试，认证、余额和超时错误，文本发送边界、可能费用、人工核对及原文不覆盖。页面右上角和共享设置页都能重置并重播；这个状态不得写入转写根目录，也不得创建 Workmode session。修改步骤、供应商入口或持久化结构时，先核对相关最新官方文档，再同步更新 `frontend/src/transcription/onboarding.test.ts` 与页面契约测试。
 
 在共享设置页保存密钥，或在本地 `.env` 设置：
 
@@ -118,6 +118,8 @@ WORKMODE_TRANSCRIPTION_DIR=
 ```
 
 API 上传使用流式请求暂存原始文件，不把大音频读入内存；单工作线程依次执行 Files API、`fun-asr` 异步任务和结果下载。签名 URL 只存在调用栈，`meta.json` 只保存模型、远端 task ID、状态与相对路径。未完成任务在后端启动时从 `meta.json` 恢复。新增或修改该模块时至少验证：多文件列表、无关根文件隔离、远端 task ID 恢复、失败重试、标题修改、输入输出成对软删除与无覆盖恢复、前端构建，以及未配置 Key 时不写入输入文件。
+
+AI 润色与总结复用共享的 OpenAI-compatible 模型设置 `WORKMODE_MODEL_BASE_URL`、`WORKMODE_MODEL_NAME` 与 `WORKMODE_MODEL_API_KEY`，不使用 DashScope Key，也不创建 session。前端只在用户确认后调用；后端对长文本按段落分块，润色逐块保持说话人与时间顺序，总结先生成片段摘要再做一次最终合并。输出只写入当前任务的 `ai-polished.md`、`ai-summary.md` 与不含密钥的 `ai-meta.json`。`ai-meta.json` 记录模型、时间和源文本 SHA-256；保存前再次核对源指纹，重新转写成功时清除旧派生结果。新增或修改该流程还必须覆盖：缺失模型配置、严禁编造提示、长文本分块、原文不覆盖、并发源变化拒绝、生成/读取/下载/清除 API 与重新转写失效。
 
 文献项目的新建入口只提交项目名称，默认托管根目录规则为：显式 `WORKMODE_MANAGED_PROJECTS_DIR` 优先；否则 Windows 有 D 盘时使用 `D:\workmode`，其余环境使用 `~/workmode`。后端负责安全目录名和同名序号，不允许前端拼接绝对路径。旧客户端仍可传 `root_path`；旧注册项目保持原地，访问文献投影时只幂等补齐缺失结构。相关回归必须覆盖名称创建、同名冲突、旧路径不搬迁、缺失结构补齐以及项目软删除不碰实体目录。
 

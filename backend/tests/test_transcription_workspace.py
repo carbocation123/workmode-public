@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from app.transcription.dashscope_fun_asr import Segment, TranscriptionResult
-from app.transcription.workspace import TranscriptionWorkspace, WorkspaceError
+from app.transcription.workspace import TranscriptionWorkspace, WorkspaceConflict, WorkspaceError
 
 
 class _FakeTranscriber:
@@ -212,6 +213,25 @@ class TranscriptionWorkspaceTests(unittest.TestCase):
         results = self.workspace.read_ai_results(job["id"])
         self.assertIsNone(results["summary"])
         self.assertIsNone(results["meta"]["summary"])
+
+    def test_ai_result_is_rejected_if_the_transcript_changed_while_the_model_was_running(self) -> None:
+        job = self.workspace.create_job(filename="meeting.wav", source=io.BytesIO(b"audio"), start=False)
+        completed = self.workspace.run_job(job["id"])
+        transcript_path = self.root / completed["output_path"] / "transcript.md"
+        original = transcript_path.read_text(encoding="utf-8")
+        original_hash = hashlib.sha256(original.encode("utf-8")).hexdigest()
+        transcript_path.write_text(original + "\n新的转写内容", encoding="utf-8")
+
+        with self.assertRaisesRegex(WorkspaceConflict, "发生变化"):
+            self.workspace.save_ai_result(
+                job["id"],
+                kind="summary",
+                content="# 基于旧文本的总结\n",
+                model="test-model",
+                expected_source_sha256=original_hash,
+            )
+
+        self.assertFalse((transcript_path.parent / "ai-summary.md").exists())
 
 
 if __name__ == "__main__":

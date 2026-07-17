@@ -1,5 +1,6 @@
 """Sessionless meeting recording transcription module."""
 
 from .workspace import TranscriptionRunner, TranscriptionWorkspace
+from .ai_processing import TranscriptionAiProcessor
 
-__all__ = ["TranscriptionRunner", "TranscriptionWorkspace"]
+__all__ = ["TranscriptionAiProcessor", "TranscriptionRunner", "TranscriptionWorkspace"]

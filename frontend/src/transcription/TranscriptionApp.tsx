@@ -4,6 +4,7 @@ import { skinUsesChrome, type ActiveCustomSkin } from '../customSkin'
 import { revealLocalItem } from '../desktop'
 import { applicationHomeUrl, workbenchSettingsUrl } from '../literatureNavigation'
 import { SkinChrome } from '../SkinChrome'
+import { MarkdownRenderer } from '../MarkdownRenderer'
 import { THEMES, type ThemeId } from '../theme'
 import {
   formatDuration,
@@ -16,9 +17,12 @@ import {
 } from './model'
 import {
   deleteJob,
+  clearAiResult,
+  generateAiResult,
   getWorkspaceInfo,
   listJobs,
   listTrash,
+  readAiResults,
   readTranscript,
   renameJob,
   restoreJob,
@@ -28,6 +32,8 @@ import {
   type DeletedTranscription,
   type TranscriptResult,
   type TranscriptionWorkspaceInfo,
+  type TranscriptionAiKind,
+  type TranscriptionAiResults,
 } from './transcriptionApi'
 import { TranscriptionOnboarding } from './TranscriptionOnboarding'
 import {
@@ -42,7 +48,7 @@ interface TranscriptionAppProps {
   customSkin: ActiveCustomSkin | null
 }
 
-type ResultTab = 'segments' | 'text' | 'markdown'
+type ResultTab = 'segments' | 'text' | 'markdown' | 'polished' | 'summary'
 const SELECTED_JOB_KEY = 'workmode-transcription-selected-job'
 
 
@@ -64,6 +70,9 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
     () => localStorage.getItem(SELECTED_JOB_KEY),
   )
   const [transcript, setTranscript] = useState<TranscriptResult | null>(null)
+  const [aiResults, setAiResults] = useState<TranscriptionAiResults | null>(null)
+  const [aiProcessing, setAiProcessing] = useState<TranscriptionAiKind | null>(null)
+  const [aiConfirmKind, setAiConfirmKind] = useState<TranscriptionAiKind | null>(null)
   const [tab, setTab] = useState<ResultTab>('segments')
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -79,6 +88,7 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
     !parseTranscriptionOnboarding(localStorage.getItem(TRANSCRIPTION_ONBOARDING_STORAGE_KEY)).completed,
   )
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const selectedJobIdRef = useRef<string | null>(selectedJobId)
 
   const selectedJob = useMemo(
     () => jobs.find((job) => job.id === selectedJobId) || null,
@@ -103,6 +113,7 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
   }, [refreshJobs])
 
   useEffect(() => {
+    selectedJobIdRef.current = selectedJobId
     if (selectedJobId) localStorage.setItem(SELECTED_JOB_KEY, selectedJobId)
     else localStorage.removeItem(SELECTED_JOB_KEY)
   }, [selectedJobId])
@@ -110,11 +121,16 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
   useEffect(() => {
     setTitleDraft(selectedJob?.title || '')
     setTranscript(null)
+    setAiResults(null)
+    setTab('segments')
     if (!selectedJob || selectedJob.status !== 'completed') return
     let cancelled = false
-    void readTranscript(selectedJob.id)
-      .then((result) => {
-        if (!cancelled) setTranscript(result)
+    void Promise.all([readTranscript(selectedJob.id), readAiResults(selectedJob.id)])
+      .then(([transcriptResult, aiResult]) => {
+        if (!cancelled) {
+          setTranscript(transcriptResult)
+          setAiResults(aiResult)
+        }
       })
       .catch((reason) => {
         if (!cancelled) setError(`转写结果读取失败：${reason instanceof Error ? reason.message : String(reason)}`)
@@ -180,6 +196,7 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
     try {
       await retryJob(selectedJob.id)
       setTranscript(null)
+      setAiResults(null)
       await refreshJobs()
       setNotice('已重新提交转写。')
     } catch (reason) {
@@ -194,6 +211,7 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
       await deleteJob(selectedJob.id)
       await refreshJobs()
       setTranscript(null)
+      setAiResults(null)
       setNotice('记录已移入回收站。')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -230,6 +248,54 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
       if (!opened) setNotice(`输出目录：${selectedJob.output_directory || selectedJob.output_path}`)
     } catch (reason) {
       setError(`打开文件夹失败：${reason instanceof Error ? reason.message : String(reason)}`)
+    }
+  }
+
+  function requestAi(kind: TranscriptionAiKind) {
+    if (!workspace?.model_api_configured) {
+      setError('AI 模型尚未配置。请打开设置，填写模型 API 地址、API Key 和模型名称后再试。')
+      return
+    }
+    setAiConfirmKind(kind)
+  }
+
+  async function confirmAi() {
+    if (!selectedJob || !aiConfirmKind || aiProcessing) return
+    const kind = aiConfirmKind
+    const jobId = selectedJob.id
+    setAiConfirmKind(null)
+    setAiProcessing(kind)
+    setError('')
+    setNotice('')
+    try {
+      const result = await generateAiResult(jobId, kind)
+      if (selectedJobIdRef.current === jobId) {
+        setAiResults(result)
+        setTab(kind === 'polish' ? 'polished' : 'summary')
+        setNotice(kind === 'polish' ? 'AI 润色稿已生成并单独保存。' : 'AI 会议总结已生成并单独保存。')
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setAiProcessing(null)
+    }
+  }
+
+  async function clearAi(kind: TranscriptionAiKind) {
+    if (!selectedJob || aiProcessing) return
+    const label = kind === 'polish' ? '润色稿' : '会议总结'
+    const jobId = selectedJob.id
+    if (!window.confirm(`清除当前 AI ${label}？原始转写不会受影响。`)) return
+    setError('')
+    try {
+      const result = await clearAiResult(jobId, kind)
+      if (selectedJobIdRef.current === jobId) {
+        setAiResults(result)
+        if (tab === (kind === 'polish' ? 'polished' : 'summary')) setTab('segments')
+        setNotice(`已清除 AI ${label}，原始转写保持不变。`)
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
     }
   }
 
@@ -356,14 +422,39 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
 
             {selectedJob.status === 'completed' && transcript ? (
               <section className="transcription-document">
+                <div className="transcription-ai-toolbar">
+                  <div>
+                    <strong>AI 文本处理</strong>
+                    <span>{workspace?.model_api_configured
+                      ? `使用 ${workspace.model_name}；仅手动触发，结果不会覆盖原文`
+                      : '尚未配置 AI 模型；不影响查看和下载原始转写'}</span>
+                  </div>
+                  <div>
+                    {!workspace?.model_api_configured && (
+                      <button type="button" onClick={() => window.location.assign(workbenchSettingsUrl(window.location.href, 'transcription'))}>配置 AI 模型</button>
+                    )}
+                    <button type="button" onClick={() => requestAi('polish')} disabled={Boolean(aiProcessing)}>
+                      {aiProcessing === 'polish' ? '正在润色…' : aiResults?.polished ? '重新生成润色' : 'AI 润色'}
+                    </button>
+                    {aiResults?.polished && <button type="button" onClick={() => void clearAi('polish')} disabled={Boolean(aiProcessing)}>清除润色</button>}
+                    <button type="button" onClick={() => requestAi('summary')} disabled={Boolean(aiProcessing)}>
+                      {aiProcessing === 'summary' ? '正在总结…' : aiResults?.summary ? '重新生成总结' : 'AI 总结'}
+                    </button>
+                    {aiResults?.summary && <button type="button" onClick={() => void clearAi('summary')} disabled={Boolean(aiProcessing)}>清除总结</button>}
+                  </div>
+                </div>
                 <nav className="result-tabs" aria-label="结果格式">
                   <button type="button" className={tab === 'segments' ? 'active' : ''} onClick={() => setTab('segments')}>按说话人</button>
                   <button type="button" className={tab === 'text' ? 'active' : ''} onClick={() => setTab('text')}>纯文本</button>
                   <button type="button" className={tab === 'markdown' ? 'active' : ''} onClick={() => setTab('markdown')}>Markdown</button>
+                  {aiResults?.polished && <button type="button" className={tab === 'polished' ? 'active' : ''} onClick={() => setTab('polished')}>AI 润色稿</button>}
+                  {aiResults?.summary && <button type="button" className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>AI 总结</button>}
                   <span />
                   <a href={transcriptFileUrl(selectedJob.id, 'text')} download>下载 TXT</a>
                   <a href={transcriptFileUrl(selectedJob.id, 'markdown')} download>下载 MD</a>
                   <a href={transcriptFileUrl(selectedJob.id, 'json')} download>下载 JSON</a>
+                  {aiResults?.polished && <a href={transcriptFileUrl(selectedJob.id, 'polished')} download>下载润色稿</a>}
+                  {aiResults?.summary && <a href={transcriptFileUrl(selectedJob.id, 'summary')} download>下载总结</a>}
                 </nav>
                 <div className="transcription-document-body">
                   {tab === 'segments' && transcript.segments.map((segment) => (
@@ -374,6 +465,8 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
                   ))}
                   {tab === 'text' && <pre>{transcript.text}</pre>}
                   {tab === 'markdown' && <pre>{transcript.markdown}</pre>}
+                  {tab === 'polished' && aiResults?.polished && <div className="ai-result-markdown"><MarkdownRenderer>{aiResults.polished}</MarkdownRenderer></div>}
+                  {tab === 'summary' && aiResults?.summary && <div className="ai-result-markdown"><MarkdownRenderer>{aiResults.summary}</MarkdownRenderer></div>}
                 </div>
               </section>
             ) : (
@@ -420,9 +513,29 @@ export default function TranscriptionApp({ themeId, customSkin }: TranscriptionA
         </div>
       )}
 
+      {aiConfirmKind && selectedJob && (
+        <div className="transcription-modal-backdrop" role="presentation" onMouseDown={() => setAiConfirmKind(null)}>
+          <section className="transcription-ai-dialog" role="dialog" aria-modal="true" aria-labelledby="transcription-ai-title" onMouseDown={(event) => event.stopPropagation()}>
+            <span>MANUAL AI</span>
+            <h2 id="transcription-ai-title">确认{aiConfirmKind === 'polish' ? '润色转写' : '生成会议总结'}</h2>
+            <p>会把当前转写文本发送给你配置的模型服务，可能产生费用。不会覆盖原始转写；生成结果会作为独立 Markdown 文件保存在本次 output 目录。</p>
+            <ul>
+              <li>当前模型：{workspace?.model_name || '未识别'}</li>
+              <li>请确认转写内容允许发送给该模型服务</li>
+              <li>AI 可能出错，重要结论和行动项仍需人工核对</li>
+            </ul>
+            <div>
+              <button type="button" onClick={() => setAiConfirmKind(null)}>取消</button>
+              <button type="button" className="primary" onClick={() => void confirmAi()}>确认并开始</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {guideOpen && (
         <TranscriptionOnboarding
           dashscopeConfigured={Boolean(workspace?.dashscope_api_key_set)}
+          modelConfigured={Boolean(workspace?.model_api_configured)}
           onConfigure={() => window.location.assign(workbenchSettingsUrl(window.location.href, 'transcription'))}
           onClose={() => setGuideOpen(false)}
         />

@@ -1,6 +1,7 @@
 """Fixed-folder storage and single-worker execution for meeting transcription."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import queue
@@ -19,6 +20,7 @@ from .dashscope_fun_asr import Segment, TranscriptionResult
 logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".m4a", ".mp3", ".wav", ".ogg", ".flac", ".aac", ".webm", ".mp4"}
+AI_RESULT_FILENAMES = {"polish": "ai-polished.md", "summary": "ai-summary.md"}
 _JOB_ID = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{4}$")
 _TRASH_ID = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9]{8}-[0-9]{6}-[0-9a-f]{4}$")
 _INVALID_WINDOWS_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -338,6 +340,94 @@ class TranscriptionWorkspace:
         _atomic_json(output_dir / "transcript.json", _transcript_payload(result.segments))
         _atomic_text(output_dir / "transcript.txt", _render_plain(result.segments))
         _atomic_text(output_dir / "transcript.md", _render_markdown(result.segments, str(job["title"])))
+        for filename in (*AI_RESULT_FILENAMES.values(), "ai-meta.json"):
+            (output_dir / filename).unlink(missing_ok=True)
+
+    def read_transcript_source(self, job_id: str) -> tuple[dict[str, Any], str]:
+        job = self.get_job(job_id)
+        if job["status"] != "completed":
+            raise WorkspaceConflict("只有转写完成的记录才能使用 AI 润色或总结")
+        path = self.root / str(job["output_path"]) / "transcript.md"
+        if not path.is_file():
+            raise WorkspaceNotFound("转写结果尚未生成")
+        return job, path.read_text(encoding="utf-8")
+
+    def _ai_meta(self, output_dir: Path) -> dict[str, Any]:
+        empty: dict[str, Any] = {"version": 1, "polish": None, "summary": None}
+        path = output_dir / "ai-meta.json"
+        if not path.is_file():
+            return empty
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as exc:
+            raise WorkspaceError("AI 结果元数据无法读取") from exc
+        if not isinstance(payload, dict) or payload.get("version") != 1:
+            raise WorkspaceError("AI 结果元数据损坏")
+        return {
+            "version": 1,
+            "polish": payload.get("polish") if isinstance(payload.get("polish"), dict) else None,
+            "summary": payload.get("summary") if isinstance(payload.get("summary"), dict) else None,
+        }
+
+    def save_ai_result(
+        self,
+        job_id: str,
+        *,
+        kind: str,
+        content: str,
+        model: str,
+        expected_source_sha256: str | None = None,
+    ) -> dict[str, Any]:
+        if kind not in AI_RESULT_FILENAMES:
+            raise WorkspaceNotFound("不支持的 AI 结果类型")
+        cleaned = content.strip()
+        if not cleaned:
+            raise WorkspaceError("AI 结果为空")
+        with self._lock:
+            job, source = self.read_transcript_source(job_id)
+            output_dir = self.root / str(job["output_path"])
+            source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
+            if expected_source_sha256 and source_sha256 != expected_source_sha256:
+                raise WorkspaceConflict("模型处理期间转写内容发生变化，旧 AI 结果已丢弃，请重新生成")
+            _atomic_text(output_dir / AI_RESULT_FILENAMES[kind], cleaned + "\n")
+            meta = self._ai_meta(output_dir)
+            meta[kind] = {
+                "model": model,
+                "generated_at": _now(),
+                "source_sha256": source_sha256,
+            }
+            _atomic_json(output_dir / "ai-meta.json", meta)
+            return self.read_ai_results(job_id)
+
+    def read_ai_results(self, job_id: str) -> dict[str, Any]:
+        job, _source = self.read_transcript_source(job_id)
+        output_dir = self.root / str(job["output_path"])
+        meta = self._ai_meta(output_dir)
+
+        def read_optional(kind: str) -> str | None:
+            path = output_dir / AI_RESULT_FILENAMES[kind]
+            return path.read_text(encoding="utf-8") if path.is_file() else None
+
+        return {
+            "polished": read_optional("polish"),
+            "summary": read_optional("summary"),
+            "meta": meta,
+        }
+
+    def clear_ai_result(self, job_id: str, *, kind: str) -> dict[str, Any]:
+        if kind not in AI_RESULT_FILENAMES:
+            raise WorkspaceNotFound("不支持的 AI 结果类型")
+        with self._lock:
+            job, _source = self.read_transcript_source(job_id)
+            output_dir = self.root / str(job["output_path"])
+            (output_dir / AI_RESULT_FILENAMES[kind]).unlink(missing_ok=True)
+            meta = self._ai_meta(output_dir)
+            meta[kind] = None
+            if meta["polish"] is None and meta["summary"] is None:
+                (output_dir / "ai-meta.json").unlink(missing_ok=True)
+            else:
+                _atomic_json(output_dir / "ai-meta.json", meta)
+            return self.read_ai_results(job_id)
 
     def run_job(self, job_id: str) -> dict[str, Any]:
         if self.transcriber is None:

@@ -5,6 +5,8 @@ export interface TranscriptionWorkspaceInfo {
   path: string
   dashscope_api_key_set: boolean
   model: string
+  model_api_configured: boolean
+  model_name: string
   supported_extensions: string[]
 }
 
@@ -13,6 +15,24 @@ export interface TranscriptResult {
   segments: TranscriptSegment[]
   markdown: string
   text: string
+}
+
+export type TranscriptionAiKind = 'polish' | 'summary'
+
+export interface TranscriptionAiMetaEntry {
+  model: string
+  generated_at: string
+  source_sha256: string
+}
+
+export interface TranscriptionAiResults {
+  polished: string | null
+  summary: string | null
+  meta: {
+    version: 1
+    polish: TranscriptionAiMetaEntry | null
+    summary: TranscriptionAiMetaEntry | null
+  }
 }
 
 export interface DeletedTranscription {
@@ -72,6 +92,28 @@ export async function readTranscript(jobId: string): Promise<TranscriptResult> {
   return request<TranscriptResult>(`/jobs/${encodeURIComponent(jobId)}/transcript`)
 }
 
+export async function readAiResults(jobId: string): Promise<TranscriptionAiResults> {
+  return request<TranscriptionAiResults>(`/jobs/${encodeURIComponent(jobId)}/ai`)
+}
+
+export async function generateAiResult(
+  jobId: string,
+  kind: TranscriptionAiKind,
+): Promise<TranscriptionAiResults> {
+  return request<TranscriptionAiResults>(`/jobs/${encodeURIComponent(jobId)}/ai/${kind}`, {
+    method: 'POST',
+  })
+}
+
+export async function clearAiResult(
+  jobId: string,
+  kind: TranscriptionAiKind,
+): Promise<TranscriptionAiResults> {
+  return request<TranscriptionAiResults>(`/jobs/${encodeURIComponent(jobId)}/ai/${kind}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function renameJob(jobId: string, title: string): Promise<TranscriptionJob> {
   return (await request<{ job: TranscriptionJob }>(`/jobs/${encodeURIComponent(jobId)}`, {
     method: 'PATCH',
@@ -102,7 +144,10 @@ export async function restoreJob(trashId: string): Promise<TranscriptionJob> {
   })).job
 }
 
-export function transcriptFileUrl(jobId: string, kind: 'text' | 'markdown' | 'json'): string {
+export function transcriptFileUrl(
+  jobId: string,
+  kind: 'text' | 'markdown' | 'json' | 'polished' | 'summary',
+): string {
   const url = new URL(`${API_BASE}/transcription/jobs/${encodeURIComponent(jobId)}/files/${kind}`)
   const token = getToken()
   if (token) url.searchParams.set('token', token)
