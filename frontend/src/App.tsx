@@ -75,6 +75,7 @@ import {
   applicationHomeUrl,
   literatureWorkbenchUrl,
   transcriptionWorkbenchUrl,
+  writingWorkbenchUrl,
   resolveSettingsReturnSurface,
   resolveWorkbenchPanel,
 } from './literatureNavigation'
@@ -1115,6 +1116,11 @@ export default function App() {
       window.location.assign(transcriptionWorkbenchUrl(window.location.href))
       return
     }
+    if (settingsReturnSurface === 'writing') {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      window.location.assign(writingWorkbenchUrl(window.location.href))
+      return
+    }
     setActivePanel('project')
   }
 
@@ -1165,7 +1171,9 @@ export default function App() {
             title={activePanel === 'settings'
               ? settingsReturnSurface === 'literature'
                 ? '返回文献智库'
-                : settingsReturnSurface === 'transcription' ? '返回会议转写' : '返回项目工作区'
+                : settingsReturnSurface === 'transcription'
+                  ? '返回会议转写'
+                  : settingsReturnSurface === 'writing' ? '返回文章处理' : '返回项目工作区'
               : '设置'}
             onClick={toggleSettingsPanel}
           >

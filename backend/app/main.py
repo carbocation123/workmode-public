@@ -12,6 +12,7 @@ from .config import APP_NAME, APP_VERSION, settings
 from .history_repair import repair_stale_tool_runs
 from .literature_routes import router as literature_router
 from .transcription.routes import recover_transcription_jobs, router as transcription_router
+from .writing.routes import router as writing_router
 from .routes import router
 from .storage import data_dir, ensure_data_dirs, sessions_dir
 
@@ -82,6 +83,7 @@ def startup() -> None:
 app.include_router(router)
 app.include_router(literature_router)
 app.include_router(transcription_router)
+app.include_router(writing_router)
 
 
 FRONTEND_DIST = settings.static_dir

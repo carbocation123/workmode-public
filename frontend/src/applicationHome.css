@@ -62,7 +62,7 @@
   box-sizing: border-box;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(16px, 2.2vw, 30px);
   padding: 0;
 }
@@ -118,6 +118,7 @@
 .mode-card-enter { justify-self: end; color: var(--ui-primary); font-size: 12px; font-weight: 700; }
 .mode-card-literature { background-image: linear-gradient(145deg, color-mix(in srgb, var(--ui-primary-container) 55%, var(--hub-panel)), var(--hub-panel)); }
 .mode-card-transcription { background-image: linear-gradient(145deg, color-mix(in srgb, var(--ui-primary-container) 36%, var(--hub-panel)), var(--hub-panel)); }
+.mode-card-writing { background-image: linear-gradient(145deg, color-mix(in srgb, var(--ui-primary-container) 46%, var(--hub-panel)), var(--hub-panel)); }
 
 .mode-hub-footer {
   display: flex;

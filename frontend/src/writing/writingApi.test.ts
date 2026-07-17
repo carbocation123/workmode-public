@@ -1,12 +1,20 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setApiBase } from '../api'
 import { deleteHistory, listHistory, processText, restoreHistory } from './writingApi'
 
 
+beforeEach(() => {
+  vi.stubGlobal('localStorage', {
+    getItem: vi.fn().mockReturnValue(null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  })
+})
+
 afterEach(() => {
   vi.unstubAllGlobals()
-  localStorage.clear()
 })
 
 

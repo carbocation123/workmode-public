@@ -2,7 +2,7 @@ export const RUNTIME_API_BASE_KEY = 'workmode-public-api-base'
 export const LITERATURE_PROJECT_KEY = 'workmode-public-literature-project'
 export type ApplicationSurface = 'home' | 'workbench'
 export type WorkbenchPanel = 'project' | 'settings'
-export type SettingsReturnSurface = 'literature' | 'transcription' | null
+export type SettingsReturnSurface = 'literature' | 'transcription' | 'writing' | null
 
 export function literatureWorkbenchUrl(currentHref: string): string {
   return new URL('./literature/index.html', currentHref).toString()
@@ -10,6 +10,10 @@ export function literatureWorkbenchUrl(currentHref: string): string {
 
 export function transcriptionWorkbenchUrl(currentHref: string): string {
   return new URL('./transcription/index.html', currentHref).toString()
+}
+
+export function writingWorkbenchUrl(currentHref: string): string {
+  return new URL('./writing/index.html', currentHref).toString()
 }
 
 export function applicationHomeUrl(currentHref: string): string {
@@ -50,5 +54,5 @@ export function resolveWorkbenchPanel(currentHref: string): WorkbenchPanel {
 
 export function resolveSettingsReturnSurface(currentHref: string): SettingsReturnSurface {
   const surface = new URL(currentHref).searchParams.get('return')
-  return surface === 'literature' || surface === 'transcription' ? surface : null
+  return surface === 'literature' || surface === 'transcription' || surface === 'writing' ? surface : null
 }

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type Project } from './api'
 import { skinUsesChrome, type ActiveCustomSkin } from './customSkin'
 import { prepareLiteratureWorkbench } from './literatureLauncher'
-import { transcriptionWorkbenchUrl, workbenchUrl } from './literatureNavigation'
+import { transcriptionWorkbenchUrl, workbenchUrl, writingWorkbenchUrl } from './literatureNavigation'
 import { SkinChrome } from './SkinChrome'
 import { THEMES, type ThemeId } from './theme'
 
@@ -125,11 +125,25 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
           <span className="mode-card-meta">独立文件工具 · 不创建项目或对话</span>
           <span className="mode-card-enter">打开转写工具 →</span>
         </button>
+
+        <button
+          type="button"
+          className="mode-card mode-card-writing"
+          data-skin-slot="feature-card"
+          onClick={() => window.location.assign(writingWorkbenchUrl(window.location.href))}
+        >
+          <span className="mode-card-index">04 / TEXT TOOL</span>
+          <span className="mode-card-icon">笔</span>
+          <strong>文章处理</strong>
+          <p>粘贴文字进行学术润色，或核查长文中的证据链、逻辑与表述一致性。</p>
+          <span className="mode-card-meta">本地处理历史 · 不创建项目或对话</span>
+          <span className="mode-card-enter">打开文章处理 →</span>
+        </button>
       </section>
 
       <footer className="mode-hub-footer">
         <span>本地文件优先 · 项目会话仅由工作台管理</span>
-        <span>转写工具只读取自己的 input / output 目录</span>
+        <span>转写与文章工具均不创建 Workmode 会话</span>
       </footer>
       {error && <div className="mode-hub-error" role="alert">{error}</div>}
     </main>

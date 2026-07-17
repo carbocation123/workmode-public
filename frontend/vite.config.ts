@@ -9,7 +9,8 @@ export default defineConfig({
       input: {
         main: 'index.html',
         literature: 'literature/index.html',
-        transcription: 'transcription/index.html'
+        transcription: 'transcription/index.html',
+        writing: 'writing/index.html'
       }
     }
   },
