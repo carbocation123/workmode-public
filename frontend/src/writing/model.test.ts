@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { historyPreview, modeLabel, sortHistory, type WritingHistoryRecord } from './model'
+import { createFreshWritingTask, historyPreview, modeLabel, sortHistory, type WritingHistoryRecord } from './model'
 
 function record(id: string, createdAt: string, inputText: string): WritingHistoryRecord {
   return {
@@ -29,5 +29,14 @@ describe('article processing view model', () => {
     expect(historyPreview('这是一段非常非常长的文字', 6)).toBe('这是一段非常…')
     expect(modeLabel('polish')).toBe('文字润色')
     expect(modeLabel('audit')).toBe('查找漏洞')
+  })
+
+  it('starts a blank task without changing the selected processing mode', () => {
+    expect(createFreshWritingTask('audit')).toEqual({
+      mode: 'audit',
+      selectedId: null,
+      inputText: '',
+      outputText: '',
+    })
   })
 })

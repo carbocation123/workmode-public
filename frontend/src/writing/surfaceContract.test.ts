@@ -25,6 +25,8 @@ describe('article processing surface contract', () => {
     expect(app).toContain('文字润色')
     expect(app).toContain('查找漏洞')
     expect(app).toContain('开始处理')
+    expect(app).toContain('新任务')
+    expect(app).toContain('startNewTask')
     expect(app).toContain('复制结果')
   })
 
