@@ -112,10 +112,12 @@
 .writing-footer span:last-child { color: var(--ui-success); }
 .writing-alert { position: fixed; left: 50%; bottom: 42px; z-index: 20; max-width: min(760px, calc(100vw - 40px)); transform: translateX(-50%); padding: 10px 14px; border: 1px solid var(--ui-danger-border); border-radius: 9px; color: var(--ui-danger); background: var(--ui-floating-background); box-shadow: 0 16px 50px var(--ui-shadow); font-size: 10px; }
 
-.writing-shell.hud-layout { gap: 6px; padding: 6px; grid-template-rows: 58px minmax(0, 1fr) 30px; }
-.writing-shell.hud-layout > .writing-header { display: none; }
+.writing-shell.hud-layout { gap: 6px; padding: 6px; grid-template-rows: 58px 52px minmax(0, 1fr) 30px; }
 .writing-shell.hud-layout > .neon-hud,
 .writing-shell.hud-layout > .preset-chrome { grid-row: 1; }
+.writing-shell.hud-layout > .writing-header { grid-row: 2; }
+.writing-shell.hud-layout > .writing-workspace { grid-row: 3; }
+.writing-shell.hud-layout > .writing-footer { grid-row: 4; }
 :root[data-theme="neon-space-lab"] .writing-history,
 :root[data-theme="neon-space-lab"] .writing-main,
 :root[data-theme="neon-space-lab"] .writing-footer { border: var(--neon-line-width) solid var(--neon-panel-edge); border-radius: var(--neon-content-radius); background: color-mix(in srgb, var(--neon-panel-glass) 84%, transparent); }
