@@ -74,9 +74,9 @@ npx --yes npm@10.9.4 ci --ignore-scripts --no-audit --no-fund
 Pop-Location
 ```
 
-打开 `http://127.0.0.1:5173` 进入应用级功能大厅。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库，`http://127.0.0.1:5173/transcription/` 是无 session 的会议转写工具。四个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不启动额外前端服务。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
+打开 `http://127.0.0.1:5173` 进入应用级功能大厅。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库，`http://127.0.0.1:5173/transcription/` 是无 session 的会议转写工具，`http://127.0.0.1:5173/writing/` 是无 session 的文章处理工具。五个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不启动额外前端服务。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
 
-`vite.config.ts` 的多页面 `input` 必须保持为相对 frontend root 的 `index.html`、`literature/index.html` 与 `transcription/index.html`。Vite 8/Rolldown 在 Windows 上会拒绝把绝对盘符路径直接作为生成资产名；修改入口后必须在 Windows 上执行一次 `npm run build`，不能只验证 dev server。
+`vite.config.ts` 的多页面 `input` 必须保持为相对 frontend root 的 `index.html`、`literature/index.html`、`transcription/index.html` 与 `writing/index.html`。Vite 8/Rolldown 在 Windows 上会拒绝把绝对盘符路径直接作为生成资产名；修改入口后必须在 Windows 上执行一次 `npm run build`，不能只验证 dev server。
 
 ```powershell
 npm ci --prefix desktop
@@ -120,6 +120,18 @@ WORKMODE_TRANSCRIPTION_DIR=
 API 上传使用流式请求暂存原始文件，不把大音频读入内存；单工作线程依次执行 Files API、`fun-asr` 异步任务和结果下载。签名 URL 只存在调用栈，`meta.json` 只保存模型、远端 task ID、状态与相对路径。未完成任务在后端启动时从 `meta.json` 恢复。新增或修改该模块时至少验证：多文件列表、无关根文件隔离、远端 task ID 恢复、失败重试、标题修改、输入输出成对软删除与无覆盖恢复、前端构建，以及未配置 Key 时不写入输入文件。
 
 AI 润色与总结复用共享的 OpenAI-compatible 模型设置 `WORKMODE_MODEL_BASE_URL`、`WORKMODE_MODEL_NAME` 与 `WORKMODE_MODEL_API_KEY`，不使用 DashScope Key，也不创建 session。前端只在用户确认后调用；后端对长文本按段落分块，润色逐块保持说话人与时间顺序，总结先生成片段摘要再做一次最终合并。输出只写入当前任务的 `ai-polished.md`、`ai-summary.md` 与不含密钥的 `ai-meta.json`。`ai-meta.json` 记录模型、时间和源文本 SHA-256；保存前再次核对源指纹，重新转写成功时清除旧派生结果。新增或修改该流程还必须覆盖：缺失模型配置、严禁编造提示、长文本分块、原文不覆盖、并发源变化拒绝、生成/读取/下载/清除 API 与重新转写失效。
+
+## 文章处理工具
+
+文章处理不是 Workmode 项目或 session。活动前端位于 `frontend/src/writing/`，独立入口是 `/writing/index.html`；后端位于 `backend/app/writing/`，统一挂载在 `/api/writing`。它只接受用户明确粘贴并提交的文字，复用共享 OpenAI-compatible 模型设置，不调用 DashScope、不写项目目录，也不进入 JSONL、上下文压缩或项目记忆。
+
+两个公开模式固定为 `polish`（文字润色）与 `audit`（查找漏洞）。润色必须保留事实、数字、引用、限定条件和结论强度；漏洞核查只分析输入内部的证据链、逻辑和表述一致性，Prompt 必须明确禁止把内部分析描述成联网事实或参考文献核验。长文核查先编号段落、分块生成局部报告，再合并全篇；不能把互相独立的分块报告直接拼成最终结果。明确的 `<sub>`、`<sup>` 与简单 LaTeX 上下标/下标可以在结果保存前规范为 Unicode，但不得猜测复杂公式。
+
+两套 Prompt 通过 `backend/app/writing/skills/polish.md` 与 `audit.md` 中的 `@.../SKILL.md` 清单加载，继续使用共享的项目引用展开器。内置 Skill 必须保持为可信、纯文本规则，不加入 Bash、联网、任意文件读取或写入；修改清单、Skill 或展开器时必须同时验证展开后的 Prompt 内容，而不是只测文件存在。
+
+成功记录保存在 `Settings.data_dir/article-processing/history/<id>.json`，删除整体移入 `article-processing/.trash/` 并支持无覆盖恢复。记录包含原始输入、模式、输出、模型、时间与字数；已经成功的历史不得被重新处理动作原地改写。列表 API 只返回短预览和元数据，`GET /api/writing/history/{id}` 才返回全文，避免历史积累后每次刷新传输全部长文。请求失败不创建成功历史。
+
+新增或修改文章处理流程时至少覆盖：空输入与 200,000 字上限、缺失模型配置、两种模式的 Prompt 契约、长文分块、Unicode 转换、成功后持久化、失败不落盘、列表不泄露全文、详情读取、可恢复删除、恢复冲突、前端历史选择/重新处理状态、共享设置返回来源、Vite 多页面构建和功能大厅四卡统一布局。面向普通用户的行为变化还要同步更新 [ARTICLE-PROCESSING.md](ARTICLE-PROCESSING.md)。
 
 文献项目的新建入口只提交项目名称，默认托管根目录规则为：显式 `WORKMODE_MANAGED_PROJECTS_DIR` 优先；否则 Windows 有 D 盘时使用 `D:\workmode`，其余环境使用 `~/workmode`。后端负责安全目录名和同名序号，不允许前端拼接绝对路径。旧客户端仍可传 `root_path`；旧注册项目保持原地，访问文献投影时只幂等补齐缺失结构。相关回归必须覆盖名称创建、同名冲突、旧路径不搬迁、缺失结构补齐以及项目软删除不碰实体目录。
 

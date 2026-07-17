@@ -272,9 +272,10 @@ export default function WritingApp({ themeId, customSkin }: WritingAppProps) {
           </div>
 
           <div className="writing-editor-grid">
-            <label className="writing-editor-panel" data-skin-slot="writing-input">
+            <section className="writing-editor-panel" data-skin-slot="writing-input">
               <span className="writing-editor-heading"><strong>文字输入</strong><small>{inputText.length.toLocaleString()} 字</small></span>
               <textarea
+                aria-label="文字输入"
                 value={inputText}
                 maxLength={200000}
                 placeholder={mode === 'polish'
@@ -285,21 +286,22 @@ export default function WritingApp({ themeId, customSkin }: WritingAppProps) {
                   setSelectedId(null)
                 }}
               />
-            </label>
+            </section>
 
-            <label className="writing-editor-panel" data-skin-slot="writing-output">
+            <section className="writing-editor-panel" data-skin-slot="writing-output">
               <span className="writing-editor-heading">
                 <strong>文字输出</strong>
                 <span><small>{outputText.length.toLocaleString()} 字</small><button type="button" disabled={!outputText} onClick={() => void copyOutput()}>复制结果</button></span>
               </span>
               <textarea
+                aria-label="文字输出"
                 value={outputText}
                 readOnly
                 placeholder={mode === 'polish'
                   ? '润色后的文字会显示在这里。'
                   : '文章内部的证据链、逻辑和一致性问题会显示在这里。'}
               />
-            </label>
+            </section>
           </div>
         </section>
       </section>
