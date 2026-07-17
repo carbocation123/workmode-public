@@ -76,5 +76,7 @@ describe('meeting transcription surface contract', () => {
     expect(onboarding).toContain('免费额度用完即停')
     expect(onboarding).toContain('查看阿里云官方步骤')
     expect(onboarding).toContain('openExternalUrl')
+    expect(onboarding).toContain('openOfficialLink')
+    expect(onboarding).toContain('无法打开系统浏览器，请手动复制此地址')
   })
 })

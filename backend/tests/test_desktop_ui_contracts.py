@@ -262,7 +262,7 @@ class DesktopUiContractTest(unittest.TestCase):
         self.assertIn("fileEntryVisual(entry", source)
         self.assertIn("tree-node-kind", source)
 
-    def test_deepseek_links_use_scoped_system_browser_opener(self) -> None:
+    def test_official_setup_links_use_scoped_system_browser_opener(self) -> None:
         desktop_source = DESKTOP_SOURCE.read_text(encoding="utf-8")
         permissions = json.loads(DESKTOP_CAPABILITIES.read_text(encoding="utf-8"))["permissions"]
         opener = next(item for item in permissions if isinstance(item, dict) and item.get("identifier") == "opener:allow-open-url")
@@ -273,6 +273,8 @@ class DesktopUiContractTest(unittest.TestCase):
             "https://platform.deepseek.com/*",
             "https://api-docs.deepseek.com/*",
             "https://mineru.net/*",
+            "https://bailian.console.aliyun.com/*",
+            "https://help.aliyun.com/*",
             "mailto:*",
         })
 
