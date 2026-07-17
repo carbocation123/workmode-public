@@ -1,6 +1,6 @@
 [package]
 name = "workmode-public"
-version = "0.8.7"
+version = "0.8.8"
 description = "Local-first research work assistant"
 authors = ["Jason Yang"]
 edition = "2021"
