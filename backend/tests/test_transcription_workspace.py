@@ -163,6 +163,56 @@ class TranscriptionWorkspaceTests(unittest.TestCase):
         self.assertEqual(completed["status"], "completed")
         self.assertEqual(self.transcriber.calls[0][0], original_input.resolve())
 
+    def test_ai_derivatives_are_separate_clearable_files_and_never_replace_the_transcript(self) -> None:
+        job = self.workspace.create_job(filename="meeting.wav", source=io.BytesIO(b"audio"), start=False)
+        completed = self.workspace.run_job(job["id"])
+        output_dir = self.root / completed["output_path"]
+        original = (output_dir / "transcript.md").read_text(encoding="utf-8")
+
+        self.workspace.save_ai_result(
+            job["id"],
+            kind="polish",
+            content="# AI 润色稿\n\n内容\n",
+            model="test-model",
+        )
+        self.workspace.save_ai_result(
+            job["id"],
+            kind="summary",
+            content="# 会议总结\n\n内容\n",
+            model="test-model",
+        )
+
+        results = self.workspace.read_ai_results(job["id"])
+        self.assertEqual(results["polished"], "# AI 润色稿\n\n内容\n")
+        self.assertEqual(results["summary"], "# 会议总结\n\n内容\n")
+        self.assertEqual(results["meta"]["polish"]["model"], "test-model")
+        self.assertEqual((output_dir / "transcript.md").read_text(encoding="utf-8"), original)
+
+        self.workspace.clear_ai_result(job["id"], kind="polish")
+
+        cleared = self.workspace.read_ai_results(job["id"])
+        self.assertIsNone(cleared["polished"])
+        self.assertEqual(cleared["summary"], "# 会议总结\n\n内容\n")
+        self.assertFalse((output_dir / "ai-polished.md").exists())
+        self.assertTrue((output_dir / "ai-summary.md").exists())
+
+    def test_successful_retranscription_invalidates_old_ai_derivatives(self) -> None:
+        job = self.workspace.create_job(filename="meeting.wav", source=io.BytesIO(b"audio"), start=False)
+        self.workspace.run_job(job["id"])
+        self.workspace.save_ai_result(
+            job["id"],
+            kind="summary",
+            content="# 旧总结\n",
+            model="test-model",
+        )
+
+        self.workspace.retry_job(job["id"], start=False)
+        self.workspace.run_job(job["id"])
+
+        results = self.workspace.read_ai_results(job["id"])
+        self.assertIsNone(results["summary"])
+        self.assertIsNone(results["meta"]["summary"])
+
 
 if __name__ == "__main__":
     unittest.main()

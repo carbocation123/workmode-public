@@ -13,8 +13,11 @@ describe('meeting transcription onboarding', () => {
   it('repairs unknown local state and clamps the active step', () => {
     expect(parseTranscriptionOnboarding(null)).toEqual(EMPTY_TRANSCRIPTION_ONBOARDING)
     expect(parseTranscriptionOnboarding('{broken')).toEqual(EMPTY_TRANSCRIPTION_ONBOARDING)
-    expect(parseTranscriptionOnboarding(JSON.stringify({ version: 1, completed: false, step: 99 })).step)
+    expect(parseTranscriptionOnboarding(JSON.stringify({ version: 2, completed: false, step: 99 })).step)
       .toBe(TRANSCRIPTION_ONBOARDING_STEPS.length - 1)
+    expect(parseTranscriptionOnboarding(JSON.stringify({ version: 1, completed: true, step: 2 })))
+      .toEqual(EMPTY_TRANSCRIPTION_ONBOARDING)
+    expect(TRANSCRIPTION_ONBOARDING_STEPS).toHaveLength(4)
   })
 
   it('completes and replays without creating project files or sessions', () => {
