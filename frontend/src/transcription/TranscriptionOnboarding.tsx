@@ -107,6 +107,7 @@ export function TranscriptionOnboarding({
   const [state, setState] = useState<TranscriptionOnboardingState>(() =>
     parseTranscriptionOnboarding(localStorage.getItem(TRANSCRIPTION_ONBOARDING_STORAGE_KEY)),
   )
+  const [linkError, setLinkError] = useState('')
   const dialogRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -124,6 +125,15 @@ export function TranscriptionOnboarding({
   function finish() {
     commit(completeTranscriptionOnboarding(state))
     onClose()
+  }
+
+  async function openOfficialLink(url: string) {
+    setLinkError('')
+    try {
+      await openExternalUrl(url)
+    } catch {
+      setLinkError(`无法打开系统浏览器，请手动复制此地址：${url}`)
+    }
   }
 
   return (
@@ -175,10 +185,11 @@ export function TranscriptionOnboarding({
           {state.step === 0 && (
             <div className="transcription-guide-setup-actions">
               <div className="transcription-guide-links">
-                <button type="button" onClick={() => void openExternalUrl(DASHSCOPE_CONSOLE_URL)}>打开百炼控制台 ↗</button>
-                <button type="button" onClick={() => void openExternalUrl(DASHSCOPE_API_KEY_GUIDE_URL)}>查看阿里云官方步骤 ↗</button>
-                <button type="button" onClick={() => void openExternalUrl(DASHSCOPE_FREE_QUOTA_GUIDE_URL)}>查看免费额度与防超额 ↗</button>
+                <button type="button" onClick={() => void openOfficialLink(DASHSCOPE_CONSOLE_URL)}>打开百炼控制台 ↗</button>
+                <button type="button" onClick={() => void openOfficialLink(DASHSCOPE_API_KEY_GUIDE_URL)}>查看阿里云官方步骤 ↗</button>
+                <button type="button" onClick={() => void openOfficialLink(DASHSCOPE_FREE_QUOTA_GUIDE_URL)}>查看免费额度与防超额 ↗</button>
               </div>
+              {linkError && <p className="transcription-guide-link-error" role="alert">{linkError}</p>}
               <div className="transcription-guide-configure">
                 <span className={dashscopeConfigured ? 'configured' : ''}>
                   {dashscopeConfigured ? '完成：DashScope 已配置，可以开始上传' : '尚未完成：Workmode Public 还没有检测到 Key'}

@@ -232,6 +232,7 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .transcription-guide-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .transcription-guide-links button { min-height: 32px; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 7px; color: var(--ui-primary); background: var(--ui-control-background); cursor: pointer; }
 .transcription-guide-links button:hover { border-color: var(--ui-primary-border); background: var(--ui-control-hover); }
+.transcription-guide-link-error { margin: 0; padding: 9px 11px; border: 1px solid var(--ui-danger-border); border-radius: 7px; color: var(--ui-danger); background: var(--ui-danger-soft); font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; }
 .transcription-guide-configure { margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; border: 1px solid var(--ui-warning-border); border-radius: 10px; background: var(--ui-warning-soft); }
 .transcription-guide-setup-actions .transcription-guide-configure { margin-top: 0; }
 .transcription-guide-configure > span { color: var(--ui-warning); font-size: 11px; }
