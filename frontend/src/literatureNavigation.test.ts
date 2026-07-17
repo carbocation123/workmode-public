@@ -45,4 +45,10 @@ describe('literature workbench navigation', () => {
     expect(resolveSettingsReturnSurface(url)).toBe('literature')
     expect(resolveWorkbenchPanel(workbenchUrl(url))).toBe('project')
   })
+
+  it('can return from shared model settings to article processing', () => {
+    const url = workbenchSettingsUrl('http://tauri.localhost/writing/index.html', 'writing')
+    expect(url).toBe('http://tauri.localhost/index.html?surface=workbench&panel=settings&return=writing')
+    expect(resolveSettingsReturnSurface(url)).toBe('writing')
+  })
 })
