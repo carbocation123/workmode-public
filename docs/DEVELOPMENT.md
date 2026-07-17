@@ -108,7 +108,7 @@ WORKMODE_MINERU_TIMEOUT_SECONDS=180
 
 会议转写不是第三套 Workmode 项目或对话。默认工作目录是 `D:\workmode\meeting-transcription`（没有 D 盘时为 `~/workmode/meeting-transcription`），可以用 `WORKMODE_TRANSCRIPTION_DIR` 覆盖；目录协议只有 `tools/`、`input/` 与 `output/`。列表只能扫描 `output/<任务 ID>/meta.json`，根目录中由通用工作台增加的 `WORKMODE.md`、笔记或其它文件必须被忽略。
 
-转写页使用独立的 `workmode-public-transcription-onboarding-v2` WebView 本地状态提供四步首次指引：配置 DashScope、批量上传、查看与导出、可选 AI 润色/总结。DashScope 步骤按完全新手路径依次说明阿里云账号/实名认证、华北2（北京）地域开通、默认业务空间与“全部”权限、只显示一次的新 Key、按量付费与免费额度用完即停、粘贴及成功标志，并只链接阿里云官方控制台和帮助文档。AI 步骤必须说明该功能完全可选，模型地址/名称/Key 与连接测试，认证、余额和超时错误，文本发送边界、可能费用、人工核对及原文不覆盖。页面右上角和共享设置页都能重置并重播；这个状态不得写入转写根目录，也不得创建 Workmode session。修改步骤、供应商入口或持久化结构时，先核对相关最新官方文档，再同步更新 `frontend/src/transcription/onboarding.test.ts` 与页面契约测试。
+转写页使用独立的 `workmode-public-transcription-onboarding-v2` WebView 本地状态提供四步首次指引：配置 DashScope、批量上传、查看与导出、可选 AI 润色/总结。DashScope 步骤按完全新手路径依次说明阿里云账号/实名认证、华北2（北京）地域开通、默认业务空间与“全部”权限、只显示一次的新 Key、按量付费与免费额度用完即停、粘贴及成功标志，并只链接阿里云官方控制台和帮助文档。安装版通过 Tauri Opener 打开这些链接，capability 必须精确放行 `bailian.console.aliyun.com/*` 与 `help.aliyun.com/*`；前端必须捕获 Opener 拒绝或系统浏览器失败，并显示可手动复制的完整 URL，不能静默吞错。AI 步骤必须说明该功能完全可选，模型地址/名称/Key 与连接测试，认证、余额和超时错误，文本发送边界、可能费用、人工核对及原文不覆盖。页面右上角和共享设置页都能重置并重播；这个状态不得写入转写根目录，也不得创建 Workmode session。修改步骤、供应商入口或持久化结构时，先核对相关最新官方文档，再同步更新 `frontend/src/transcription/onboarding.test.ts` 与页面契约测试。
 
 在共享设置页保存密钥，或在本地 `.env` 设置：
 
