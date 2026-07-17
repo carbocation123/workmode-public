@@ -147,6 +147,10 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertIn("说明什么问题", prompt)
         self.assertIn('literature_read(part="full_text")', prompt)
         self.assertIn("不得仅因为文献刚刚入库或被选中就调用 literature_process", prompt)
+        self.assertIn("精读某一篇", prompt)
+        self.assertIn("默认逐图讲解", prompt)
+        self.assertIn("图注或图像信息不足", prompt)
+        self.assertIn("不得猜测", prompt)
         self.assertNotIn("project_bash", prompt)
         self.assertEqual(usage["tool_profile"], "literature")
         self.assertEqual(usage["tool_count"], 15)
@@ -179,6 +183,8 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertIn("我可以帮你简洁概括", messages[0]["content"])
         self.assertIn("项目笔记", messages[0]["content"])
         self.assertIn("MinerU API", messages[0]["content"])
+        self.assertIn("精读这篇", messages[0]["content"])
+        self.assertIn("默认逐图讲解", messages[0]["content"])
         self.assertIn("现在，我能帮你什么", messages[0]["content"])
 
     def test_projection_route_updates_without_confirmed_flag(self) -> None:

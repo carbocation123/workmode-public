@@ -55,6 +55,13 @@ describe('literature live interaction contracts', () => {
     expect(literatureOnboarding).not.toContain('创建并复制 Token')
   })
 
+  it('guides single-paper close reading toward evidence-based figure walkthroughs', () => {
+    expect(source).toContain('选中一篇后说“精读这篇”，默认逐图讲解')
+    expect(literatureOnboarding).toContain('精读这篇')
+    expect(literatureOnboarding).toContain('默认逐图讲解')
+    expect(literatureOnboarding).toContain('图表信息不足时会明确说明，不会猜测')
+  })
+
   it('offers recoverable paper deletion and removes deleted papers from live attachments', () => {
     expect(source).toContain('文献回收站')
     expect(source).toContain('移入回收站')
