@@ -39,7 +39,7 @@ describe('literature theme color contract', () => {
     ['modal close', '.modal-header > button', '--lit-control-bg'],
     ['notes header controls', '.notes-header-actions button', '--lit-control-bg'],
     ['notes document controls', '.note-document-toolbar > button, .note-mode-switch button', '--lit-control-bg'],
-    ['filter controls', '.tag-filter-trigger, .clear-filter', '--lit-control-bg'],
+    ['filter controls', '.tag-filter-trigger', '--lit-control-bg'],
     ['import controls', '.import-confirm-actions button', '--lit-control-bg'],
     ['composer', '.composer', '--lit-input-bg'],
     ['PDF workspace', '.pdf-workspace', '--lit-document-bg'],

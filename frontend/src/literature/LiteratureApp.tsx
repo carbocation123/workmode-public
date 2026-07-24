@@ -1257,59 +1257,110 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
       <main className="workspace" data-skin-slot="literature-workspace">
         <aside className="library-panel" data-skin-slot="literature-library">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">LIBRARY</span>
-              <h1>文献库</h1>
-            </div>
-            <div className="library-heading-actions">
-              <span className="count-badge">{papers.length}</span>
-              <button type="button" onClick={() => void openPaperTrash()} title="文献回收站" aria-label="打开文献回收站"><Icon name="trash" /></button>
-              <button type="button" onClick={() => void openProjectManager()} title="新建或切换文献项目" aria-label="管理文献项目"><Icon name="layers" /></button>
+          <div className="library-panel-header">
+            <button
+              className="library-project-selector"
+              type="button"
+              onClick={() => void openProjectManager()}
+              title="切换或管理项目"
+            >
+              <span>当前项目</span>
+              <strong>{projectInfo?.name || '等待项目'}</strong>
+              <em aria-hidden>⌄</em>
+            </button>
+            <div className="library-panel-meta">
+              <span className="library-paper-count">{papers.length} 篇</span>
+              <details className="library-more-menu">
+                <summary aria-label="更多项目操作" title="更多项目操作">•••</summary>
+                <div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.currentTarget.closest('details')?.removeAttribute('open')
+                      void openProjectManager()
+                    }}
+                  >
+                    <Icon name="layers" />管理项目
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.currentTarget.closest('details')?.removeAttribute('open')
+                      void openPaperTrash()
+                    }}
+                  >
+                    <Icon name="trash" />文献回收站
+                  </button>
+                </div>
+              </details>
             </div>
           </div>
 
-          <label className="search-box">
-            <Icon name="search" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="标题、作者、期刊…"
-            />
-          </label>
-
-          <button
-            className="endnote-import-trigger"
-            disabled={backendMode !== 'connected'}
-            onClick={openEndNoteImport}
-            type="button"
-          >
-            <Icon name="file" />
-            <span><strong>导入 EndNote 文献库</strong><small>文献、分组、标签和附件一次带过来</small></span>
-          </button>
-
-          {literatureGroups.length > 0 && (
-            <label className="literature-group-filter">
-              <span>文献分组</span>
-              <select value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}>
-                <option value="">全部分组</option>
-                {literatureGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-              </select>
+          <div className="library-toolbar">
+            <label className="search-box">
+              <Icon name="search" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜索标题、作者、期刊、DOI…"
+              />
             </label>
-          )}
 
-          <div className="tag-filter-control">
-            <button
-              className={`tag-filter-trigger${tagFilterOpen ? ' active' : ''}`}
-              onClick={() => setTagFilterOpen((open) => !open)}
-            >
-              <Icon name="filter" />
-              <span>按标签筛选</span>
-              {selectedTagIds.length > 0 && <em>{selectedTagIds.length}</em>}
-            </button>
-            {selectedTagIds.length > 0 && (
-              <button className="clear-filter" onClick={() => setSelectedTagIds([])}>清除</button>
-            )}
+            <div className="library-command-row">
+              <label className="literature-group-filter">
+                <select
+                  aria-label="按文献分组筛选"
+                  value={selectedGroupId}
+                  onChange={(event) => setSelectedGroupId(event.target.value)}
+                >
+                  <option value="">全部分组</option>
+                  {literatureGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                </select>
+              </label>
+
+              <div className="tag-filter-control">
+                <button
+                  className={`tag-filter-trigger${tagFilterOpen ? ' active' : ''}`}
+                  onClick={() => setTagFilterOpen((open) => !open)}
+                  type="button"
+                >
+                  <Icon name="filter" />
+                  <span>标签筛选</span>
+                  {selectedTagIds.length > 0 && <em>{selectedTagIds.length}</em>}
+                </button>
+              </div>
+
+              <details className="library-import-menu">
+                <summary aria-label="导入文献">
+                  <Icon name="file" />
+                  <span>导入</span>
+                </summary>
+                <div>
+                  <button
+                    disabled={backendMode !== 'connected' || streaming}
+                    onClick={(event) => {
+                      event.currentTarget.closest('details')?.removeAttribute('open')
+                      fileInputRef.current?.click()
+                    }}
+                    type="button"
+                  >
+                    <Icon name="paperclip" />
+                    <span><strong>导入 PDF</strong><small>选择一篇或多篇论文</small></span>
+                  </button>
+                  <button
+                    disabled={backendMode !== 'connected'}
+                    onClick={(event) => {
+                      event.currentTarget.closest('details')?.removeAttribute('open')
+                      openEndNoteImport()
+                    }}
+                    type="button"
+                  >
+                    <Icon name="file" />
+                    <span><strong>导入 EndNote</strong><small>带入分组、标签和附件</small></span>
+                  </button>
+                </div>
+              </details>
+            </div>
 
             {tagFilterOpen && (
               <div className="tag-filter-popover">
@@ -1368,18 +1419,19 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 )}
               </div>
             )}
-          </div>
 
-          {selectedTagIds.length > 0 && (
-            <div className="selected-filter-tags">
-              {selectedTagIds.map((tagId) => {
-                const tag = tagRegistry.find((item) => item.id === tagId)
-                return tag ? (
-                  <button key={tag.id} onClick={() => toggleTagFilter(tag.id)}>{tag.name}<Icon name="close" /></button>
-                ) : null
-              })}
-            </div>
-          )}
+            {selectedTagIds.length > 0 && (
+              <div className="selected-filter-tags">
+                {selectedTagIds.map((tagId) => {
+                  const tag = tagRegistry.find((item) => item.id === tagId)
+                  return tag ? (
+                    <button key={tag.id} onClick={() => toggleTagFilter(tag.id)}>{tag.name}<Icon name="close" /></button>
+                  ) : null
+                })}
+                <button className="clear-all-tags" onClick={() => setSelectedTagIds([])}>清除全部</button>
+              </div>
+            )}
+          </div>
 
           <div className="paper-list" aria-label="文献列表">
             {filteredPapers.map((paper) => {
@@ -1399,40 +1451,35 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   </button>
                   <div className="paper-main">
                     <h2>{paper.title}</h2>
-                    <p className="paper-filename">{paper.filename}</p>
-                    {paper.archiveFilename && paper.archiveFilename !== paper.filename && (
-                      <p className="original-filename">标准名：{paper.archiveFilename}</p>
-                    )}
-                    {paper.groupIds.length > 0 && (
-                      <div className="card-groups">
-                        {paper.groupIds.slice(0, 2).map((groupId) => (
-                          <span key={groupId}>{literatureGroups.find((group) => group.id === groupId)?.name || groupId}</span>
-                        ))}
-                        {paper.groupIds.length > 2 && <span>+{paper.groupIds.length - 2}</span>}
-                      </div>
-                    )}
-                    <div className="card-tags">
-                      {paper.tagIds.slice(0, 4).map((tagId) => {
-                        const tag = tagRegistry.find((item) => item.id === tagId)
-                        return tag ? <span className={tag.status === 'provisional' ? 'provisional' : ''} key={tag.id}>{tag.name}</span> : null
-                      })}
-                      {paper.tagIds.length > 4 && <span className="tag-overflow">+{paper.tagIds.length - 4}</span>}
-                    </div>
                     {(paper.year || paper.journal) && (
-                      <div className="status-line">
+                      <div className="paper-card-meta">
                         {paper.journal && <span>{paper.journal}</span>}
                         {paper.year && <span className="card-year">{paper.year}</span>}
+                      </div>
+                    )}
+                    {(paper.groupIds.length > 0 || paper.tagIds.length > 0) && (
+                      <div className="paper-classifiers">
+                        {paper.groupIds.length > 0 && (
+                          <div className="card-groups">
+                            {paper.groupIds.slice(0, 1).map((groupId) => (
+                              <span key={groupId}>{literatureGroups.find((group) => group.id === groupId)?.name || groupId}</span>
+                            ))}
+                            {paper.groupIds.length > 1 && <span>+{paper.groupIds.length - 1}</span>}
+                          </div>
+                        )}
+                        <div className="card-tags">
+                          {paper.tagIds.slice(0, 3).map((tagId) => {
+                            const tag = tagRegistry.find((item) => item.id === tagId)
+                            return tag ? <span className={tag.status === 'provisional' ? 'provisional' : ''} key={tag.id}>{tag.name}</span> : null
+                          })}
+                          {paper.tagIds.length > 3 && <span className="tag-overflow">+{paper.tagIds.length - 3}</span>}
+                        </div>
                       </div>
                     )}
                   </div>
                 </article>
               )
             })}
-          </div>
-
-          <div className="library-footnote">
-            <Icon name="filter" />
-            <span>标签负责筛选，关注点保留为自然语言摘要。</span>
           </div>
         </aside>
 

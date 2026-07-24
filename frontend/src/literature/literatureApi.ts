@@ -491,7 +491,7 @@ export function mapBackendPaper(paper: BackendPaper): PaperRecord {
         : paper.metadata_source,
     paperType: paper.paper_type,
     verificationStatus: paper.verification_status || 'pending',
-    title: paper.title || paper.original_filename.replace(/\.pdf$/i, ''),
+    title: paper.title || '未识别标题',
     authors: paper.authors || '等待首页元数据识别',
     firstAuthorSurname: paper.first_author_surname || '',
     year: paper.year,
