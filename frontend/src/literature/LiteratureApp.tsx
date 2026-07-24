@@ -2076,7 +2076,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   </div>
                   <div className="endnote-choice-grid">
                     <button disabled={endNoteBusy} onClick={() => void autoFindEndNote()}>
-                      <Icon name="search" /><span><strong>自动查找</strong><small>在常用文件夹中寻找 .enl 和 .enlx</small></span>
+                      <Icon name="search" /><span><strong>{endNoteBusy ? '正在扫描本机所有磁盘…' : '自动查找'}</strong><small>扫描本机所有磁盘中的 .enl 和 .enlx，可能需要几十秒</small></span>
                     </button>
                     <button disabled={endNoteBusy} onClick={() => void manuallyChooseEndNote()}>
                       <Icon name="file" /><span><strong>手动选择</strong><small>自己选一个 EndNote 文献库文件</small></span>
@@ -2087,7 +2087,16 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                       <strong>找到了 {endNoteCandidates.length} 个文献库，请选择一个：</strong>
                       {endNoteCandidates.map((candidate) => (
                         <button key={candidate.path} onClick={() => void loadEndNotePreview(candidate.path)}>
-                          <span>{candidate.name}</span><small>{candidate.path}</small>
+                          <span>{candidate.name}</span>
+                          <small>
+                            {candidate.has_data_folder
+                              ? '完整工作库'
+                              : candidate.type === 'enlx'
+                                ? '压缩文献库'
+                                : '未找到同名 .Data 文件夹'}
+                            {candidate.variants.length > 1 ? ` · 同名文件 ${candidate.variants.length} 个` : ''}
+                            {' · '}{candidate.path}
+                          </small>
                         </button>
                       ))}
                     </div>

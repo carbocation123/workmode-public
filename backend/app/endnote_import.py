@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import ctypes
 import hashlib
 import os
 import re
@@ -12,6 +13,7 @@ import unicodedata
 import urllib.parse
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable
@@ -349,49 +351,162 @@ def inspect_endnote_library(source: Path) -> dict[str, Any]:
         return _preview_payload(source, _read_library(bundle))
 
 
+def _local_volume_roots() -> list[Path]:
+    if os.name != "nt":
+        return [Path("/")]
+    try:
+        bitmask = int(ctypes.windll.kernel32.GetLogicalDrives())
+        get_drive_type = ctypes.windll.kernel32.GetDriveTypeW
+    except (AttributeError, OSError, TypeError, ValueError):
+        bitmask = 0
+        get_drive_type = None
+    roots: list[Path] = []
+    for index in range(26):
+        if bitmask and not (bitmask & (1 << index)):
+            continue
+        root = Path(f"{chr(ord('A') + index)}:/")
+        if not root.exists():
+            continue
+        if get_drive_type is not None:
+            try:
+                drive_type = int(get_drive_type(str(root)))
+            except (OSError, TypeError, ValueError):
+                continue
+            if drive_type not in {2, 3}:  # removable or fixed local volume
+                continue
+        roots.append(root)
+    return roots
+
+
 def _default_search_roots() -> list[Path]:
-    home = Path.home()
-    candidates = [home / "Documents", home / "Desktop", home / "Downloads"]
-    for variable in ("OneDrive", "OneDriveCommercial", "OneDriveConsumer"):
-        value = os.environ.get(variable)
-        if value:
-            candidates.append(Path(value))
-    baidu_root = Path("D:/BaiduSyncdisk")
-    if baidu_root.exists():
-        candidates.append(baidu_root)
-    return candidates
+    return _local_volume_roots()
+
+
+def _scan_volume_for_endnote_libraries(root: Path) -> list[Path]:
+    found: list[Path] = []
+    pending = [root]
+    while pending:
+        folder = pending.pop()
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            if entry.name.casefold().endswith(".data"):
+                                continue
+                            pending.append(Path(entry.path))
+                            continue
+                        if (
+                            entry.is_file(follow_symlinks=False)
+                            and Path(entry.name).suffix.casefold() in {".enl", ".enlx"}
+                        ):
+                            found.append(Path(entry.path).resolve())
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return found
+
+
+def _matching_data_folder(library: Path) -> Path | None:
+    expected_name = f"{library.stem}.Data".casefold()
+    try:
+        for child in library.parent.iterdir():
+            if child.is_dir() and child.name.casefold() == expected_name:
+                return child.resolve()
+    except OSError:
+        pass
+    return None
 
 
 def find_endnote_libraries(search_roots: Iterable[Path] | None = None) -> list[dict[str, Any]]:
     roots = list(search_roots) if search_roots is not None else _default_search_roots()
-    found: dict[str, Path] = {}
+    normalized_roots: dict[str, Path] = {}
     for raw_root in roots:
         root = Path(raw_root).expanduser().resolve()
-        if not root.exists() or not root.is_dir():
-            continue
-        for pattern in ("*.enl", "*.enlx"):
-            try:
-                candidates = root.rglob(pattern)
-                for candidate in candidates:
-                    if candidate.is_file():
-                        found[os.path.normcase(str(candidate.resolve()))] = candidate.resolve()
-            except OSError:
-                continue
-    result: list[dict[str, Any]] = []
-    for path in sorted(found.values(), key=lambda item: str(item).casefold()):
+        if root.exists() and root.is_dir():
+            normalized_roots[os.path.normcase(str(root))] = root
+
+    found: dict[str, Path] = {}
+    with ThreadPoolExecutor(max_workers=max(1, min(len(normalized_roots), 4))) as executor:
+        for candidates in executor.map(
+            _scan_volume_for_endnote_libraries,
+            normalized_roots.values(),
+        ):
+            for candidate in candidates:
+                found[os.path.normcase(str(candidate))] = candidate
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for path in found.values():
         try:
             stats = path.stat()
         except OSError:
             continue
-        result.append(
-            {
-                "path": str(path),
+        variant = {
+                "path": str(path.resolve()),
                 "name": path.name,
                 "type": path.suffix.casefold().lstrip("."),
                 "size": stats.st_size,
                 "modified_at": stats.st_mtime,
+        }
+        key = (os.path.normcase(str(path.parent.resolve())), path.stem.casefold())
+        grouped.setdefault(key, []).append(variant)
+
+    result: list[dict[str, Any]] = []
+    for variants in grouped.values():
+        variants.sort(
+            key=lambda item: (
+                0 if item["type"] == "enl" else 1,
+                -float(item["modified_at"]),
+                str(item["path"]).casefold(),
+            )
+        )
+        enl_variants = [item for item in variants if item["type"] == "enl"]
+        enlx_variants = [item for item in variants if item["type"] == "enlx"]
+        complete_enl = next(
+            (
+                item
+                for item in enl_variants
+                if _matching_data_folder(Path(str(item["path"]))) is not None
+            ),
+            None,
+        )
+        if complete_enl is not None:
+            recommended = complete_enl
+            reason = "complete_working_library"
+            has_data_folder = True
+            rank = 0
+        elif enlx_variants:
+            recommended = enlx_variants[0]
+            reason = "compressed_library"
+            has_data_folder = False
+            rank = 1
+        else:
+            recommended = enl_variants[0]
+            reason = "library_without_data_folder"
+            has_data_folder = False
+            rank = 2
+        result.append(
+            {
+                **recommended,
+                "has_data_folder": has_data_folder,
+                "recommended_reason": reason,
+                "variants": variants,
+                "_rank": rank,
             }
         )
+
+    result.sort(
+        key=lambda item: (
+            int(item["_rank"]),
+            -float(item["modified_at"]),
+            str(item["path"]).casefold(),
+        )
+    )
+    for item in result:
+        item.pop("_rank", None)
     return result
 
 

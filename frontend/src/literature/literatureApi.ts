@@ -186,6 +186,18 @@ export interface EndNoteLibraryCandidate {
   type: 'enl' | 'enlx'
   size: number
   modified_at: number
+  has_data_folder: boolean
+  recommended_reason:
+    | 'complete_working_library'
+    | 'compressed_library'
+    | 'library_without_data_folder'
+  variants: Array<{
+    path: string
+    name: string
+    type: 'enl' | 'enlx'
+    size: number
+    modified_at: number
+  }>
 }
 
 export interface EndNotePreview {
