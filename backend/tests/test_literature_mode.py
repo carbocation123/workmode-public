@@ -101,6 +101,21 @@ class LiteratureModeTest(unittest.TestCase):
         )
         self.assertTrue(created_tag.ok, created_tag.content)
         tag_id = json.loads(created_tag.content)["tag"]["id"]
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"].append(
+            {
+                "id": "paper-tagged",
+                "title": "Tagged paper",
+                "tag_ids": [tag_id],
+                "group_ids": [],
+                "paths": {},
+            }
+        )
+        catalog_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
         second_group = execute_literature_tool(
             self.project.slug,
@@ -150,6 +165,18 @@ class LiteratureModeTest(unittest.TestCase):
             {"query": "XPS", "include_archived": True},
         )
         self.assertEqual(json.loads(archived_tags.content)["tags"][0]["archived"], True)
+        self.assertEqual(
+            json.loads(catalog_path.read_text(encoding="utf-8"))["papers"][0]["tag_ids"],
+            [tag_id],
+        )
+        archived_search = execute_literature_tool(
+            self.project.slug,
+            "literature_search",
+            {"query": "Tagged paper"},
+        )
+        self.assertTrue(
+            json.loads(archived_search.content)["papers"][0]["tags"][0]["archived"]
+        )
 
         restored = execute_literature_tool(
             self.project.slug,
@@ -164,6 +191,15 @@ class LiteratureModeTest(unittest.TestCase):
             {"action": "archive_group", "group_id": second_group_id},
         )
         self.assertTrue(archived_group.ok, archived_group.content)
+        overview = execute_literature_tool(
+            self.project.slug,
+            "literature_library_overview",
+            {},
+        )
+        self.assertNotIn(
+            second_group_id,
+            {item["id"] for item in json.loads(overview.content)["tag_groups"]},
+        )
         stored_registry = json.loads((self.root / "tags.json").read_text(encoding="utf-8"))
         stored_tag = next(item for item in stored_registry["tags"] if item["id"] == tag_id)
         self.assertEqual(stored_tag["archived_by_group_id"], second_group_id)
@@ -570,7 +606,7 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertIn("不能根据 papers/ 下的物理文件夹推断", prompt)
         self.assertNotIn("project_bash", prompt)
         self.assertEqual(usage["tool_profile"], "literature")
-        self.assertEqual(usage["tool_count"], 16)
+        self.assertEqual(usage["tool_count"], 17)
 
         schemas = {
             item["function"]["name"]: item["function"]

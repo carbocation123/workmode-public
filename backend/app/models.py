@@ -47,6 +47,25 @@ class LiteratureRecordUpdate(BaseModel):
     metadata_source: Literal["cite_this", "layout_json", "manual", "pending"] | None = None
 
 
+class LiteratureTagManage(BaseModel):
+    action: Literal[
+        "create_group",
+        "update_group",
+        "archive_group",
+        "restore_group",
+        "create_tag",
+        "update_tag",
+        "archive_tag",
+        "restore_tag",
+    ]
+    group_id: str | None = Field(default=None, min_length=1, max_length=500)
+    tag_id: str | None = Field(default=None, min_length=1, max_length=500)
+    name: str | None = Field(default=None, min_length=1, max_length=500)
+    color: str | None = Field(default=None, min_length=1, max_length=32)
+    aliases: list[str] | None = Field(default=None, max_length=100)
+    status: Literal["confirmed", "provisional"] | None = None
+
+
 class EndNoteLibraryPath(BaseModel):
     path: str = Field(min_length=1, max_length=32000)
 

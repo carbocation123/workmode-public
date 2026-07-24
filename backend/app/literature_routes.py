@@ -26,6 +26,7 @@ from .literature_project import (
     initialize_literature_project,
     is_literature_project,
     literature_paper,
+    literature_tag_registry,
     list_deleted_literature_papers,
     literature_import_event_content,
     literature_snapshot,
@@ -40,6 +41,7 @@ from .models import (
     LiteratureNoteUpdate,
     LiteratureProjectCreate,
     LiteratureRecordUpdate,
+    LiteratureTagManage,
 )
 
 
@@ -181,13 +183,35 @@ def restore_deleted_paper(slug: str, trash_id: str) -> dict[str, object]:
 
 
 @router.get("/projects/{slug}/literature/tags")
-def list_tags(slug: str) -> list[dict[str, object]]:
-    return literature_snapshot(_project_root(slug))["tags"]["tags"]
+def list_tags(slug: str, include_archived: bool = Query(default=False)) -> list[dict[str, object]]:
+    return literature_tag_registry(
+        _project_root(slug),
+        include_archived=include_archived,
+    )["tags"]
 
 
 @router.get("/projects/{slug}/literature/tag-registry")
-def read_tag_registry(slug: str) -> dict[str, object]:
-    return literature_snapshot(_project_root(slug))["tags"]
+def read_tag_registry(slug: str, include_archived: bool = Query(default=False)) -> dict[str, object]:
+    return literature_tag_registry(
+        _project_root(slug),
+        include_archived=include_archived,
+    )
+
+
+@router.post("/projects/{slug}/literature/tag-registry/manage")
+def manage_tag_registry(
+    slug: str,
+    payload: LiteratureTagManage,
+) -> dict[str, object]:
+    result = _tool_payload(
+        slug,
+        "literature_tag_manage",
+        payload.model_dump(exclude_none=True),
+    )
+    return {
+        "result": result,
+        "registry": literature_tag_registry(_project_root(slug), include_archived=True),
+    }
 
 
 @router.get("/projects/{slug}/literature/groups")

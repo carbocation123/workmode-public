@@ -159,6 +159,10 @@ Before assigning or replacing paper tags, call `literature_tag_list` and inspect
 real tag groups and canonical registry. Reuse existing names or aliases whenever
 possible; create a new provisional tag only when no existing tag expresses the same
 concept. Never invent hard-coded subject categories that are not present in tags.json.
+When the user explicitly asks to organize the registry itself, use
+`literature_tag_manage` to create, rename, recolor, move, confirm, archive or restore
+tag groups and tags. Archive is recoverable and preserves paper references; never
+describe an archived object as permanently deleted.
 
 Manual literature groups and colored tag groups are different structures. `groups.json`
 contains literature groups such as research projects or topic folders; `tags.json`
@@ -240,8 +244,48 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "query": {"type": "string", "description": "Optional text matched against tag ID, name, aliases and group."},
                     "group_id": {"type": "string", "description": "Optional exact tag-group filter."},
                     "status": {"type": "string", "description": "Optional exact status filter, such as confirmed or provisional."},
+                    "include_archived": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include archived tag groups and tags when inspecting or restoring them.",
+                    },
                     "limit": {"type": "integer", "default": 200, "minimum": 1, "maximum": 500},
                 },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "literature_tag_manage",
+            "description": "Manage the canonical tag registry shared by the frontend and AI. Create or update tag groups and tags, move or confirm tags, and archive or restore them without destroying paper references.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "create_group",
+                            "update_group",
+                            "archive_group",
+                            "restore_group",
+                            "create_tag",
+                            "update_tag",
+                            "archive_tag",
+                            "restore_tag",
+                        ],
+                    },
+                    "group_id": {"type": "string"},
+                    "tag_id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "color": {
+                        "type": "string",
+                        "description": "Tag-group color in #RRGGBB form.",
+                    },
+                    "aliases": {"type": "array", "items": {"type": "string"}},
+                    "status": {"type": "string", "enum": ["confirmed", "provisional"]},
+                },
+                "required": ["action"],
             },
         },
     },
@@ -797,6 +841,52 @@ def literature_snapshot(root: Path) -> dict[str, Any]:
     }
 
 
+def literature_tag_registry(
+    root: Path,
+    *,
+    include_archived: bool = False,
+) -> dict[str, Any]:
+    root = root.expanduser().resolve()
+    if not is_literature_project(root):
+        raise LiteratureProjectError("Current project is not a literature-library project")
+    registry = _tags(root)
+    visible_groups: list[dict[str, Any]] = []
+    active_group_ids: set[str] = set()
+    for raw_group in registry["groups"]:
+        if not isinstance(raw_group, dict) or not isinstance(raw_group.get("id"), str):
+            raise LiteratureProjectError("tags.json contains an invalid tag-group record")
+        archived = bool(raw_group.get("archived_at"))
+        if archived and not include_archived:
+            continue
+        group = _tag_group_result(raw_group)
+        if archived:
+            group["archived"] = True
+        else:
+            active_group_ids.add(str(raw_group["id"]))
+        visible_groups.append(group)
+
+    visible_tags: list[dict[str, Any]] = []
+    for raw_tag in registry["tags"]:
+        if not isinstance(raw_tag, dict) or not isinstance(raw_tag.get("id"), str):
+            raise LiteratureProjectError("tags.json contains an invalid tag record")
+        archived = bool(raw_tag.get("archived_at"))
+        group_id = str(raw_tag.get("group_id") or "ungrouped")
+        if not include_archived and (archived or group_id not in active_group_ids):
+            continue
+        tag = _tag_result(raw_tag)
+        if archived:
+            tag["archived"] = True
+        visible_tags.append(tag)
+
+    visible_groups.sort(key=lambda item: (int(item.get("order") or 0), str(item["name"]).casefold()))
+    visible_tags.sort(key=lambda item: (str(item["group_id"]).casefold(), str(item["name"]).casefold()))
+    return {
+        "schema_version": registry["schema_version"],
+        "groups": visible_groups,
+        "tags": visible_tags,
+    }
+
+
 def literature_paper(root: Path, paper_id: str) -> dict[str, Any]:
     return _paper(root.expanduser().resolve(), paper_id)
 
@@ -1059,6 +1149,7 @@ def execute_literature_tool(
             "literature_search": _search,
             "literature_library_overview": _library_overview,
             "literature_tag_list": _tag_list,
+            "literature_tag_manage": _tag_manage,
             "literature_read": _read,
             "literature_import": _import_pdf,
             "literature_update_record": _update_record,
@@ -1139,7 +1230,8 @@ def _library_overview(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     del args
     papers = _catalog(root)["papers"]
     literature_groups = _groups(root)["groups"]
-    tag_registry = _tags(root)
+    complete_tag_registry = literature_tag_registry(root, include_archived=True)
+    tag_registry = literature_tag_registry(root)
 
     literature_group_usage: dict[str, int] = {}
     paper_status_counts: dict[str, int] = {}
@@ -1196,6 +1288,12 @@ def _library_overview(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             "paper_status_counts": paper_status_counts,
             "metadata_trust_counts": metadata_trust_counts,
             "asset_counts": asset_counts,
+            "archived_tag_group_count": sum(
+                1 for group in complete_tag_registry["groups"] if group.get("archived")
+            ),
+            "archived_tag_count": sum(
+                1 for tag in complete_tag_registry["tags"] if tag.get("archived")
+            ),
             "literature_groups": [
                 {
                     "id": str(group.get("id") or ""),
@@ -1218,10 +1316,13 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     query = str(args.get("query") or "").strip().casefold()
     requested_group = str(args.get("group_id") or args.get("category") or "").strip().casefold()
     requested_status = str(args.get("status") or "").strip().casefold()
+    include_archived = bool(args.get("include_archived"))
     limit = min(max(int(args.get("limit") or 200), 1), 500)
 
     registry_payload = _tags(root)
     registry = registry_payload["tags"]
+    visible_registry = literature_tag_registry(root, include_archived=include_archived)
+    visible_tag_ids = {str(item["id"]) for item in visible_registry["tags"]}
     usage_counts: dict[str, int] = {}
     for paper in _catalog(root)["papers"]:
         for tag_id in set(str(item) for item in (paper.get("tag_ids") or [])):
@@ -1237,6 +1338,9 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
         aliases = [str(item) for item in (raw_tag.get("aliases") or [])]
         group_id = str(raw_tag.get("group_id") or "ungrouped")
         status = str(raw_tag.get("status") or "confirmed")
+        archived = bool(raw_tag.get("archived_at"))
+        if tag_id not in visible_tag_ids:
+            continue
         group_counts[group_id] = group_counts.get(group_id, 0) + 1
         if requested_group and group_id.casefold() != requested_group:
             continue
@@ -1245,16 +1349,17 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
         haystack = "\n".join([tag_id, name, group_id, *aliases]).casefold()
         if query and query not in haystack:
             continue
-        matched.append(
-            {
-                "id": tag_id,
-                "name": name,
-                "aliases": aliases,
-                "group_id": group_id,
-                "status": status,
-                "usage_count": usage_counts.get(tag_id, 0),
-            }
-        )
+        tag = {
+            "id": tag_id,
+            "name": name,
+            "aliases": aliases,
+            "group_id": group_id,
+            "status": status,
+            "usage_count": usage_counts.get(tag_id, 0),
+        }
+        if archived:
+            tag["archived"] = True
+        matched.append(tag)
 
     matched.sort(key=lambda item: (item["group_id"].casefold(), item["name"].casefold(), item["id"].casefold()))
     visible = matched[:limit]
@@ -1266,14 +1371,153 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
         {
             "ok": True,
             "operation": "literature_tag_list",
-            "registry_count": len(registry),
+            "registry_count": len(visible_registry["tags"]),
             "matched_count": len(matched),
             "count": len(visible),
             "truncated": len(visible) < len(matched),
             "group_counts": groups,
-            "groups": registry_payload["groups"],
+            "groups": visible_registry["groups"],
             "tags": visible,
         }
+    )
+
+
+def _tag_manage(root: Path, args: dict[str, Any]) -> ProjectToolResult:
+    action = _require_string(args, "action")
+    now = utc_now()
+    with _catalog_lock(root):
+        registry = _tags(root)
+        groups = registry["groups"]
+        tags = registry["tags"]
+
+        if action == "create_group":
+            name = _require_string(args, "name")
+            color = _validated_tag_color(args.get("color"))
+            _ensure_unique_group_name(groups, name)
+            group = {
+                "id": _unique_registry_id(name, groups, prefix="group"),
+                "name": name,
+                "color": color,
+                "order": max((int(item.get("order") or 0) for item in groups if isinstance(item, dict)), default=0) + 1,
+            }
+            groups.append(group)
+            payload = {"group": _tag_group_result(group)}
+        elif action == "update_group":
+            group = _find_tag_group(groups, _require_string(args, "group_id"))
+            _require_active_registry_item(group, "tag group")
+            supplied = False
+            if "name" in args:
+                name = _require_string(args, "name")
+                _ensure_unique_group_name(groups, name, exclude_id=str(group["id"]))
+                group["name"] = name
+                supplied = True
+            if "color" in args:
+                group["color"] = _validated_tag_color(args.get("color"))
+                supplied = True
+            if not supplied:
+                raise LiteratureProjectError("update_group requires name or color")
+            payload = {"group": _tag_group_result(group)}
+        elif action == "archive_group":
+            group = _find_tag_group(groups, _require_string(args, "group_id"))
+            if str(group["id"]) == "ungrouped":
+                raise LiteratureProjectError("The ungrouped tag group cannot be archived")
+            _require_active_registry_item(group, "tag group")
+            group["archived_at"] = now
+            archived_tags: list[dict[str, Any]] = []
+            for tag in tags:
+                if str(tag.get("group_id") or "") != str(group["id"]) or tag.get("archived_at"):
+                    continue
+                tag["archived_at"] = now
+                tag["archived_by_group_id"] = str(group["id"])
+                archived_tags.append(_tag_result(tag) | {"archived": True})
+            payload = {
+                "group": _tag_group_result(group) | {"archived": True},
+                "tags": archived_tags,
+            }
+        elif action == "restore_group":
+            group = _find_tag_group(groups, _require_string(args, "group_id"))
+            if not group.get("archived_at"):
+                raise LiteratureProjectError("Tag group is not archived")
+            group.pop("archived_at", None)
+            restored_tags: list[dict[str, Any]] = []
+            for tag in tags:
+                if str(tag.get("archived_by_group_id") or "") != str(group["id"]):
+                    continue
+                tag.pop("archived_at", None)
+                tag.pop("archived_by_group_id", None)
+                restored_tags.append(_tag_result(tag))
+            payload = {"group": _tag_group_result(group), "tags": restored_tags}
+        elif action == "create_tag":
+            group = _find_tag_group(groups, _require_string(args, "group_id"))
+            _require_active_registry_item(group, "tag group")
+            name = _require_string(args, "name")
+            aliases = _normalized_tag_aliases(args.get("aliases"), name=name)
+            status = _validated_tag_status(args.get("status") or "provisional")
+            _ensure_unique_tag_labels(tags, name, aliases)
+            tag = {
+                "id": _unique_registry_id(name, tags, prefix="tag"),
+                "name": name,
+                "aliases": aliases,
+                "group_id": str(group["id"]),
+                "status": status,
+            }
+            tags.append(tag)
+            payload = {"tag": _tag_result(tag)}
+        elif action == "update_tag":
+            tag = _find_tag(tags, _require_string(args, "tag_id"))
+            _require_active_registry_item(tag, "tag")
+            supplied = False
+            name = str(tag.get("name") or tag["id"])
+            aliases = [str(item) for item in (tag.get("aliases") or [])]
+            if "name" in args:
+                name = _require_string(args, "name")
+                supplied = True
+            if "aliases" in args:
+                aliases = _normalized_tag_aliases(args.get("aliases"), name=name)
+                supplied = True
+            else:
+                aliases = _normalized_tag_aliases(aliases, name=name)
+            if "name" in args or "aliases" in args:
+                _ensure_unique_tag_labels(tags, name, aliases, exclude_id=str(tag["id"]))
+                tag["name"] = name
+                tag["aliases"] = aliases
+            if "group_id" in args:
+                group = _find_tag_group(groups, _require_string(args, "group_id"))
+                _require_active_registry_item(group, "tag group")
+                tag["group_id"] = str(group["id"])
+                supplied = True
+            if "status" in args:
+                tag["status"] = _validated_tag_status(args.get("status"))
+                supplied = True
+            if not supplied:
+                raise LiteratureProjectError("update_tag requires a writable field")
+            payload = {"tag": _tag_result(tag)}
+        elif action == "archive_tag":
+            tag = _find_tag(tags, _require_string(args, "tag_id"))
+            _require_active_registry_item(tag, "tag")
+            tag["archived_at"] = now
+            payload = {"tag": _tag_result(tag) | {"archived": True}}
+        elif action == "restore_tag":
+            tag = _find_tag(tags, _require_string(args, "tag_id"))
+            if not tag.get("archived_at"):
+                raise LiteratureProjectError("Tag is not archived")
+            group = _find_tag_group(groups, str(tag.get("group_id") or ""))
+            _require_active_registry_item(group, "tag group")
+            tag.pop("archived_at", None)
+            tag.pop("archived_by_group_id", None)
+            payload = {"tag": _tag_result(tag)}
+        else:
+            raise LiteratureProjectError(f"Unknown tag registry action: {action}")
+
+        _write_tags(root, registry)
+    return _json_result(
+        {
+            "ok": True,
+            "operation": "literature_tag_manage",
+            "action": action,
+            **payload,
+        },
+        changed_paths=["tags.json"],
     )
 
 
@@ -2153,6 +2397,8 @@ def _paper_projection(
         }
         if tag is None:
             resolved_tag["missing_from_registry"] = True
+        elif tag.get("archived_at") or (tag_group or {}).get("archived_at"):
+            resolved_tag["archived"] = True
         tags.append(resolved_tag)
 
     keys = (
@@ -2195,6 +2441,121 @@ def _paper_summary(root: Path, paper: dict[str, Any]) -> dict[str, Any]:
     return _paper_projection(paper, _paper_projection_lookups(root))
 
 
+def _tag_group_result(raw: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(raw.get("id") or ""),
+        "name": str(raw.get("name") or raw.get("id") or ""),
+        "color": str(raw.get("color") or "#94A3B8"),
+        "order": int(raw.get("order") or 0),
+    }
+
+
+def _tag_result(raw: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(raw.get("id") or ""),
+        "name": str(raw.get("name") or raw.get("id") or ""),
+        "aliases": [str(item) for item in (raw.get("aliases") or [])],
+        "group_id": str(raw.get("group_id") or "ungrouped"),
+        "status": str(raw.get("status") or "confirmed"),
+    }
+
+
+def _validated_tag_color(value: Any) -> str:
+    color = str(value or "").strip().upper()
+    if not re.fullmatch(r"#[0-9A-F]{6}", color):
+        raise LiteratureProjectError("color must use #RRGGBB format")
+    return color
+
+
+def _validated_tag_status(value: Any) -> str:
+    status = str(value or "").strip()
+    if status not in {"confirmed", "provisional"}:
+        raise LiteratureProjectError("status must be confirmed or provisional")
+    return status
+
+
+def _normalized_tag_aliases(value: Any, *, name: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise LiteratureProjectError("aliases must be an array")
+    aliases: list[str] = []
+    seen = {name.casefold()}
+    for raw in value:
+        alias = str(raw or "").strip()
+        if not alias or alias.casefold() in seen:
+            continue
+        seen.add(alias.casefold())
+        aliases.append(alias)
+    return aliases
+
+
+def _ensure_unique_group_name(
+    groups: list[dict[str, Any]],
+    name: str,
+    *,
+    exclude_id: str = "",
+) -> None:
+    for group in groups:
+        if str(group.get("id") or "") == exclude_id:
+            continue
+        if str(group.get("name") or "").casefold() == name.casefold():
+            raise LiteratureProjectError(f"Tag group already exists: {name}")
+
+
+def _ensure_unique_tag_labels(
+    tags: list[dict[str, Any]],
+    name: str,
+    aliases: list[str],
+    *,
+    exclude_id: str = "",
+) -> None:
+    wanted = {name.casefold(), *(item.casefold() for item in aliases)}
+    for tag in tags:
+        if str(tag.get("id") or "") == exclude_id:
+            continue
+        existing = {
+            str(tag.get("name") or "").casefold(),
+            *(str(item).casefold() for item in tag.get("aliases") or []),
+        }
+        if wanted & existing:
+            raise LiteratureProjectError(
+                f"Tag name or alias already exists: {str(tag.get('name') or tag.get('id') or '')}"
+            )
+
+
+def _find_tag_group(groups: list[dict[str, Any]], group_id: str) -> dict[str, Any]:
+    for group in groups:
+        if str(group.get("id") or "") == group_id:
+            return group
+    raise LiteratureProjectError(f"Unknown tag group: {group_id}")
+
+
+def _find_tag(tags: list[dict[str, Any]], tag_id: str) -> dict[str, Any]:
+    for tag in tags:
+        if str(tag.get("id") or "") == tag_id:
+            return tag
+    raise LiteratureProjectError(f"Unknown tag: {tag_id}")
+
+
+def _require_active_registry_item(item: dict[str, Any], label: str) -> None:
+    if item.get("archived_at"):
+        raise LiteratureProjectError(f"{label.capitalize()} is archived; restore it first")
+
+
+def _unique_registry_id(name: str, items: list[dict[str, Any]], *, prefix: str) -> str:
+    base = _slug(name)
+    if base.startswith("tag-") and prefix != "tag":
+        base = f"{prefix}-{base.removeprefix('tag-')}"
+    used = {str(item.get("id") or "") for item in items}
+    candidate = base
+    suffix = 2
+    while candidate in used:
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
 def _upsert_tag(registry: dict[str, Any], raw: dict[str, Any]) -> str:
     name = str(raw.get("name") or "").strip()
     group_id = str(raw.get("group_id") or raw.get("category") or "ungrouped").strip()
@@ -2205,20 +2566,15 @@ def _upsert_tag(registry: dict[str, Any], raw: dict[str, Any]) -> str:
         str(group.get("id") or "") == group_id for group in registry.get("groups") or []
     ):
         registry.setdefault("groups", []).append(dict(UNGROUPED_TAG_GROUP))
-    if not any(str(group.get("id") or "") == group_id for group in registry.get("groups") or []):
-        raise LiteratureProjectError(f"Unknown tag group: {group_id}")
+    group = _find_tag_group(registry.get("groups") or [], group_id)
+    _require_active_registry_item(group, "tag group")
     wanted = {name.casefold(), *(item.casefold() for item in aliases)}
     for tag in registry["tags"]:
         existing = {str(tag.get("name") or "").casefold(), *(str(item).casefold() for item in tag.get("aliases") or [])}
         if wanted & existing:
+            _require_active_registry_item(tag, "tag")
             return str(tag["id"])
-    tag_id = _slug(name)
-    used = {str(item.get("id")) for item in registry["tags"]}
-    base = tag_id
-    suffix = 2
-    while tag_id in used:
-        tag_id = f"{base}-{suffix}"
-        suffix += 1
+    tag_id = _unique_registry_id(name, registry["tags"], prefix="tag")
     registry["tags"].append(
         {"id": tag_id, "name": name, "aliases": aliases, "group_id": group_id, "status": "provisional"}
     )

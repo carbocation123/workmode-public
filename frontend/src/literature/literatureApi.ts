@@ -57,6 +57,7 @@ const REQUIRED_AGENT_TOOLS = [
   'literature_search',
   'literature_library_overview',
   'literature_tag_list',
+  'literature_tag_manage',
   'literature_read',
   'literature_update_record',
   'literature_delete',
@@ -173,6 +174,7 @@ export interface BackendTag {
   aliases: string[]
   group_id: string
   status: 'confirmed' | 'provisional'
+  archived?: boolean
 }
 
 export interface BackendTagGroup {
@@ -180,6 +182,27 @@ export interface BackendTagGroup {
   name: string
   color: string
   order: number
+  archived?: boolean
+}
+
+export type TagRegistryAction =
+  | 'create_group'
+  | 'update_group'
+  | 'archive_group'
+  | 'restore_group'
+  | 'create_tag'
+  | 'update_tag'
+  | 'archive_tag'
+  | 'restore_tag'
+
+export interface TagRegistryMutation {
+  action: TagRegistryAction
+  group_id?: string
+  tag_id?: string
+  name?: string
+  color?: string
+  aliases?: string[]
+  status?: 'confirmed' | 'provisional'
 }
 
 export interface BackendLiteratureGroup {
@@ -557,8 +580,28 @@ export async function listBackendTags(): Promise<BackendTag[]> {
   return (await listBackendTagRegistry()).tags
 }
 
-export async function listBackendTagRegistry(): Promise<{ groups: BackendTagGroup[]; tags: BackendTag[] }> {
-  return literatureRequest<{ groups: BackendTagGroup[]; tags: BackendTag[] }>('/tag-registry')
+export async function listBackendTagRegistry(
+  includeArchived = false,
+): Promise<{ groups: BackendTagGroup[]; tags: BackendTag[] }> {
+  return literatureRequest<{ groups: BackendTagGroup[]; tags: BackendTag[] }>(
+    `/tag-registry${includeArchived ? '?include_archived=true' : ''}`,
+  )
+}
+
+export async function manageBackendTags(
+  payload: TagRegistryMutation,
+): Promise<{
+  result: Record<string, unknown>
+  registry: { groups: BackendTagGroup[]; tags: BackendTag[] }
+}> {
+  return literatureRequest<{
+    result: Record<string, unknown>
+    registry: { groups: BackendTagGroup[]; tags: BackendTag[] }
+  }>('/tag-registry/manage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function listBackendGroups(): Promise<BackendLiteratureGroup[]> {

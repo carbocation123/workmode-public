@@ -47,22 +47,27 @@ PDF 拖拽先停留在前端确认弹窗，不直接写盘。确认上传完成�
 
 ```text
 literature_search
+literature_library_overview
 literature_tag_list
+literature_tag_manage
 literature_read
 literature_import
 literature_process
 literature_update_record
 literature_update_cross_relation
 literature_archive
+literature_delete
+literature_restore
 literature_note_search
 literature_note_read
 literature_note_upsert
+literature_note_delete
 literature_note_export
 ```
 
 Shell、Python、通用 read/write/edit/glob/grep、Web、通用 memory 和 plan schema 不进入模型请求。写工具是直接领域命令，不使用 proposal/confirm/reject。后端只做确定性身份、路径、schema、引用、冲突和原子写入校验。
 
-`literature_tag_list` 是标签写入前的只读注册表入口，返回规范 ID、名称、别名、分类、状态和使用次数。`literature_update_record` 应优先复用查询到的规范名称或别名；只有注册表中不存在同义概念时才创建 provisional 标签。
+`literature_tag_list` 是标签写入前的只读注册表入口，返回规范 ID、名称、别名、分类、状态和使用次数。`literature_tag_manage` 与前端管理器共用同一执行器，可以维护标签组名称和颜色、维护标签名称/别名/归属、确认 provisional 标签，并以可恢复归档代替永久删除。`literature_update_record` 应优先复用查询到的规范名称或别名；只有注册表中不存在同义概念时才创建 provisional 标签。
 
 ## 当前资料
 
@@ -107,4 +112,4 @@ papers/unprocessed/extracted/<paper-id>/
 
 ## 尚未完成
 
-真实 MinerU 联网验收、DOI 语义去重、标签治理和最终主档生成仍在后续阶段。文献页面已经迁入 `frontend/src/literature/`，由主 Vite 工程生成 `/literature/` 并随正式桌面 `frontend/dist` 打包；旧 5176 开发壳已归档。项目标题和上下文占用来自正式 Workmode API；旧 Demo 的静态标题、假百分比和独立任务轮询已经移除。
+真实 MinerU 联网验收、DOI 语义去重、标签合并/批量整理和最终主档生成仍在后续阶段。标签注册表的前端/AI 共享治理已经完成。文献页面已经迁入 `frontend/src/literature/`，由主 Vite 工程生成 `/literature/` 并随正式桌面 `frontend/dist` 打包；旧 5176 开发壳已归档。项目标题和上下文占用来自正式 Workmode API；旧 Demo 的静态标题、假百分比和独立任务轮询已经移除。

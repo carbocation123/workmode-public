@@ -43,6 +43,7 @@ import {
   listBackendNotes,
   listBackendLiteratureProjects,
   listBackendTagRegistry,
+  manageBackendTags,
   mapBackendPaper,
   openBackendSiFolder,
   paperPdfUrl,
@@ -71,6 +72,7 @@ import {
   type EndNoteImportResult,
   type EndNoteLibraryCandidate,
   type EndNotePreview,
+  type TagRegistryMutation,
   type WorkmodeProject,
 } from './literatureApi'
 import {
@@ -206,6 +208,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [selectedGroupId, setSelectedGroupId] = useState('')
   const [tagFilterOpen, setTagFilterOpen] = useState(false)
   const [tagQuery, setTagQuery] = useState('')
+  const [tagManagerOpen, setTagManagerOpen] = useState(false)
+  const [tagManagerRegistry, setTagManagerRegistry] = useState<{
+    groups: BackendTagGroup[]
+    tags: BackendTag[]
+  }>({ groups: [], tags: [] })
+  const [tagManagerGroupId, setTagManagerGroupId] = useState('')
+  const [tagManagerBusy, setTagManagerBusy] = useState(false)
+  const [tagManagerMessage, setTagManagerMessage] = useState('')
   const hudLayoutActive = Boolean(customSkin?.enabled && skinUsesChrome(customSkin.skin))
     || THEMES.some((theme) => theme.id === themeId && theme.layout === 'hud')
   const [input, setInput] = useState('')
@@ -464,6 +474,9 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       [tag.name, ...tag.aliases].some((label) => label.toLocaleLowerCase().includes(query)),
     )
   }, [tagQuery, tagRegistry])
+
+  const managedTagGroup = tagManagerRegistry.groups.find((group) => group.id === tagManagerGroupId) ?? null
+  const managedTags = tagManagerRegistry.tags.filter((tag) => tag.group_id === tagManagerGroupId)
 
   const detailPaper = papers.find((paper) => paper.id === detailPaperId) ?? null
 
@@ -898,6 +911,111 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     setSelectedTagIds((current) =>
       current.includes(id) ? current.filter((tagId) => tagId !== id) : [...current, id],
     )
+  }
+
+  function applyActiveTagRegistry(registry: {
+    groups: BackendTagGroup[]
+    tags: BackendTag[]
+  }) {
+    const groups = registry.groups.filter((group) => !group.archived)
+    const activeGroupIds = new Set(groups.map((group) => group.id))
+    const tags = registry.tags.filter((tag) => !tag.archived && activeGroupIds.has(tag.group_id))
+    setTagGroups(groups)
+    setTagRegistry(tags)
+    const activeTagIds = new Set(tags.map((tag) => tag.id))
+    setSelectedTagIds((current) => current.filter((id) => activeTagIds.has(id)))
+  }
+
+  async function openTagManager() {
+    setTagFilterOpen(false)
+    setTagManagerMessage('')
+    setTagManagerOpen(true)
+    setTagManagerBusy(true)
+    try {
+      const registry = await listBackendTagRegistry(true)
+      setTagManagerRegistry(registry)
+      setTagManagerGroupId((current) => (
+        registry.groups.some((group) => group.id === current)
+          ? current
+          : registry.groups.find((group) => !group.archived)?.id || registry.groups[0]?.id || ''
+      ))
+    } catch (error) {
+      setTagManagerMessage(`标签读取失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setTagManagerBusy(false)
+    }
+  }
+
+  async function runTagRegistryAction(payload: TagRegistryMutation, successMessage: string): Promise<boolean> {
+    setTagManagerBusy(true)
+    setTagManagerMessage('')
+    try {
+      const response = await manageBackendTags(payload)
+      setTagManagerRegistry(response.registry)
+      applyActiveTagRegistry(response.registry)
+      setTagManagerGroupId((current) => (
+        response.registry.groups.some((group) => group.id === current)
+          ? current
+          : response.registry.groups.find((group) => !group.archived)?.id || response.registry.groups[0]?.id || ''
+      ))
+      setTagManagerMessage(successMessage)
+      return true
+    } catch (error) {
+      setTagManagerMessage(`操作失败：${error instanceof Error ? error.message : '未知错误'}`)
+      return false
+    } finally {
+      setTagManagerBusy(false)
+    }
+  }
+
+  async function createTagGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const data = new FormData(form)
+    const created = await runTagRegistryAction({
+      action: 'create_group',
+      name: String(data.get('name') || '').trim(),
+      color: String(data.get('color') || '').trim(),
+    }, '标签组已创建。')
+    if (created) form.reset()
+  }
+
+  async function updateTagGroup(event: FormEvent<HTMLFormElement>, group: BackendTagGroup) {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    await runTagRegistryAction({
+      action: 'update_group',
+      group_id: group.id,
+      name: String(data.get('name') || '').trim(),
+      color: String(data.get('color') || '').trim(),
+    }, '标签组名称与颜色已更新。')
+  }
+
+  async function createManagedTag(event: FormEvent<HTMLFormElement>, groupId: string) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const data = new FormData(form)
+    const created = await runTagRegistryAction({
+      action: 'create_tag',
+      group_id: groupId,
+      name: String(data.get('name') || '').trim(),
+      aliases: String(data.get('aliases') || '').split(/[，,;；\n]+/).map((item) => item.trim()).filter(Boolean),
+      status: 'confirmed',
+    }, '标签已创建并确认为正式标签。')
+    if (created) form.reset()
+  }
+
+  async function updateManagedTag(event: FormEvent<HTMLFormElement>, tag: BackendTag) {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    await runTagRegistryAction({
+      action: 'update_tag',
+      tag_id: tag.id,
+      name: String(data.get('name') || '').trim(),
+      group_id: String(data.get('group_id') || '').trim(),
+      aliases: String(data.get('aliases') || '').split(/[，,;；\n]+/).map((item) => item.trim()).filter(Boolean),
+      status: String(data.get('status') || 'provisional') as BackendTag['status'],
+    }, '标签名称、别名和所属标签组已更新。')
   }
 
   function handleFiles(fileList: FileList | File[]) {
@@ -1352,6 +1470,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
             {tagFilterOpen && (
               <div className="tag-filter-popover">
+                <div className="tag-filter-heading">
+                  <strong>按标签筛选</strong>
+                  <button disabled={backendMode !== 'connected'} onClick={() => void openTagManager()} type="button">
+                    <Icon name="edit" />管理标签
+                  </button>
+                </div>
                 <label className="tag-search">
                   <Icon name="search" />
                   <input
@@ -1735,6 +1859,189 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 <small>Windows 默认保存在 D:\workmode\项目名；没有 D 盘时自动使用用户目录。旧版外部项目保持原位置。</small>
               </form>
               {projectManagerError && <p className="literature-project-manager-error" role="alert">{projectManagerError}</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tagManagerOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (!tagManagerBusy) setTagManagerOpen(false)
+        }}>
+          <section
+            aria-labelledby="tag-registry-title"
+            aria-modal="true"
+            className="tag-registry-modal"
+            role="dialog"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">TAG REGISTRY</span><h2 id="tag-registry-title">管理标签</h2></div>
+              <button disabled={tagManagerBusy} onClick={() => setTagManagerOpen(false)} aria-label="关闭标签管理"><Icon name="close" /></button>
+            </header>
+            <div className="tag-registry-body">
+              <aside className="tag-registry-groups">
+                <div className="tag-manager-section-title">
+                  <strong>标签组</strong>
+                  <small>{tagManagerRegistry.groups.filter((group) => !group.archived).length} 个使用中</small>
+                </div>
+                <div className="tag-manager-group-list">
+                  {tagManagerRegistry.groups.map((group) => (
+                    <button
+                      className={`${group.id === tagManagerGroupId ? 'active' : ''}${group.archived ? ' archived' : ''}`}
+                      key={group.id}
+                      onClick={() => setTagManagerGroupId(group.id)}
+                      type="button"
+                    >
+                      <i style={{ background: group.color }} />
+                      <span><strong>{group.name}</strong><small>{tagManagerRegistry.tags.filter((tag) => tag.group_id === group.id).length} 个标签</small></span>
+                      {group.archived && <em>已归档</em>}
+                    </button>
+                  ))}
+                  {!tagManagerRegistry.groups.length && <p>还没有标签组，请先新建一个。</p>}
+                </div>
+                <form className="tag-manager-create-group" onSubmit={(event) => void createTagGroup(event)}>
+                  <strong>新建标签组</strong>
+                  <input name="name" placeholder="例如：表征方法" required maxLength={500} />
+                  <label><span>颜色</span><input name="color" type="color" defaultValue="#53CF64" /></label>
+                  <button disabled={tagManagerBusy} type="submit">创建标签组</button>
+                </form>
+              </aside>
+
+              <main className="tag-registry-editor">
+                {managedTagGroup ? (
+                  <>
+                    <form
+                      className="tag-manager-group-editor"
+                      key={managedTagGroup.id}
+                      onSubmit={(event) => void updateTagGroup(event, managedTagGroup)}
+                    >
+                      <div className="tag-manager-section-title">
+                        <strong>修改名称与颜色</strong>
+                        {managedTagGroup.archived && <small>该标签组已归档</small>}
+                      </div>
+                      <input name="name" defaultValue={managedTagGroup.name} disabled={managedTagGroup.archived} required maxLength={500} />
+                      <input name="color" type="color" defaultValue={managedTagGroup.color} disabled={managedTagGroup.archived} />
+                      <div>
+                        {!managedTagGroup.archived ? (
+                          <>
+                            <button disabled={tagManagerBusy} type="submit">保存标签组</button>
+                            <button
+                              className="danger"
+                              disabled={tagManagerBusy || managedTagGroup.id === 'ungrouped'}
+                              onClick={() => {
+                                if (window.confirm(`归档“${managedTagGroup.name}”及其中仍在使用的标签？之后可以恢复。`)) {
+                                  void runTagRegistryAction({
+                                    action: 'archive_group',
+                                    group_id: managedTagGroup.id,
+                                  }, '标签组及其中的使用中标签已归档，可随时恢复。')
+                                }
+                              }}
+                              type="button"
+                            >归档标签组</button>
+                          </>
+                        ) : (
+                          <button
+                            disabled={tagManagerBusy}
+                            onClick={() => void runTagRegistryAction({
+                              action: 'restore_group',
+                              group_id: managedTagGroup.id,
+                            }, '标签组及随组归档的标签已恢复。')}
+                            type="button"
+                          >恢复标签组</button>
+                        )}
+                      </div>
+                    </form>
+
+                    {!managedTagGroup.archived && (
+                      <form
+                        className="tag-manager-create-tag"
+                        key={`create-tag-${managedTagGroup.id}`}
+                        onSubmit={(event) => void createManagedTag(event, managedTagGroup.id)}
+                      >
+                        <div className="tag-manager-section-title"><strong>新建标签</strong><small>人工创建时直接确认为正式标签</small></div>
+                        <input name="name" placeholder="标签名称" required maxLength={500} />
+                        <input name="aliases" placeholder="别名，用逗号分隔（可选）" />
+                        <button disabled={tagManagerBusy} type="submit">添加到当前标签组</button>
+                      </form>
+                    )}
+
+                    <div className="tag-manager-tag-list">
+                      <div className="tag-manager-section-title"><strong>组内标签</strong><small>{managedTags.length} 个</small></div>
+                      {managedTags.map((tag) => (
+                        <form
+                          className={`tag-manager-tag-card${tag.archived ? ' archived' : ''}`}
+                          key={tag.id}
+                          onSubmit={(event) => void updateManagedTag(event, tag)}
+                        >
+                          <div className="tag-manager-tag-state">
+                            <strong>{tag.name}</strong>
+                            <span>{tag.archived ? '已归档' : tag.status === 'provisional' ? '候选标签' : '正式标签'}</span>
+                          </div>
+                          {!tag.archived ? (
+                            <>
+                              <label><span>名称</span><input name="name" defaultValue={tag.name} required maxLength={500} /></label>
+                              <label><span>别名</span><input name="aliases" defaultValue={tag.aliases.join('，')} placeholder="用逗号分隔" /></label>
+                              <label>
+                                <span>移动到其他标签组</span>
+                                <select name="group_id" defaultValue={tag.group_id}>
+                                  {tagManagerRegistry.groups.filter((group) => !group.archived).map((group) => (
+                                    <option key={group.id} value={group.id}>{group.name}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <input name="status" type="hidden" value={tag.status} />
+                              <div className="tag-manager-tag-actions">
+                                <button disabled={tagManagerBusy} type="submit">保存修改</button>
+                                {tag.status === 'provisional' && (
+                                  <button
+                                    disabled={tagManagerBusy}
+                                    onClick={() => void runTagRegistryAction({
+                                      action: 'update_tag',
+                                      tag_id: tag.id,
+                                      status: 'confirmed',
+                                    }, '候选标签已确认为正式标签。')}
+                                    type="button"
+                                  >确认候选</button>
+                                )}
+                                <button
+                                  className="danger"
+                                  disabled={tagManagerBusy}
+                                  onClick={() => {
+                                    if (window.confirm(`归档标签“${tag.name}”？文献引用会保留，恢复后重新显示。`)) {
+                                      void runTagRegistryAction({
+                                        action: 'archive_tag',
+                                        tag_id: tag.id,
+                                      }, '标签已归档，文献引用保持不变。')
+                                    }
+                                  }}
+                                  type="button"
+                                >归档标签</button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="tag-manager-tag-actions">
+                              <button
+                                disabled={tagManagerBusy || Boolean(managedTagGroup.archived)}
+                                onClick={() => void runTagRegistryAction({
+                                  action: 'restore_tag',
+                                  tag_id: tag.id,
+                                }, '标签已恢复。')}
+                                type="button"
+                              >恢复标签</button>
+                              {managedTagGroup.archived && <small>请先恢复所属标签组</small>}
+                            </div>
+                          )}
+                        </form>
+                      ))}
+                      {!managedTags.length && <p className="tag-manager-empty">这个标签组还没有标签。</p>}
+                    </div>
+                  </>
+                ) : (
+                  <div className="tag-manager-empty"><strong>请先选择或新建标签组</strong></div>
+                )}
+                {tagManagerMessage && <p className="tag-manager-message" role="status">{tagManagerMessage}</p>}
+              </main>
             </div>
           </section>
         </div>
