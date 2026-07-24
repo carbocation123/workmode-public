@@ -10,7 +10,7 @@ interface NeonHudProps extends SkinRuntimeProps {
   chrome?: DeclarativeHudChrome
 }
 
-export function NeonHud({ projectName, projectPath, modelName, streaming, status, actions, onProjectClick, chrome }: NeonHudProps) {
+export function NeonHud({ projectName, projectPath, modelName, streaming, status, actions, onProjectClick, projectGuideTarget, chrome }: NeonHudProps) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function NeonHud({ projectName, projectPath, modelName, streaming, status
         <span className="neon-brand-copy"><strong>{chrome?.title || 'WORKMODE'}</strong><small>{chrome?.subtitle || 'NEON SPACE LAB'}</small></span>
       </div>
       {onProjectClick ? (
-        <button className="neon-mission" type="button" onClick={onProjectClick} title="管理项目">
+        <button className="neon-mission" data-literature-guide={projectGuideTarget} type="button" onClick={onProjectClick} title="管理项目">
           <span>{chrome?.missionLabel || 'ACTIVE MISSION'}</span>
           <strong>{projectName || 'NO PROJECT LINKED'}</strong>
           <small>{projectPath || 'SELECT A LOCAL RESEARCH WORKSPACE'}</small>

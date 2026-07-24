@@ -12,6 +12,7 @@ export interface SkinRuntimeProps {
   status: string
   actions?: ReactNode
   onProjectClick?: () => void
+  projectGuideTarget?: string
 }
 
 interface SkinChromeProps extends SkinRuntimeProps {

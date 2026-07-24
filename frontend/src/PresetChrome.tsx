@@ -32,7 +32,7 @@ const CHROME_COPY: Record<PresetChromeProps['preset'], {
   }
 }
 
-export function PresetChrome({ preset, projectName, projectPath, modelName, streaming, status, actions, onProjectClick }: PresetChromeProps) {
+export function PresetChrome({ preset, projectName, projectPath, modelName, streaming, status, actions, onProjectClick, projectGuideTarget }: PresetChromeProps) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
@@ -44,7 +44,7 @@ export function PresetChrome({ preset, projectName, projectPath, modelName, stre
       <span className="preset-chrome-emblem" aria-hidden>{copy.emblem}</span>
       <span className="preset-chrome-brand"><strong>{copy.title}</strong><small>{projectPath || 'SELECT A LOCAL RESEARCH WORKSPACE'}</small></span>
       {onProjectClick ? (
-        <button className="preset-chrome-field preset-chrome-project" type="button" onClick={onProjectClick} title="管理项目">
+        <button className="preset-chrome-field preset-chrome-project" data-literature-guide={projectGuideTarget} type="button" onClick={onProjectClick} title="管理项目">
           <small>{copy.projectLabel}</small><strong>{projectName || 'NO PROJECT'}</strong>
         </button>
       ) : (

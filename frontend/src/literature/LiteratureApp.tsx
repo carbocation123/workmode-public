@@ -6,6 +6,7 @@ import { Icon } from './Icon'
 import { LiteratureOnboarding } from './LiteratureOnboarding'
 import { EMPTY_RUNTIME_SESSION } from './runtimeState'
 import { installButtonTooltips } from './buttonTooltips'
+import { api } from '../api'
 import { LITERATURE_PROJECT_KEY, applicationHomeUrl, workbenchSettingsUrl } from '../literatureNavigation'
 import { SKIN_RUNTIME_GUARD_KEY, skinUsesChrome, type ActiveCustomSkin } from '../customSkin'
 import { MarkdownRenderer } from '../MarkdownRenderer'
@@ -184,6 +185,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
   const [backendError, setBackendError] = useState('')
+  const [modelConfigured, setModelConfigured] = useState<boolean | null>(null)
   const [projectInfo, setProjectInfo] = useState<WorkmodeProject | null>(null)
   const [projectOptions, setProjectOptions] = useState<WorkmodeProject[]>([])
   const [projectManagerOpen, setProjectManagerOpen] = useState(false)
@@ -337,6 +339,20 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   useEffect(() => {
     if (!appShellRef.current) return undefined
     return installButtonTooltips(appShellRef.current)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    void api.settings()
+      .then(({ settings }) => {
+        if (active) setModelConfigured(Boolean(settings.model_base_url && settings.model_api_key_set))
+      })
+      .catch(() => {
+        if (active) setModelConfigured(null)
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
   useEffect(() => {
@@ -1218,6 +1234,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           status={backendMode === 'connected' ? 'READY' : backendMode === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
           actions={projectHudActions}
           onProjectClick={() => void openProjectManager()}
+          projectGuideTarget="project"
         />
       )}
       <nav className="activity-bar" data-skin-slot="activity-navigation" aria-label="主活动栏">
@@ -1238,6 +1255,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <button
             type="button"
             className="activity-btn"
+            data-literature-guide="settings"
             disabled={streaming}
             onClick={() => {
               localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
@@ -1255,7 +1273,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <strong>WORKMODE / LITERA</strong>
           <span>轻量文献智库工作台</span>
         </div>
-        <button className="project-heading" type="button" onClick={() => void openProjectManager()} title="管理项目">
+        <button className="project-heading" data-literature-guide="project" type="button" onClick={() => void openProjectManager()} title="管理项目">
           <span className="eyebrow">当前项目</span>
           <strong>{projectInfo?.name || '等待文献项目'}</strong>
           <span className="project-heading-action">文献项目</span>
@@ -1276,7 +1294,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               />
             </label>
 
-            <div className="library-command-row">
+            <div className="library-command-row" data-literature-guide="filters">
               <label className="literature-group-filter">
                 <select
                   aria-label="按文献分组筛选"
@@ -1301,7 +1319,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               </div>
 
               <details className="library-import-menu">
-                <summary aria-label="导入文献">
+                <summary aria-label="导入文献" data-literature-guide="import">
                   <Icon name="file" />
                   <span>导入</span>
                 </summary>
@@ -1403,7 +1421,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             )}
           </div>
 
-          <div className="paper-list" aria-label="文献列表">
+          <div className="paper-list" aria-label="文献列表" data-literature-guide="papers">
             {filteredPapers.map((paper) => {
               const attached = activeSession.attachedPaperIds.includes(paper.id)
               return (
@@ -1585,7 +1603,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             </button>
           )}
 
-          <div className="composer-wrap" data-skin-slot="composer">
+          <div className="composer-wrap" data-literature-guide="composer" data-skin-slot="composer">
             {actionMessage && <div className="action-message" role="status">{actionMessage}</div>}
             {(attachedPapers.length > 0 || attachedNotes.length > 0) && (
               <div className="attachment-tray">
@@ -2293,8 +2311,9 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
         </div>
       )}
 
-      {projectInfo && <LiteratureOnboarding
-        onConfigureMineru={() => {
+      {(projectInfo || modelConfigured === false) && <LiteratureOnboarding
+        modelConfigured={modelConfigured}
+        onConfigureModel={() => {
           localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
           window.location.assign(workbenchSettingsUrl(window.location.href, 'literature'))
         }}

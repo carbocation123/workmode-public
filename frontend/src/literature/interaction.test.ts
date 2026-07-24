@@ -6,6 +6,7 @@ const styles = new TextDecoder().decode(readFileSync(new URL('./styles.css', imp
 const appStyles = new TextDecoder().decode(readFileSync(new URL('../styles.css', import.meta.url)))
 const onboarding = new TextDecoder().decode(readFileSync(new URL('../OnboardingUI.tsx', import.meta.url)))
 const literatureOnboarding = new TextDecoder().decode(readFileSync(new URL('./LiteratureOnboarding.tsx', import.meta.url)))
+const literatureOnboardingModel = new TextDecoder().decode(readFileSync(new URL('./onboarding.ts', import.meta.url)))
 const literatureApi = new TextDecoder().decode(readFileSync(new URL('./literatureApi.ts', import.meta.url)))
 const desktop = new TextDecoder().decode(readFileSync(new URL('../desktop.ts', import.meta.url)))
 const skinChrome = new TextDecoder().decode(readFileSync(new URL('../SkinChrome.tsx', import.meta.url)))
@@ -38,7 +39,7 @@ describe('literature live interaction contracts', () => {
     expect(appStyles).toContain('grid-template-columns: repeat(2, minmax(320px, 1fr))')
     expect(onboarding).toContain('点击「创建 API Key」')
     expect(onboarding).toContain('复制新生成的 Key')
-    expect(literatureOnboarding).toContain('MinerU')
+    expect(literatureOnboarding).toContain('先配置 DeepSeek API')
     expect(literatureOnboarding).toContain('设置')
   })
 
@@ -58,17 +59,16 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('PDF 只会加入文献库，不会自动解析或加入当前对话')
   })
 
-  it('treats MinerU as an optional advanced feature in the beginner guide', () => {
-    expect(literatureOnboarding).toContain('需要更精确地识别表格、公式或复杂版面时')
-    expect(literatureOnboarding).toContain('设置中配置 MinerU')
+  it('keeps optional MinerU setup out of the first interface tour', () => {
+    expect(literatureOnboarding).not.toContain('MinerU')
     expect(literatureOnboarding).not.toContain('创建并复制 Token')
+    expect(onboarding).toContain('MinerU 不是必需项')
   })
 
   it('guides single-paper close reading toward evidence-based figure walkthroughs', () => {
     expect(source).toContain('选中一篇后说“精读这篇”，默认逐图讲解')
-    expect(literatureOnboarding).toContain('精读这篇')
-    expect(literatureOnboarding).toContain('默认逐图讲解')
-    expect(literatureOnboarding).toContain('图表信息不足时会明确说明，不会猜测')
+    expect(literatureOnboardingModel).toContain('精读这篇')
+    expect(literatureOnboardingModel).toContain('比较这些文献的结论')
   })
 
   it('offers recoverable paper deletion and removes deleted papers from live attachments', () => {
