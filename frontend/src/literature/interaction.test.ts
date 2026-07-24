@@ -96,6 +96,19 @@ describe('literature live interaction contracts', () => {
     expect(styles).toContain('.endnote-import-modal')
   })
 
+  it('imports a Zotero library through the same beginner-friendly migration flow', () => {
+    expect(source).toContain('导入 Zotero 文献库')
+    expect(source).toContain('请先关闭 Zotero')
+    expect(source).toContain('Zotero 中可用的文献元数据、分组、标签、标签颜色和附件')
+    expect(source).toContain('导入完成后查重')
+    expect(literatureApi).toContain('findZoteroLibraries')
+    expect(literatureApi).toContain('previewZoteroLibrary')
+    expect(literatureApi).toContain('importZoteroLibrary')
+    expect(desktop).toContain('chooseZoteroLibrary')
+    expect(desktop).toContain("extensions: ['sqlite']")
+    expect(source).toContain('<strong>导入 Zotero</strong>')
+  })
+
   it('uses project tag groups and exposes each paper SI folder', () => {
     expect(source).not.toContain('const TAG_CATEGORIES')
     expect(source).toContain('tagGroups')
