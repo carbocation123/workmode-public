@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 
 class WordCitationModelTest(unittest.TestCase):
@@ -60,6 +61,48 @@ class WordCitationModelTest(unittest.TestCase):
             "DOI: 10.1000/workmode.1.",
         )
         self.assertEqual(format_reference(1, {"title": "Only a title"}), "[1] Only a title.")
+
+    def test_word_actions_forward_the_selected_document(self) -> None:
+        from app.word_citations import (
+            insert_word_bibliography,
+            insert_word_citation,
+            list_word_documents,
+        )
+
+        with patch(
+            "app.word_citations._run_word_action",
+            return_value={"ok": True, "documents": []},
+        ) as run_action:
+            self.assertEqual(list_word_documents()["documents"], [])
+            run_action.assert_called_once_with("list_documents")
+
+        payload = {
+            "schema": "workmode-citation/v1",
+            "project_slug": "library",
+            "paper_id": "paper-1",
+            "metadata": {"title": "Targeted citation"},
+        }
+        with patch(
+            "app.word_citations._run_word_action",
+            return_value={"ok": True},
+        ) as run_action:
+            insert_word_citation(payload, "C:\\Papers\\draft.docx")
+            run_action.assert_called_once_with(
+                "insert_citation",
+                encode_field_payload(payload),
+                "C:\\Papers\\draft.docx",
+            )
+
+        with patch(
+            "app.word_citations._run_word_action",
+            return_value={"ok": True},
+        ) as run_action:
+            insert_word_bibliography("unsaved::Document1")
+            run_action.assert_called_once_with(
+                "insert_bibliography",
+                None,
+                "unsaved::Document1",
+            )
 
 
 if __name__ == "__main__":

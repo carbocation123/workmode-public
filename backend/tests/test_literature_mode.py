@@ -728,29 +728,74 @@ class LiteratureModeTest(unittest.TestCase):
         catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
         client = TestClient(app)
-        with patch(
-            "app.literature_routes.insert_word_citation",
-            return_value={"ok": True, "citation_count": 1, "reference_count": 0},
-        ) as insert_citation:
+        documents_result = {
+            "ok": True,
+            "documents": [
+                {
+                    "id": "C:\\Papers\\draft.docx",
+                    "name": "draft.docx",
+                    "full_path": "C:\\Papers\\draft.docx",
+                    "active": True,
+                },
+                {
+                    "id": "unsaved::Document1",
+                    "name": "Document1",
+                    "full_path": None,
+                    "active": False,
+                },
+            ],
+            "active_document_id": "C:\\Papers\\draft.docx",
+        }
+        with (
+            patch(
+                "app.literature_routes.list_word_documents",
+                return_value=documents_result,
+            ) as list_documents,
+            patch(
+                "app.literature_routes.insert_word_citation",
+                return_value={
+                    "ok": True,
+                    "citation_count": 1,
+                    "reference_count": 0,
+                    "document_id": "C:\\Papers\\draft.docx",
+                    "document_name": "draft.docx",
+                },
+            ) as insert_citation,
+        ):
+            documents = client.get(
+                f"/api/work/projects/{self.project.slug}/literature/word/documents"
+            )
             citation = client.post(
-                f"/api/work/projects/{self.project.slug}/literature/word/citations/paper-word"
+                f"/api/work/projects/{self.project.slug}/literature/word/citations/paper-word",
+                json={"document_id": "C:\\Papers\\draft.docx"},
             )
         with patch(
             "app.literature_routes.insert_word_bibliography",
-            return_value={"ok": True, "citation_count": 1, "reference_count": 1},
+            return_value={
+                "ok": True,
+                "citation_count": 1,
+                "reference_count": 1,
+                "document_id": "C:\\Papers\\draft.docx",
+                "document_name": "draft.docx",
+            },
         ) as insert_bibliography:
             bibliography = client.post(
-                f"/api/work/projects/{self.project.slug}/literature/word/bibliography"
+                f"/api/work/projects/{self.project.slug}/literature/word/bibliography",
+                json={"document_id": "C:\\Papers\\draft.docx"},
             )
 
+        self.assertEqual(documents.status_code, 200)
+        self.assertEqual(documents.json(), documents_result)
+        list_documents.assert_called_once_with()
         self.assertEqual(citation.status_code, 200)
         self.assertEqual(citation.json()["citation_count"], 1)
         inserted_payload = insert_citation.call_args.args[0]
         self.assertEqual(inserted_payload["paper_id"], "paper-word")
         self.assertEqual(inserted_payload["metadata"]["title"], "Linked Word citation")
+        self.assertEqual(insert_citation.call_args.args[1], "C:\\Papers\\draft.docx")
         self.assertEqual(bibliography.status_code, 200)
         self.assertEqual(bibliography.json()["reference_count"], 1)
-        insert_bibliography.assert_called_once_with()
+        insert_bibliography.assert_called_once_with("C:\\Papers\\draft.docx")
 
     def test_chat_persists_active_context_as_message_metadata(self) -> None:
         from app.main import app
