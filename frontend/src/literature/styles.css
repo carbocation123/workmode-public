@@ -153,12 +153,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   align-items: flex-start;
   gap: 3px;
   padding-left: 22px;
+  border: 0;
   border-left: 1px solid var(--line);
   color: var(--text);
+  background: transparent;
   text-align: left;
+  cursor: pointer;
 }
 
 .project-heading strong { font-size: 14px; font-weight: 600; }
+.project-heading:hover strong { color: var(--cyan); }
 .project-heading-action { color: var(--faint); font-size: 8px; }
 .eyebrow { color: var(--cyan); font-size: 9px; letter-spacing: .18em; text-transform: uppercase; }
 .topbar-spacer { flex: 1; }
@@ -169,6 +173,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .literature-project-hud-menu button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--lit-control-bg); cursor: pointer; }
 .literature-project-hud-menu button:hover { color: var(--cyan); border-color: var(--lit-accent-border); background: var(--lit-accent-soft); }
 .literature-project-hud-menu button svg { width: 14px; }
+.app-shell button.neon-mission, .app-shell button.preset-chrome-project { border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.app-shell button.neon-mission:hover strong, .app-shell button.preset-chrome-project:hover strong { color: var(--cyan); }
 
 .workspace {
   grid-column: 2;

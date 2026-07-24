@@ -1209,6 +1209,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           streaming={streaming}
           status={backendMode === 'connected' ? 'READY' : backendMode === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
           actions={projectHudActions}
+          onProjectClick={() => void openProjectManager()}
         />
       )}
       <nav className="activity-bar" data-skin-slot="activity-navigation" aria-label="主活动栏">
@@ -1246,11 +1247,11 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <strong>WORKMODE / LITERA</strong>
           <span>轻量文献智库工作台</span>
         </div>
-        <div className="project-heading">
+        <button className="project-heading" type="button" onClick={() => void openProjectManager()} title="管理项目">
           <span className="eyebrow">当前项目</span>
           <strong>{projectInfo?.name || '等待文献项目'}</strong>
           <span className="project-heading-action">文献项目</span>
-        </div>
+        </button>
         <div className="topbar-spacer" />
         {!hudLayoutActive && projectHudActions}
       </header>

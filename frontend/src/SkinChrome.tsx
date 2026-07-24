@@ -11,6 +11,7 @@ export interface SkinRuntimeProps {
   streaming: boolean
   status: string
   actions?: ReactNode
+  onProjectClick?: () => void
 }
 
 interface SkinChromeProps extends SkinRuntimeProps {

@@ -10,7 +10,7 @@ interface NeonHudProps extends SkinRuntimeProps {
   chrome?: DeclarativeHudChrome
 }
 
-export function NeonHud({ projectName, projectPath, modelName, streaming, status, actions, chrome }: NeonHudProps) {
+export function NeonHud({ projectName, projectPath, modelName, streaming, status, actions, onProjectClick, chrome }: NeonHudProps) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -26,11 +26,19 @@ export function NeonHud({ projectName, projectPath, modelName, streaming, status
         <span className="neon-brand-ring" aria-hidden />
         <span className="neon-brand-copy"><strong>{chrome?.title || 'WORKMODE'}</strong><small>{chrome?.subtitle || 'NEON SPACE LAB'}</small></span>
       </div>
-      <div className="neon-mission">
-        <span>{chrome?.missionLabel || 'ACTIVE MISSION'}</span>
-        <strong>{projectName || 'NO PROJECT LINKED'}</strong>
-        <small>{projectPath || 'SELECT A LOCAL RESEARCH WORKSPACE'}</small>
-      </div>
+      {onProjectClick ? (
+        <button className="neon-mission" type="button" onClick={onProjectClick} title="管理项目">
+          <span>{chrome?.missionLabel || 'ACTIVE MISSION'}</span>
+          <strong>{projectName || 'NO PROJECT LINKED'}</strong>
+          <small>{projectPath || 'SELECT A LOCAL RESEARCH WORKSPACE'}</small>
+        </button>
+      ) : (
+        <div className="neon-mission">
+          <span>{chrome?.missionLabel || 'ACTIVE MISSION'}</span>
+          <strong>{projectName || 'NO PROJECT LINKED'}</strong>
+          <small>{projectPath || 'SELECT A LOCAL RESEARCH WORKSPACE'}</small>
+        </div>
+      )}
       <div className="neon-telemetry">
         <span><small>{chrome?.modelLabel || 'MODEL LINK'}</small><strong>{modelName || 'NOT CONFIGURED'}</strong></span>
         <span><small>{chrome?.stateLabel || 'CORE STATE'}</small><strong className={streaming ? 'live' : ''}>{streaming ? 'GENERATING' : status || 'READY'}</strong></span>

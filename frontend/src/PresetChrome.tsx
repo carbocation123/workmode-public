@@ -32,7 +32,7 @@ const CHROME_COPY: Record<PresetChromeProps['preset'], {
   }
 }
 
-export function PresetChrome({ preset, projectName, projectPath, modelName, streaming, status, actions }: PresetChromeProps) {
+export function PresetChrome({ preset, projectName, projectPath, modelName, streaming, status, actions, onProjectClick }: PresetChromeProps) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
@@ -43,7 +43,13 @@ export function PresetChrome({ preset, projectName, projectPath, modelName, stre
     <header className={`preset-chrome preset-chrome-${preset}`} data-skin-slot="app-chrome" aria-label={copy.ariaLabel}>
       <span className="preset-chrome-emblem" aria-hidden>{copy.emblem}</span>
       <span className="preset-chrome-brand"><strong>{copy.title}</strong><small>{projectPath || 'SELECT A LOCAL RESEARCH WORKSPACE'}</small></span>
-      <span className="preset-chrome-field"><small>{copy.projectLabel}</small><strong>{projectName || 'NO PROJECT'}</strong></span>
+      {onProjectClick ? (
+        <button className="preset-chrome-field preset-chrome-project" type="button" onClick={onProjectClick} title="管理项目">
+          <small>{copy.projectLabel}</small><strong>{projectName || 'NO PROJECT'}</strong>
+        </button>
+      ) : (
+        <span className="preset-chrome-field"><small>{copy.projectLabel}</small><strong>{projectName || 'NO PROJECT'}</strong></span>
+      )}
       <span className="preset-chrome-field"><small>{copy.modelLabel}</small><strong>{modelName || 'NOT CONFIGURED'}</strong></span>
       <span className="preset-chrome-field"><small>{copy.stateLabel}</small><strong className={streaming ? 'live' : ''}>{streaming ? 'GENERATING' : status || 'READY'}</strong></span>
       <span className="preset-chrome-clock">{now.toLocaleTimeString('zh-CN', { hour12: false })}</span>
