@@ -391,6 +391,33 @@ class EndNoteImportTest(unittest.TestCase):
         self.assertEqual({group["color"] for group in tags["groups"] if group["id"].startswith("endnote-")}, {"#DE3131", "#F6A33A"})
         self.assertEqual({tag["name"] for tag in tags["tags"]}, {"XPS", "Operando"})
 
+    def test_imported_metadata_trust_is_partial_when_core_bibliography_is_missing(self) -> None:
+        from app.endnote_import import _new_record
+
+        record = _new_record(
+            {
+                "title": "Only a title was preserved",
+                "author": "",
+                "year": "",
+                "date": "",
+                "secondary_title": "",
+                "electronic_resource_number": "",
+                "attachments": [{"path": "1000/main.pdf"}],
+                "main_attachment_index": 0,
+            },
+            paper_id="paper-incomplete",
+            digest="abc",
+            pdf_relative="papers/unprocessed/pdf/main.pdf",
+            si_relative="papers/unprocessed/SI/paper-incomplete",
+            group_ids=[],
+            tag_ids=[],
+        )
+
+        self.assertEqual(record["metadata_trust"], "partial")
+        self.assertIn("authors", record["metadata_issue"])
+        self.assertIn("year", record["metadata_issue"])
+        self.assertIn("journal", record["metadata_issue"])
+
     def test_enlx_uses_the_first_valid_pdf_even_when_a_non_pdf_attachment_comes_first(self) -> None:
         from app.endnote_import import import_endnote_library
 

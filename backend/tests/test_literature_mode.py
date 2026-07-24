@@ -386,6 +386,47 @@ class LiteratureModeTest(unittest.TestCase):
         read_paper = json.loads(read_result.content)["paper"]
         self.assertEqual(read_paper, paper)
 
+    def test_catalog_projection_downgrades_impossible_complete_metadata_state(self) -> None:
+        from app.literature_project import execute_literature_tool
+
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"].append(
+            {
+                "id": "paper-incomplete",
+                "title": "Only a title",
+                "authors": "",
+                "year": None,
+                "journal": "",
+                "metadata_source": "manual",
+                "metadata_trust": "complete",
+                "metadata_issue": "",
+                "status": "pending",
+                "group_ids": [],
+                "tag_ids": [],
+                "paths": {"pdf": "papers/unprocessed/pdf/incomplete.pdf"},
+            }
+        )
+        catalog_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        result = execute_literature_tool(
+            self.project.slug,
+            "literature_search",
+            {"query": "Only a title"},
+        )
+
+        self.assertTrue(result.ok, result.content)
+        paper = json.loads(result.content)["papers"][0]
+        self.assertEqual(paper["metadata_trust"], "partial")
+        self.assertIn("authors", paper["metadata_issue"])
+        self.assertIn("year", paper["metadata_issue"])
+        self.assertIn("journal", paper["metadata_issue"])
+        stored = json.loads(catalog_path.read_text(encoding="utf-8"))["papers"][0]
+        self.assertEqual(stored["metadata_trust"], "complete")
+
     def test_system_prompt_and_budget_use_literature_tool_profile(self) -> None:
         from app.prompt import build_system_prompt
 
