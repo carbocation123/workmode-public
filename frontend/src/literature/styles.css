@@ -446,7 +446,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .literature-onboarding-actions button { min-width: 86px; height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-control-bg); cursor: pointer; }
 .literature-onboarding-actions button:last-child { color: var(--color-on-primary, var(--bg)); border-color: var(--cyan); background: var(--cyan); }
 .literature-onboarding-actions button:disabled { opacity: .35; cursor: default; }
-.paper-detail-modal { width: min(1120px, calc(100vw - 68px)); height: min(860px, calc(100vh - 68px)); display: grid; grid-template-rows: 64px 44px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--lit-floating-bg); box-shadow: 0 34px 100px var(--lit-shadow); }
+.paper-detail-modal { position: relative; width: min(1120px, calc(100vw - 68px)); height: min(860px, calc(100vh - 68px)); display: grid; grid-template-rows: 64px 44px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--lit-floating-bg); box-shadow: 0 34px 100px var(--lit-shadow); }
 .paper-detail-modal.detail-overview { height: auto; max-height: min(860px, calc(100vh - 68px)); grid-template-rows: 64px 44px minmax(0, auto); }
 .paper-detail-modal.detail-overview .modal-scroll { max-height: calc(100vh - 176px); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--lit-panel-bg); }
@@ -513,6 +513,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .paper-detail-more-menu[open] summary, .paper-detail-more-menu summary:hover { color: var(--text); border-color: var(--cyan); background: var(--lit-control-hover); }
 .paper-detail-more-menu > div { position: absolute; z-index: 40; top: 37px; right: 0; width: 160px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--lit-floating-bg); box-shadow: 0 16px 45px var(--lit-shadow); }
 .paper-detail-more-menu > div .paper-delete-button { width: 100%; }
+.paper-detail-toast { position: absolute; z-index: 35; top: 116px; right: 22px; max-width: 360px; padding: 8px 11px; border: 1px solid var(--lit-accent-border); border-radius: 8px; color: var(--text); background: var(--lit-floating-bg); box-shadow: 0 12px 34px var(--lit-shadow); font-size: 9px; line-height: 1.45; pointer-events: none; }
 .session-rename-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 22px; }
 .session-rename-form label { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
 .session-rename-form input { min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 9px; outline: 0; color: var(--lit-control-text); background: var(--lit-control-bg); }
@@ -599,8 +600,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .metadata-review-notice { display: flex; align-items: flex-start; gap: 10px; margin-top: 15px; padding: 11px 12px; border: 1px solid var(--lit-warning-border); border-radius: 9px; color: var(--lit-control-text); background: color-mix(in srgb, var(--amber) 9%, var(--lit-surface-soft)); font-size: 10px; line-height: 1.55; }
 .metadata-review-notice strong { flex: 0 0 auto; color: var(--amber); }
 .metadata-review-notice span { min-width: 0; }
-.detail-grid { display: grid; grid-template-columns: 1fr; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
 .summary-section > p { margin: 0; color: var(--lit-control-text); font-size: 10.5px; line-height: 1.7; }
+.empty-detail-copy { margin: 0; color: var(--faint); font-size: 10px; font-style: italic; }
 
 .detail-section { padding: 20px 0; border-bottom: 1px solid var(--line); }
 .section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
@@ -1064,6 +1066,7 @@ body {
   .literature-project-row-actions { justify-content: flex-end; }
   .literature-project-rename { grid-template-columns: 1fr auto; }
   .literature-project-rename input { grid-column: 1 / -1; }
+  .detail-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

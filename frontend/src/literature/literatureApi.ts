@@ -591,7 +591,8 @@ export async function scanBackendDuplicates(): Promise<DuplicateScanResult> {
 
 export async function openBackendSiFolder(paperId: string): Promise<string> {
   const result = await literatureRequest<{ path: string }>(
-    `/papers/${encodeURIComponent(paperId)}/si-folder`,
+    `/papers/${encodeURIComponent(paperId)}/si-folder/open`,
+    { method: 'POST' },
   )
   return result.path
 }

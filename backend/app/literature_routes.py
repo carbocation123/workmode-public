@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -60,6 +63,31 @@ def _managed_storage_mode(root: Path) -> str:
         return "managed"
     except ValueError:
         return "external"
+
+
+def open_local_folder(path: Path) -> None:
+    if sys.platform == "win32":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        return
+    command = ["open", str(path)] if sys.platform == "darwin" else ["xdg-open", str(path)]
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def _si_folder(root: Path, paper_id: str) -> tuple[Path, str]:
+    paper = literature_paper(root, paper_id)
+    relative = str((paper.get("paths") or {}).get("si_folder") or "")
+    if not relative:
+        raise LiteratureProjectError("该文献没有 SI 文件夹")
+    path = (root / relative).resolve()
+    path.relative_to(root)
+    path.mkdir(parents=True, exist_ok=True)
+    return path, relative
 
 
 def _allocate_managed_root(name: str) -> Path:
@@ -249,16 +277,23 @@ def read_pdf(slug: str, paper_id: str):
 def read_si_folder(slug: str, paper_id: str) -> dict[str, object]:
     root = _project_root(slug)
     try:
-        paper = literature_paper(root, paper_id)
-        relative = str((paper.get("paths") or {}).get("si_folder") or "")
-        if not relative:
-            raise LiteratureProjectError("该文献没有 SI 文件夹")
-        path = (root / relative).resolve()
-        path.relative_to(root)
-        path.mkdir(parents=True, exist_ok=True)
+        path, relative = _si_folder(root, paper_id)
         return {"path": str(path), "relative_path": relative}
     except (LiteratureProjectError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/papers/{paper_id}/si-folder/open")
+def open_si_folder(slug: str, paper_id: str) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        path, _relative = _si_folder(root, paper_id)
+        open_local_folder(path)
+        return {"opened": True, "path": str(path)}
+    except (LiteratureProjectError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"系统无法打开 SI 文件夹：{exc}") from exc
 
 
 @router.post("/projects/{slug}/literature/papers/import")

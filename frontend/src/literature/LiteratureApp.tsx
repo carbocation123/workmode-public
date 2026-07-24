@@ -13,7 +13,7 @@ import { SkinChrome } from '../SkinChrome'
 import { THEMES, type ThemeId } from '../theme'
 import { isNearBottom } from '../conversation'
 import { projectRefreshTargets, type ProjectRefreshTarget } from '../projectChanges'
-import { chooseEndNoteLibrary, openLocalPath } from '../desktop'
+import { chooseEndNoteLibrary } from '../desktop'
 import {
   chatActionMessageForEvent,
   createLiveChatState,
@@ -178,6 +178,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [detailPaperId, setDetailPaperId] = useState<string | null>(null)
   const [detailTab, setDetailTab] = useState<'overview' | 'facts' | 'pdf'>('overview')
   const [detailEditing, setDetailEditing] = useState(false)
+  const [siOpening, setSiOpening] = useState(false)
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
@@ -864,6 +865,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   }
 
   function openPaperDetail(id: string, tab: 'overview' | 'facts' | 'pdf' = 'overview') {
+    setActionMessage('')
     setDetailPaperId(id)
     setDetailTab(tab)
     setDetailEditing(false)
@@ -976,12 +978,16 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   }
 
   async function openPaperSiFolder(paperId: string) {
+    if (siOpening) return
+    setSiOpening(true)
+    setActionMessage('正在打开 SI 文件夹…')
     try {
-      const path = await openBackendSiFolder(paperId)
-      const opened = await openLocalPath(path)
-      setActionMessage(opened ? '已打开 SI 文件夹。' : `SI 文件夹：${path}`)
+      await openBackendSiFolder(paperId)
+      setActionMessage('已打开 SI 文件夹。')
     } catch (error) {
       setActionMessage(`无法打开 SI 文件夹：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setSiOpening(false)
     }
   }
 
@@ -1826,8 +1832,8 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                     <Icon name="edit" />{detailEditing ? '收起编辑' : '编辑信息'}
                   </button>
                 )}
-                <button onClick={() => void openPaperSiFolder(detailPaper.id)}>
-                  <Icon name="layers" />打开 SI 文件夹
+                <button disabled={siOpening} onClick={() => void openPaperSiFolder(detailPaper.id)}>
+                  <Icon name="layers" />{siOpening ? '正在打开…' : '打开 SI 文件夹'}
                 </button>
                 <details className="paper-detail-more-menu">
                   <summary aria-label="更多文献操作" title="更多文献操作">•••</summary>
@@ -1854,6 +1860,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               )}
               <button className={detailTab === 'pdf' ? 'active' : ''} onClick={() => setDetailTab('pdf')}>原始 PDF</button>
             </nav>
+            {actionMessage && <div className="paper-detail-toast" role="status">{actionMessage}</div>}
 
             {detailTab === 'overview' && (
               <div className="modal-scroll">
@@ -1888,22 +1895,16 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   )}
                 </div>
 
-                {(detailPaper.summary || detailPaper.focus) && (
-                  <div className="detail-grid">
-                    {detailPaper.summary && (
-                      <section className="detail-section summary-section">
-                        <div className="section-title"><span>AI 提炼摘要</span></div>
-                        <p>{detailPaper.summary}</p>
-                      </section>
-                    )}
-                    {detailPaper.focus && (
-                      <section className="detail-section focus-section">
-                        <div className="section-title"><span>用户关注点</span></div>
-                        <p className="focus-note">{detailPaper.focus}</p>
-                      </section>
-                    )}
-                  </div>
-                )}
+                <div className="detail-grid">
+                  <section className="detail-section summary-section">
+                    <div className="section-title"><span>AI 提炼摘要</span></div>
+                    <p className={detailPaper.summary ? '' : 'empty-detail-copy'}>{detailPaper.summary || '暂空'}</p>
+                  </section>
+                  <section className="detail-section focus-section">
+                    <div className="section-title"><span>用户关注点</span></div>
+                    <p className={detailPaper.focus ? 'focus-note' : 'empty-detail-copy'}>{detailPaper.focus || '暂空'}</p>
+                  </section>
+                </div>
                 {detailEditing && backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' && (
                   <section className="review-confirm-panel">
                     <div className="section-title"><span>编辑文献信息</span></div>
