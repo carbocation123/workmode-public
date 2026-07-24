@@ -8,6 +8,9 @@ const onboarding = new TextDecoder().decode(readFileSync(new URL('../OnboardingU
 const literatureOnboarding = new TextDecoder().decode(readFileSync(new URL('./LiteratureOnboarding.tsx', import.meta.url)))
 const literatureApi = new TextDecoder().decode(readFileSync(new URL('./literatureApi.ts', import.meta.url)))
 const desktop = new TextDecoder().decode(readFileSync(new URL('../desktop.ts', import.meta.url)))
+const skinChrome = new TextDecoder().decode(readFileSync(new URL('../SkinChrome.tsx', import.meta.url)))
+const neonHud = new TextDecoder().decode(readFileSync(new URL('../NeonHud.tsx', import.meta.url)))
+const presetChrome = new TextDecoder().decode(readFileSync(new URL('../PresetChrome.tsx', import.meta.url)))
 const detailOverview = source.slice(
   source.indexOf("{detailTab === 'overview' && ("),
   source.indexOf("{detailTab === 'facts' && ("),
@@ -152,6 +155,11 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('className="literature-project-hud-actions"')
     expect(source).toContain('className="literature-project-hud-menu"')
     expect(source).toContain('actions={projectHudActions}')
+    expect(source).toContain('<button className="project-heading"')
+    expect(source).toContain('onProjectClick={() => void openProjectManager()}')
+    expect(skinChrome).toContain('onProjectClick?: () => void')
+    expect(neonHud).toContain('onClick={onProjectClick}')
+    expect(presetChrome).toContain('onClick={onProjectClick}')
     expect(source).toContain('className="library-command-row"')
     expect(source).toContain('className="library-import-menu"')
     expect(source).toContain('导入 PDF')
