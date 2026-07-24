@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import struct
 import tempfile
+import threading
 import unittest
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 
 def _group_spec(name: str, type_code: int = 3, color: str | None = None) -> bytes:
@@ -267,6 +271,83 @@ class EndNoteImportTest(unittest.TestCase):
             {"characterization", "material", "mechanism", "performance", "uncategorized"}
             .intersection(group["id"] for group in tags["groups"])
         )
+
+    def test_concurrent_first_open_serializes_schema_migration(self) -> None:
+        from app.literature_project import initialize_literature_project
+
+        legacy_root = self.base / "concurrent-legacy-project"
+        legacy_root.mkdir()
+        (legacy_root / "literature-project.json").write_text(
+            json.dumps(
+                {
+                    "project_type": "literature-library",
+                    "schema_version": 1,
+                    "tool_profile": "literature",
+                    "frontend_projection": "literature-library",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (legacy_root / "catalog.json").write_text(
+            json.dumps({"schema_version": 1, "papers": []}),
+            encoding="utf-8",
+        )
+        (legacy_root / "tags.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "groups": [],
+                    "tags": [
+                        {
+                            "id": "xps",
+                            "name": "XPS",
+                            "aliases": [],
+                            "category": "characterization",
+                            "status": "confirmed",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        real_replace = os.replace
+        first_two_replaces = threading.Barrier(2)
+        replace_count = 0
+        replace_count_lock = threading.Lock()
+
+        def synchronized_replace(source: str | Path, target: str | Path) -> None:
+            nonlocal replace_count
+            with replace_count_lock:
+                replace_count += 1
+                position = replace_count
+            if position <= 2:
+                try:
+                    first_two_replaces.wait(timeout=1)
+                except threading.BrokenBarrierError:
+                    pass
+            real_replace(source, target)
+
+        with patch("app.literature_project.os.replace", side_effect=synchronized_replace):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [
+                    executor.submit(
+                        initialize_literature_project,
+                        legacy_root,
+                        name="Concurrent legacy",
+                    )
+                    for _ in range(2)
+                ]
+                for future in futures:
+                    future.result()
+
+        manifest = json.loads(
+            (legacy_root / "literature-project.json").read_text(encoding="utf-8")
+        )
+        tags = json.loads((legacy_root / "tags.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["schema_version"], 2)
+        self.assertEqual(tags["schema_version"], 2)
+        self.assertEqual(tags["tags"][0]["group_id"], "ungrouped")
 
     def test_inspection_and_import_preserve_groups_tags_colors_and_si_files(self) -> None:
         from app.endnote_import import import_endnote_library, inspect_endnote_library
