@@ -24,6 +24,7 @@ from .literature_project import (
     _catalog,
     _catalog_lock,
     _groups,
+    _normalize_metadata_quality,
     _slug,
     _tags,
     _write_catalog,
@@ -673,7 +674,7 @@ def _new_record(
     authors = _normalized_authors(reference.get("author"))
     now = utc_now()
     main_attachment = reference["attachments"][reference["main_attachment_index"]]
-    return {
+    return _normalize_metadata_quality({
         "id": paper_id,
         "content_sha256": digest,
         "title": str(reference.get("title") or "").strip(),
@@ -706,7 +707,7 @@ def _new_record(
         "verification_status": "pending",
         "created_at": now,
         "updated_at": now,
-    }
+    })
 
 
 def import_endnote_library(project_root: Path, source: Path) -> dict[str, Any]:

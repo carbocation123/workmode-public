@@ -2019,6 +2019,7 @@ def _catalog(root: Path) -> dict[str, Any]:
     for paper in payload["papers"]:
         if not isinstance(paper, dict) or not isinstance(paper.get("id"), str):
             raise LiteratureProjectError("catalog.json contains an invalid paper record")
+        _normalize_metadata_quality(paper)
     return payload
 
 
@@ -2070,6 +2071,32 @@ def _record_value(paper: dict[str, Any], key: str) -> Any:
             return None
         current = current.get(segment)
     return current
+
+
+def _normalize_metadata_quality(paper: dict[str, Any]) -> dict[str, Any]:
+    """Keep the derived metadata quality state honest without rewriting on read."""
+    if str(paper.get("metadata_trust") or "") != "complete":
+        return paper
+    missing = [
+        label
+        for key, label in (
+            ("title", "title"),
+            ("authors", "authors"),
+            ("year", "year"),
+            ("journal", "journal"),
+        )
+        if paper.get(key) in {None, ""}
+    ]
+    if not missing:
+        return paper
+    paper["metadata_trust"] = "partial"
+    missing_message = f"Metadata is missing: {', '.join(missing)}"
+    current_issue = str(paper.get("metadata_issue") or "").strip()
+    if not current_issue:
+        paper["metadata_issue"] = missing_message
+    elif missing_message not in current_issue:
+        paper["metadata_issue"] = f"{current_issue}; {missing_message}"
+    return paper
 
 
 def _paper_projection_lookups(root: Path) -> dict[str, dict[str, dict[str, Any]]]:
