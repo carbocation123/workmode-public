@@ -38,6 +38,8 @@ import {
   findZoteroLibraries,
   importEndNoteLibrary,
   importZoteroLibrary,
+  insertBackendWordBibliography,
+  insertBackendWordCitation,
   listBackendPapers,
   listBackendGroups,
   listDeletedBackendPapers,
@@ -188,6 +190,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [detailPaperId, setDetailPaperId] = useState<string | null>(null)
   const [detailTab, setDetailTab] = useState<'overview' | 'facts' | 'pdf'>('overview')
   const [siOpening, setSiOpening] = useState(false)
+  const [wordBusy, setWordBusy] = useState<'citation' | 'bibliography' | null>(null)
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
@@ -1238,6 +1241,34 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     }
   }
 
+  async function insertPaperIntoWord(paperId: string) {
+    if (wordBusy) return
+    setWordBusy('citation')
+    setActionMessage('正在插入 Word 引用…')
+    try {
+      const result = await insertBackendWordCitation(paperId)
+      setActionMessage(`已插入 Word 引用；当前文档共 ${result.citation_count} 处引用。`)
+    } catch (error) {
+      setActionMessage(`无法插入 Word 引用：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setWordBusy(null)
+    }
+  }
+
+  async function createWordBibliography() {
+    if (wordBusy) return
+    setWordBusy('bibliography')
+    setActionMessage('正在生成 Word 参考文献…')
+    try {
+      const result = await insertBackendWordBibliography()
+      setActionMessage(`Word 参考文献已更新，共 ${result.reference_count} 条。`)
+    } catch (error) {
+      setActionMessage(`无法生成 Word 参考文献：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setWordBusy(null)
+    }
+  }
+
   async function confirmPendingImport() {
     if (!pendingImportFiles.length || importingPapers || backendMode !== 'connected') return
     const files = pendingImportFiles
@@ -2254,12 +2285,29 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             <header className="modal-header">
               <div><h2>文献详情</h2></div>
               <div className="paper-detail-header-actions">
+                <button
+                  disabled={Boolean(wordBusy)}
+                  onClick={() => void insertPaperIntoWord(detailPaper.id)}
+                  title="把这篇文献作为可更新引用插入当前 Word 光标处"
+                >
+                  <Icon name="book" />{wordBusy === 'citation' ? '正在插入…' : '插入 Word 引用'}
+                </button>
                 <button disabled={siOpening} onClick={() => void openPaperSiFolder(detailPaper.id)}>
                   <Icon name="layers" />{siOpening ? '正在打开…' : '打开 SI 文件夹'}
                 </button>
                 <details className="paper-detail-more-menu">
                   <summary aria-label="更多文献操作" title="更多文献操作">•••</summary>
                   <div>
+                    <button
+                      disabled={Boolean(wordBusy)}
+                      onClick={(event) => {
+                        event.currentTarget.closest('details')?.removeAttribute('open')
+                        void createWordBibliography()
+                      }}
+                      title="在当前 Word 光标处生成参考文献；已有列表会直接刷新"
+                    >
+                      <Icon name="book" />{wordBusy === 'bibliography' ? '正在生成…' : '生成 Word 参考文献'}
+                    </button>
                     <button
                       className="paper-delete-button"
                       disabled={streaming || trashBusyId === detailPaper.id}

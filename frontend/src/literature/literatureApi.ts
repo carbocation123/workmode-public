@@ -692,6 +692,24 @@ export async function openBackendSiFolder(paperId: string): Promise<string> {
   return result.path
 }
 
+export interface WordCitationResult {
+  ok: true
+  citation_count: number
+  reference_count: number
+  bibliography_count: number
+}
+
+export async function insertBackendWordCitation(paperId: string): Promise<WordCitationResult> {
+  return literatureRequest<WordCitationResult>(
+    `/word/citations/${encodeURIComponent(paperId)}`,
+    { method: 'POST' },
+  )
+}
+
+export async function insertBackendWordBibliography(): Promise<WordCitationResult> {
+  return literatureRequest<WordCitationResult>('/word/bibliography', { method: 'POST' })
+}
+
 export async function uploadPaper(file: File): Promise<{ paper: BackendPaper; duplicate: boolean }> {
   const result = await literatureRequest<ImportResult>(`/papers/import?filename=${encodeURIComponent(file.name)}`, {
     method: 'POST',

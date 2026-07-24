@@ -536,7 +536,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .paper-detail-more-menu summary::-webkit-details-marker { display: none; }
 .paper-detail-more-menu[open] summary, .paper-detail-more-menu summary:hover { color: var(--text); border-color: var(--cyan); background: var(--lit-control-hover); }
 .paper-detail-more-menu > div { position: absolute; z-index: 40; top: 37px; right: 0; width: 160px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--lit-floating-bg); box-shadow: 0 16px 45px var(--lit-shadow); }
-.paper-detail-more-menu > div .paper-delete-button { width: 100%; }
+.paper-detail-more-menu > div button { width: 100%; margin-bottom: 4px; justify-content: flex-start; }
+.paper-detail-more-menu > div button:last-child { margin-bottom: 0; }
 .paper-detail-toast { position: absolute; z-index: 35; top: 116px; right: 22px; max-width: 360px; padding: 8px 11px; border: 1px solid var(--lit-accent-border); border-radius: 8px; color: var(--text); background: var(--lit-floating-bg); box-shadow: 0 12px 34px var(--lit-shadow); font-size: 9px; line-height: 1.45; pointer-events: none; }
 .session-rename-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 22px; }
 .session-rename-form label { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }

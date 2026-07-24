@@ -24,6 +24,12 @@ from .zotero_import import (
     import_zotero_library,
     inspect_zotero_library,
 )
+from .word_citations import (
+    WordCitationError,
+    build_citation_payload,
+    insert_word_bibliography,
+    insert_word_citation,
+)
 from .literature_project import (
     LITERATURE_TOOL_SCHEMAS,
     LiteratureProjectError,
@@ -347,6 +353,27 @@ def open_si_folder(slug: str, paper_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"系统无法打开 SI 文件夹：{exc}") from exc
+
+
+@router.post("/projects/{slug}/literature/word/citations/{paper_id}")
+def add_word_citation(slug: str, paper_id: str) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        payload = build_citation_payload(slug, literature_paper(root, paper_id))
+        return insert_word_citation(payload)
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WordCitationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/word/bibliography")
+def add_word_bibliography(slug: str) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return insert_word_bibliography()
+    except WordCitationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/projects/{slug}/literature/papers/import")
