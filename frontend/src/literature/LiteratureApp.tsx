@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { Icon } from './Icon'
 import { LiteratureOnboarding } from './LiteratureOnboarding'
 import { EMPTY_RUNTIME_SESSION } from './runtimeState'
+import { installButtonTooltips } from './buttonTooltips'
 import { LITERATURE_PROJECT_KEY, applicationHomeUrl, workbenchSettingsUrl } from '../literatureNavigation'
 import { SKIN_RUNTIME_GUARD_KEY, skinUsesChrome, type ActiveCustomSkin } from '../customSkin'
 import { MarkdownRenderer } from '../MarkdownRenderer'
@@ -234,6 +235,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [archiveVerification, setArchiveVerification] = useState<ArchiveVerification | null>(null)
   const [actionMessage, setActionMessage] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const appShellRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const notePreviewRef = useRef<HTMLDivElement>(null)
   const messageStreamRef = useRef<HTMLDivElement>(null)
@@ -330,6 +332,11 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
   useEffect(() => () => {
     if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (!appShellRef.current) return undefined
+    return installButtonTooltips(appShellRef.current)
   }, [])
 
   useEffect(() => {
@@ -1174,6 +1181,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
   return (
     <div
+      ref={appShellRef}
       className={`app-shell${dragActive ? ' is-dragging' : ''}${hudLayoutActive ? ' hud-layout' : ''}`}
       data-skin-slot="literature-shell"
       data-app-surface="literature"
