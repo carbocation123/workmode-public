@@ -52,6 +52,28 @@ describe('literature frontend model', () => {
     expect(paper.factReport).toEqual([])
   })
 
+  it('uses a human placeholder instead of exposing the raw filename as a missing title', () => {
+    const paper = mapBackendPaper({
+      id: 'paper-without-title',
+      original_filename: '4-3.pdf',
+      archive_filename: null,
+      archive_location: '文献/未处理',
+      title: '',
+      authors: '',
+      year: null,
+      journal: '',
+      status: 'pending',
+      tags: [],
+      focus: '',
+      summary: '',
+      paper_type: 'unknown',
+      metadata_source: 'pending',
+      metadata_trust: 'unknown',
+    })
+
+    expect(paper.title).toBe('未识别标题')
+  })
+
   it('maps backend manual metadata and review issues to the visible frontend contract', () => {
     const paper = mapBackendPaper({
       id: 'paper-manual',
