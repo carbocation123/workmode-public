@@ -98,6 +98,11 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('tagGroups')
     expect(source).toContain('打开 SI 文件夹')
     expect(literatureApi).toContain('openBackendSiFolder')
+    expect(literatureApi).toContain("method: 'POST'")
+    expect(source).toContain('const [siOpening, setSiOpening] = useState(false)')
+    expect(source).toContain("siOpening ? '正在打开…' : '打开 SI 文件夹'")
+    expect(source).toContain('className="paper-detail-toast"')
+    expect(source).not.toContain('openLocalPath')
   })
 
   it('keeps useful bibliographic and workflow fields available to search and AI', () => {
@@ -119,8 +124,9 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain("detailPaper.factReport.length > 0 &&")
     expect(detailOverview).toContain('className="paper-bibliography"')
     expect(detailOverview).toContain('className="detail-classifiers"')
-    expect(detailOverview).toContain("detailPaper.summary &&")
-    expect(detailOverview).toContain("detailPaper.focus &&")
+    expect(detailOverview).toContain("detailPaper.summary || '暂空'")
+    expect(detailOverview).toContain("detailPaper.focus || '暂空'")
+    expect(detailOverview).toContain('empty-detail-copy')
     expect(detailOverview).toContain("detailEditing &&")
     expect(detailOverview).not.toContain('标准档名')
     expect(detailOverview).not.toContain('原始导入名')

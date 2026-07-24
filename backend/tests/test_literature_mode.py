@@ -515,6 +515,37 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.json()["focus"], "direct write")
 
+    def test_si_folder_open_route_launches_validated_project_folder(self) -> None:
+        from app.main import app
+        from fastapi.testclient import TestClient
+
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"].append(
+            {
+                "id": "paper-si",
+                "title": "Paper with SI",
+                "original_filename": "paper.pdf",
+                "status": "pending",
+                "tag_ids": [],
+                "focus": "",
+                "summary": "",
+                "paths": {"si_folder": "papers/unprocessed/SI/paper-si"},
+            }
+        )
+        catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        expected = (self.root / "papers/unprocessed/SI/paper-si").resolve()
+
+        with patch("app.literature_routes.open_local_folder", create=True) as opener:
+            response = TestClient(app).post(
+                f"/api/work/projects/{self.project.slug}/literature/papers/paper-si/si-folder/open"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"opened": True, "path": str(expected)})
+        self.assertTrue(expected.is_dir())
+        opener.assert_called_once_with(expected)
+
     def test_chat_persists_active_context_as_message_metadata(self) -> None:
         from app.main import app
         from fastapi.testclient import TestClient
