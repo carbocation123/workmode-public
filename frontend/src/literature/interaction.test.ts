@@ -8,6 +8,10 @@ const onboarding = new TextDecoder().decode(readFileSync(new URL('../OnboardingU
 const literatureOnboarding = new TextDecoder().decode(readFileSync(new URL('./LiteratureOnboarding.tsx', import.meta.url)))
 const literatureApi = new TextDecoder().decode(readFileSync(new URL('./literatureApi.ts', import.meta.url)))
 const desktop = new TextDecoder().decode(readFileSync(new URL('../desktop.ts', import.meta.url)))
+const detailOverview = source.slice(
+  source.indexOf("{detailTab === 'overview'"),
+  source.indexOf("{detailTab === 'facts'"),
+)
 
 describe('literature live interaction contracts', () => {
   it('uses VS Code-style follow-latest behavior instead of forcing every delta into view', () => {
@@ -96,15 +100,40 @@ describe('literature live interaction contracts', () => {
     expect(literatureApi).toContain('openBackendSiFolder')
   })
 
-  it('shows and searches the same useful bibliographic and workflow fields exposed to AI', () => {
+  it('keeps useful bibliographic and workflow fields available to search and AI', () => {
     expect(source).toContain('paper.doi')
-    expect(source).toContain('<strong>期刊</strong>')
-    expect(source).toContain('<strong>DOI</strong>')
-    expect(source).toContain('<strong>第一作者姓</strong>')
-    expect(source).toContain('<strong>期刊缩写</strong>')
-    expect(source).toContain('<strong>处理阶段</strong>')
-    expect(source).toContain('<strong>处理错误</strong>')
-    expect(source).toContain('<strong>SI 文件夹</strong>')
+    expect(literatureApi).toContain('firstAuthorSurname')
+    expect(literatureApi).toContain('journalAbbreviation')
+    expect(literatureApi).toContain('processingStage')
+    expect(literatureApi).toContain('processingError')
+    expect(literatureApi).toContain('siFolder')
+  })
+
+  it('opens a reader-focused paper detail and reveals editing only on demand', () => {
+    expect(source).toContain('<h2>{detailPaper.title}</h2>')
+    expect(source).not.toContain('<span className="eyebrow">PAPER RECORD</span>')
+    expect(source).toContain('const [detailEditing, setDetailEditing] = useState(false)')
+    expect(source).toContain('编辑信息')
+    expect(source).toContain("detailPaper.factReport.length > 0 &&")
+    expect(detailOverview).toContain('className="paper-bibliography"')
+    expect(detailOverview).toContain('className="detail-classifiers"')
+    expect(detailOverview).toContain("detailPaper.summary &&")
+    expect(detailOverview).toContain("detailPaper.focus &&")
+    expect(detailOverview).toContain("detailEditing &&")
+    expect(detailOverview).not.toContain('标准档名')
+    expect(detailOverview).not.toContain('原始导入名')
+    expect(detailOverview).not.toContain('归档位置')
+    expect(detailOverview).not.toContain('元数据来源')
+    expect(detailOverview).not.toContain('第一作者姓')
+    expect(detailOverview).not.toContain('期刊缩写')
+    expect(detailOverview).not.toContain('SI 文件夹')
+    expect(detailOverview).not.toContain('处理阶段')
+    expect(detailOverview).not.toContain('处理错误')
+    expect(detailOverview).not.toContain('MinerU 产物目录')
+    expect(detailOverview).not.toContain('归档校验')
+    expect(detailOverview).not.toContain('文献入档流程')
+    expect(styles).toContain('.paper-bibliography')
+    expect(styles).toContain('.detail-edit-toggle')
   })
 
   it('uses one compact library toolbar instead of unrelated stacked controls', () => {
