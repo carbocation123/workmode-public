@@ -157,6 +157,8 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('actions={projectHudActions}')
     expect(source).toContain('<button className="project-heading"')
     expect(source).toContain('onProjectClick={() => void openProjectManager()}')
+    expect(source).toContain('installButtonTooltips')
+    expect(source).toContain('ref={appShellRef}')
     expect(skinChrome).toContain('onProjectClick?: () => void')
     expect(neonHud).toContain('onClick={onProjectClick}')
     expect(presetChrome).toContain('onClick={onProjectClick}')
