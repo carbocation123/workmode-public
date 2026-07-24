@@ -383,6 +383,18 @@ class ZoteroImportTest(unittest.TestCase):
         self.assertEqual(by_directory["database_path"], by_database["database_path"])
         self.assertEqual(by_directory["data_directory"], by_database["data_directory"])
 
+    def test_storage_attachment_key_cannot_escape_the_zotero_storage_directory(self) -> None:
+        from app.zotero_import import _attachment_source
+
+        escaped = _attachment_source(
+            self.data_root,
+            item_key="../../outside",
+            link_mode=0,
+            stored_path="storage:secret.pdf",
+        )
+
+        self.assertIsNone(escaped)
+
 
 if __name__ == "__main__":
     unittest.main()
