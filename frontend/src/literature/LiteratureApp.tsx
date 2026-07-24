@@ -79,7 +79,6 @@ import {
   updateSessionById,
   type ProjectMemoryState,
   type PaperRecord,
-  type PaperStatus,
 } from './model'
 
 interface NoteDocument {
@@ -166,31 +165,8 @@ const FACT_KIND_LABELS = {
   excerpt: '原始内容',
 } as const
 
-const METADATA_SOURCE_LABELS = {
-  cite_this: 'PDF 首页 Cite This',
-  layout_json_fallback: 'layout.json DOI 回退',
-  manual_review: '人工确认',
-  pending: '等待首页元数据',
-} as const
-
-const PAPER_TYPE_LABELS = {
-  research: '研究论文 · 扁平主档',
-  review: '综述 · N+1 分层主档',
-  unknown: '等待文章类型判定',
-} as const
-
-const VERIFICATION_LABELS = {
-  pending: '等待 verify_archive.py',
-  passed: '归档校验通过',
-  needs_fix: '需要修复后复验',
-} as const
-
 function messageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-function StatusDot({ status }: { status: PaperStatus }) {
-  return <span className={`status-dot status-${status}`} aria-hidden="true" />
 }
 
 export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProps) {
@@ -201,6 +177,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [activeSessionId, setActiveSessionId] = useState(emptySession.id)
   const [detailPaperId, setDetailPaperId] = useState<string | null>(null)
   const [detailTab, setDetailTab] = useState<'overview' | 'facts' | 'pdf'>('overview')
+  const [detailEditing, setDetailEditing] = useState(false)
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
@@ -889,6 +866,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   function openPaperDetail(id: string, tab: 'overview' | 'facts' | 'pdf' = 'overview') {
     setDetailPaperId(id)
     setDetailTab(tab)
+    setDetailEditing(false)
   }
 
   function toggleTagFilter(id: string) {
@@ -1831,120 +1809,104 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <section
             aria-label="文献详细信息"
             aria-modal="true"
-            className="paper-detail-modal"
+            className={`paper-detail-modal detail-${detailTab}`}
             data-skin-slot="literature-detail"
             role="dialog"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header className="modal-header">
-              <div>
-                <span className="eyebrow">PAPER RECORD</span>
-                <h2>{detailPaper.archiveFilename ?? detailPaper.filename}</h2>
-              </div>
+              <div><h2>文献详情</h2></div>
               <div className="paper-detail-header-actions">
+                {backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' && (
+                  <button
+                    className={`detail-edit-toggle${detailEditing ? ' active' : ''}`}
+                    onClick={() => setDetailEditing((editing) => !editing)}
+                    type="button"
+                  >
+                    <Icon name="edit" />{detailEditing ? '收起编辑' : '编辑信息'}
+                  </button>
+                )}
                 <button onClick={() => void openPaperSiFolder(detailPaper.id)}>
                   <Icon name="layers" />打开 SI 文件夹
                 </button>
-                <button className="paper-delete-button" disabled={streaming || trashBusyId === detailPaper.id} onClick={() => void deleteDetailPaper()}>
-                  <Icon name="trash" />{trashBusyId === detailPaper.id ? '处理中…' : '移入回收站'}
-                </button>
+                <details className="paper-detail-more-menu">
+                  <summary aria-label="更多文献操作" title="更多文献操作">•••</summary>
+                  <div>
+                    <button
+                      className="paper-delete-button"
+                      disabled={streaming || trashBusyId === detailPaper.id}
+                      onClick={(event) => {
+                        event.currentTarget.closest('details')?.removeAttribute('open')
+                        void deleteDetailPaper()
+                      }}
+                    >
+                      <Icon name="trash" />{trashBusyId === detailPaper.id ? '处理中…' : '移入回收站'}
+                    </button>
+                  </div>
+                </details>
                 <button onClick={() => setDetailPaperId(null)} aria-label="关闭文献详情"><Icon name="close" /></button>
               </div>
             </header>
             <nav className="paper-detail-tabs" aria-label="文献详情页签">
-              <button className={detailTab === 'overview' ? 'active' : ''} onClick={() => setDetailTab('overview')}>概览与提炼</button>
-              <button className={detailTab === 'facts' ? 'active' : ''} onClick={() => setDetailTab('facts')}>完整客观事实 <span>{detailPaper.factReport.length}</span></button>
+              <button className={detailTab === 'overview' ? 'active' : ''} onClick={() => setDetailTab('overview')}>概览</button>
+              {detailPaper.factReport.length > 0 && (
+                <button className={detailTab === 'facts' ? 'active' : ''} onClick={() => setDetailTab('facts')}>客观事实 <span>{detailPaper.factReport.length}</span></button>
+              )}
               <button className={detailTab === 'pdf' ? 'active' : ''} onClick={() => setDetailTab('pdf')}>原始 PDF</button>
             </nav>
 
             {detailTab === 'overview' && (
               <div className="modal-scroll">
                 <div className="paper-detail-heading">
-                  <span className={`status-badge status-${detailPaper.status}`}><StatusDot status={detailPaper.status} /> {statusLabel(detailPaper.status)}</span>
                   <h1>{detailPaper.title}</h1>
                   <p>{detailPaper.authors}</p>
+                  {(detailPaper.journal || detailPaper.publicationDate || detailPaper.year || detailPaper.doi) && (
+                    <div className="paper-bibliography">
+                      {detailPaper.journal && <span>{detailPaper.journal}</span>}
+                      {(detailPaper.publicationDate || detailPaper.year) && <span>{detailPaper.publicationDate || detailPaper.year}</span>}
+                      {detailPaper.doi && <span>DOI: {detailPaper.doi}</span>}
+                    </div>
+                  )}
+                  {(detailPaper.groupIds.length > 0 || detailPaper.tagIds.length > 0) && (
+                    <div className="detail-classifiers">
+                      {detailPaper.groupIds.map((groupId) => (
+                        <span className="detail-group-chip" key={groupId}>
+                          {literatureGroups.find((group) => group.id === groupId)?.name || groupId}
+                        </span>
+                      ))}
+                      {detailPaper.tagIds.map((tagId) => {
+                        const tag = tagRegistry.find((item) => item.id === tagId)
+                        return tag ? <span className={tag.status === 'provisional' ? 'provisional' : ''} key={tag.id}>{tag.name}</span> : null
+                      })}
+                    </div>
+                  )}
                   {detailPaper.metadataTrust !== 'complete' && (
                     <div className="metadata-review-notice" role="status">
                       <strong>元数据待人工确认</strong>
-                      <span>{detailPaper.metadataIssue || '首页没有找到可逐字核验的 Cite This 元数据。客观事实报告仍会继续生成；请在下方补齐作者、年份和期刊后完成标准命名。'}</span>
+                      <span>{detailPaper.metadataIssue || '作者、年份或期刊信息可能不完整，使用前请核对原始 PDF。'}</span>
                     </div>
                   )}
-                  <div className="detail-metadata">
-                    <span className={!detailPaper.archiveFilename ? 'metadata-pending' : ''}>
-                      <strong>标准档名</strong>{detailPaper.archiveFilename ?? '等待首页元数据确认'}
-                      <small>若同名已存在，依次追加 _2、_3，不覆盖原文件。</small>
-                    </span>
-                    <span><strong>原始导入名</strong>{detailPaper.filename}</span>
-                    <span><strong>归档位置</strong>{detailPaper.archiveLocation}/</span>
-                    <span><strong>元数据来源</strong>{METADATA_SOURCE_LABELS[detailPaper.metadataSource]}</span>
-                    <span><strong>发表日期</strong>{detailPaper.publicationDate || detailPaper.year || '未填写'}</span>
-                    <span><strong>期刊</strong>{detailPaper.journal || '未填写'}</span>
-                    <span><strong>DOI</strong>{detailPaper.doi || '未填写'}</span>
-                    <span><strong>第一作者姓</strong>{detailPaper.firstAuthorSurname || '未填写'}</span>
-                    <span><strong>期刊缩写</strong>{detailPaper.journalAbbreviation || '未填写'}</span>
-                    <span><strong>文献分组</strong>{detailPaper.groupIds.map((id) => literatureGroups.find((group) => group.id === id)?.name || id).join(' · ') || '未分组'}</span>
-                    <span><strong>SI 文件夹</strong>{detailPaper.siFolder || '未登记'}</span>
-                    <span><strong>处理阶段</strong>{detailPaper.processingStage || statusLabel(detailPaper.status)}</span>
-                    <span><strong>处理错误</strong>{detailPaper.processingError || '无'}</span>
-                  </div>
-                  <div className="archive-contract">
-                    <article>
-                      <span>文章类型与主档模板</span>
-                      <strong>{PAPER_TYPE_LABELS[detailPaper.paperType]}</strong>
-                      <small>按标题、摘要自定位和数据来源判断，不按行数或引用数判断。</small>
-                    </article>
-                    <article>
-                      <span>MinerU 产物目录</span>
-                      <strong>{detailPaper.archiveLocation}/minerU识别结果/{(detailPaper.archiveFilename ?? detailPaper.filename).replace(/\.pdf$/i, '')}/</strong>
-                      <small>full.md · images/ · layout.json · *_content_list.json</small>
-                    </article>
-                    <article>
-                      <span>归档校验</span>
-                      <strong>{VERIFICATION_LABELS[detailPaper.verificationStatus]}</strong>
-                      <small>通过后同步更新处理结果索引。</small>
-                    </article>
-                  </div>
-                  <div className="archive-flow" aria-label="文献入档流程">
-                    <span className={detailPaper.archiveFilename ? 'done' : 'current'}><em>1</em>首页元数据与标准命名</span>
-                    <span className={detailPaper.factReport.length ? 'done' : 'current'}><em>2</em>MinerU + 事实段 1–5</span>
-                    <span className={detailPaper.archiveLocation === '文献/已处理' ? 'done' : 'current'}><em>3</em>主对话补跨文献段</span>
-                    <span className={detailPaper.verificationStatus === 'passed' ? 'done' : ''}><em>4</em>校验并更新索引</span>
-                  </div>
                 </div>
 
-                <div className="detail-grid">
-                  <section className="detail-section summary-section">
-                    <div className="section-title"><span>AI 提炼摘要</span><em>SYNTHESIS</em></div>
-                    <p>{detailPaper.summary || '等待正文解析和讨论完成后生成。'}</p>
-                  </section>
-
-                  <section className="detail-section focus-section">
-                    <div className="section-title"><span>用户关注点</span><em>FOCUS</em></div>
-                    <p className="focus-note">{detailPaper.focus || '尚未记录用户关注点。'}</p>
-                  </section>
-
-                  <section className="detail-section facts-section">
-                    <div className="section-title"><span>事实报告摘要</span><em>REPORT INDEX</em></div>
-                    <ol className="fact-list">
-                      {(detailPaper.facts.length ? detailPaper.facts : ['等待 MinerU 和客观事实抽取流水线完成。']).map((fact) => <li key={fact}>{fact}</li>)}
-                    </ol>
-                    <button className="open-full-report" onClick={() => setDetailTab('facts')}>阅读完整客观事实报告</button>
-                  </section>
-
-                  <section className="detail-section tags-section">
-                    <div className="section-title"><span>文章标签</span><em>SEMI-OPEN</em></div>
-                    <div className="paper-tags">
-                      {detailPaper.tagIds.map((tagId) => {
-                        const tag = tagRegistry.find((item) => item.id === tagId)
-                        return tag ? <span className={tag.status === 'provisional' ? 'provisional' : ''} key={tag.id}>{tag.name}{tag.status === 'provisional' && ' · 候选'}</span> : null
-                      })}
-                    </div>
-                    <p className="muted-copy">正式标签用于稳定筛选；新概念先作为候选标签，确认后再进入对应标签集。</p>
-                  </section>
-                </div>
-                {backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' && (
+                {(detailPaper.summary || detailPaper.focus) && (
+                  <div className="detail-grid">
+                    {detailPaper.summary && (
+                      <section className="detail-section summary-section">
+                        <div className="section-title"><span>AI 提炼摘要</span></div>
+                        <p>{detailPaper.summary}</p>
+                      </section>
+                    )}
+                    {detailPaper.focus && (
+                      <section className="detail-section focus-section">
+                        <div className="section-title"><span>用户关注点</span></div>
+                        <p className="focus-note">{detailPaper.focus}</p>
+                      </section>
+                    )}
+                  </div>
+                )}
+                {detailEditing && backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' && (
                   <section className="review-confirm-panel">
-                    <div className="section-title"><span>文献入档信息</span><em>DIRECT WRITE</em></div>
+                    <div className="section-title"><span>编辑文献信息</span></div>
                     <label>
                       <span>文章标签</span>
                       <input

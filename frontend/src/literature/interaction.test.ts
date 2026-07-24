@@ -9,8 +9,8 @@ const literatureOnboarding = new TextDecoder().decode(readFileSync(new URL('./Li
 const literatureApi = new TextDecoder().decode(readFileSync(new URL('./literatureApi.ts', import.meta.url)))
 const desktop = new TextDecoder().decode(readFileSync(new URL('../desktop.ts', import.meta.url)))
 const detailOverview = source.slice(
-  source.indexOf("{detailTab === 'overview'"),
-  source.indexOf("{detailTab === 'facts'"),
+  source.indexOf("{detailTab === 'overview' && ("),
+  source.indexOf("{detailTab === 'facts' && ("),
 )
 
 describe('literature live interaction contracts', () => {
@@ -110,8 +110,10 @@ describe('literature live interaction contracts', () => {
   })
 
   it('opens a reader-focused paper detail and reveals editing only on demand', () => {
-    expect(source).toContain('<h2>{detailPaper.title}</h2>')
+    expect(source).toContain('<h2>文献详情</h2>')
     expect(source).not.toContain('<span className="eyebrow">PAPER RECORD</span>')
+    expect(source).not.toContain('<h2>{detailPaper.archiveFilename ?? detailPaper.filename}</h2>')
+    expect(source).toContain('className={`paper-detail-modal detail-${detailTab}`}')
     expect(source).toContain('const [detailEditing, setDetailEditing] = useState(false)')
     expect(source).toContain('编辑信息')
     expect(source).toContain("detailPaper.factReport.length > 0 &&")
@@ -134,6 +136,7 @@ describe('literature live interaction contracts', () => {
     expect(detailOverview).not.toContain('文献入档流程')
     expect(styles).toContain('.paper-bibliography')
     expect(styles).toContain('.detail-edit-toggle')
+    expect(styles).toContain('.paper-detail-modal.detail-overview')
   })
 
   it('uses one compact library toolbar instead of unrelated stacked controls', () => {
