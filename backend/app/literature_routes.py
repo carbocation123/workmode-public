@@ -29,6 +29,7 @@ from .word_citations import (
     build_citation_payload,
     insert_word_bibliography,
     insert_word_citation,
+    list_word_documents,
 )
 from .literature_project import (
     LITERATURE_TOOL_SCHEMAS,
@@ -53,6 +54,7 @@ from .models import (
     LiteratureProjectCreate,
     LiteratureRecordUpdate,
     LiteratureTagManage,
+    WordDocumentTarget,
     ZoteroLibraryPath,
 )
 
@@ -355,12 +357,25 @@ def open_si_folder(slug: str, paper_id: str) -> dict[str, object]:
         raise HTTPException(status_code=500, detail=f"系统无法打开 SI 文件夹：{exc}") from exc
 
 
+@router.get("/projects/{slug}/literature/word/documents")
+def read_word_documents(slug: str) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return list_word_documents()
+    except WordCitationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/projects/{slug}/literature/word/citations/{paper_id}")
-def add_word_citation(slug: str, paper_id: str) -> dict[str, object]:
+def add_word_citation(
+    slug: str,
+    paper_id: str,
+    target: WordDocumentTarget | None = None,
+) -> dict[str, object]:
     root = _project_root(slug)
     try:
         payload = build_citation_payload(slug, literature_paper(root, paper_id))
-        return insert_word_citation(payload)
+        return insert_word_citation(payload, target.document_id if target else None)
     except LiteratureProjectError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except WordCitationError as exc:
@@ -368,10 +383,13 @@ def add_word_citation(slug: str, paper_id: str) -> dict[str, object]:
 
 
 @router.post("/projects/{slug}/literature/word/bibliography")
-def add_word_bibliography(slug: str) -> dict[str, object]:
+def add_word_bibliography(
+    slug: str,
+    target: WordDocumentTarget | None = None,
+) -> dict[str, object]:
     _project_root(slug)
     try:
-        return insert_word_bibliography()
+        return insert_word_bibliography(target.document_id if target else None)
     except WordCitationError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

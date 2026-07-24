@@ -74,6 +74,10 @@ class ZoteroLibraryPath(BaseModel):
     path: str = Field(min_length=1, max_length=32000)
 
 
+class WordDocumentTarget(BaseModel):
+    document_id: str | None = Field(default=None, max_length=32768)
+
+
 class LiteratureCrossRelationUpdate(BaseModel):
     markdown: str = Field(max_length=2_000_000)
 

@@ -40,6 +40,7 @@ import {
   importZoteroLibrary,
   insertBackendWordBibliography,
   insertBackendWordCitation,
+  listBackendWordDocuments,
   listBackendPapers,
   listBackendGroups,
   listDeletedBackendPapers,
@@ -79,6 +80,7 @@ import {
   type EndNotePreview,
   type TagRegistryMutation,
   type WorkmodeProject,
+  type WordDocumentInfo,
   type ZoteroImportResult,
   type ZoteroLibraryCandidate,
   type ZoteroPreview,
@@ -191,6 +193,10 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [detailTab, setDetailTab] = useState<'overview' | 'facts' | 'pdf'>('overview')
   const [siOpening, setSiOpening] = useState(false)
   const [wordBusy, setWordBusy] = useState<'citation' | 'bibliography' | null>(null)
+  const [wordDocuments, setWordDocuments] = useState<WordDocumentInfo[]>([])
+  const [wordDocumentId, setWordDocumentId] = useState('')
+  const [wordDocumentsLoading, setWordDocumentsLoading] = useState(false)
+  const [wordDocumentsError, setWordDocumentsError] = useState('')
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
@@ -381,6 +387,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (detailPaperId) {
+      void refreshWordDocuments()
+    } else {
+      setWordDocumentsError('')
+    }
+  }, [detailPaperId])
 
   useEffect(() => {
     let active = true
@@ -1241,13 +1255,44 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     }
   }
 
+  async function refreshWordDocuments() {
+    if (wordDocumentsLoading) return
+    setWordDocumentsLoading(true)
+    setWordDocumentsError('')
+    try {
+      const result = await listBackendWordDocuments()
+      setWordDocuments(result.documents)
+      setWordDocumentId((current) => {
+        if (result.documents.some((document) => document.id === current)) return current
+        if (
+          result.active_document_id
+          && result.documents.some((document) => document.id === result.active_document_id)
+        ) {
+          return result.active_document_id
+        }
+        return result.documents[0]?.id || ''
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      setWordDocuments([])
+      setWordDocumentId('')
+      setWordDocumentsError(message)
+    } finally {
+      setWordDocumentsLoading(false)
+    }
+  }
+
   async function insertPaperIntoWord(paperId: string) {
-    if (wordBusy) return
+    if (wordBusy || !wordDocumentId) return
     setWordBusy('citation')
     setActionMessage('正在插入 Word 引用…')
     try {
-      const result = await insertBackendWordCitation(paperId)
-      setActionMessage(`已插入 Word 引用；当前文档共 ${result.citation_count} 处引用。`)
+      const result = await insertBackendWordCitation(paperId, wordDocumentId)
+      setWordDocuments((current) => current.map((document) => ({
+        ...document,
+        active: document.id === result.document_id,
+      })))
+      setActionMessage(`已插入到「${result.document_name}」；当前文档共 ${result.citation_count} 处引用。`)
     } catch (error) {
       setActionMessage(`无法插入 Word 引用：${error instanceof Error ? error.message : '未知错误'}`)
     } finally {
@@ -1256,12 +1301,16 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   }
 
   async function createWordBibliography() {
-    if (wordBusy) return
+    if (wordBusy || !wordDocumentId) return
     setWordBusy('bibliography')
     setActionMessage('正在生成 Word 参考文献…')
     try {
-      const result = await insertBackendWordBibliography()
-      setActionMessage(`Word 参考文献已更新，共 ${result.reference_count} 条。`)
+      const result = await insertBackendWordBibliography(wordDocumentId)
+      setWordDocuments((current) => current.map((document) => ({
+        ...document,
+        active: document.id === result.document_id,
+      })))
+      setActionMessage(`「${result.document_name}」的参考文献已更新，共 ${result.reference_count} 条。`)
     } catch (error) {
       setActionMessage(`无法生成 Word 参考文献：${error instanceof Error ? error.message : '未知错误'}`)
     } finally {
@@ -2285,10 +2334,50 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             <header className="modal-header">
               <div><h2>文献详情</h2></div>
               <div className="paper-detail-header-actions">
+                <div
+                  className={`word-target-picker${wordDocumentsError ? ' has-error' : ''}`}
+                  title={wordDocumentsError || '选择插入引用和参考文献的 Word 文档'}
+                >
+                  <span>Word</span>
+                  <select
+                    aria-label="Word 目标文档"
+                    disabled={wordDocumentsLoading || wordDocuments.length === 0}
+                    onChange={(event) => setWordDocumentId(event.target.value)}
+                    value={wordDocumentId}
+                  >
+                    {wordDocuments.length === 0 && (
+                      <option value="">
+                        {wordDocumentsLoading
+                          ? '正在查找 Word…'
+                          : wordDocumentsError
+                            ? '读取失败'
+                            : '未检测到 Word 文档'}
+                      </option>
+                    )}
+                    {wordDocuments.map((document) => (
+                      <option key={document.id} value={document.id}>
+                        {document.full_path
+                          ? `${document.name} — ${document.full_path}`
+                          : document.name}
+                        {document.active ? '（当前）' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    aria-label="刷新 Word 文档列表"
+                    disabled={wordDocumentsLoading || Boolean(wordBusy)}
+                    onClick={() => void refreshWordDocuments()}
+                    title="重新读取当前打开的 Word 文档"
+                  >
+                    ↻
+                  </button>
+                </div>
                 <button
-                  disabled={Boolean(wordBusy)}
+                  disabled={Boolean(wordBusy) || !wordDocumentId}
                   onClick={() => void insertPaperIntoWord(detailPaper.id)}
-                  title="把这篇文献作为可更新引用插入当前 Word 光标处"
+                  title={wordDocumentId
+                    ? '把这篇文献作为可更新引用插入所选 Word 文档的当前光标处'
+                    : '请先打开 Word 文档并刷新列表'}
                 >
                   <Icon name="book" />{wordBusy === 'citation' ? '正在插入…' : '插入 Word 引用'}
                 </button>
@@ -2299,7 +2388,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   <summary aria-label="更多文献操作" title="更多文献操作">•••</summary>
                   <div>
                     <button
-                      disabled={Boolean(wordBusy)}
+                      disabled={Boolean(wordBusy) || !wordDocumentId}
                       onClick={(event) => {
                         event.currentTarget.closest('details')?.removeAttribute('open')
                         void createWordBibliography()

@@ -21,6 +21,7 @@ _CITATION_METADATA_FIELDS = (
 _WORD_ERROR_MESSAGES = {
     "WORD_NOT_RUNNING": "请先打开 Microsoft Word 和要编辑的文档，再回到 Workmode 重试。",
     "WORD_NO_DOCUMENT": "Microsoft Word 中没有打开的文档。",
+    "WORD_DOCUMENT_NOT_FOUND": "目标 Word 文档已关闭或改名，请刷新后重新选择。",
     "WORD_MISSING_CITATION": "缺少要插入的 Workmode 文献数据。",
     "WORD_NO_CITATIONS": "当前 Word 文档里还没有 Workmode 引用，请先插入至少一篇文献。",
     "WORD_UNSUPPORTED_ACTION": "不支持的 Word 引用操作。",
@@ -98,7 +99,11 @@ def format_reference(number: int, metadata: dict[str, Any]) -> str:
     return f"[{number}] {' '.join(parts)}"
 
 
-def _run_word_action(action: str, field_payload: str | None = None) -> dict[str, Any]:
+def _run_word_action(
+    action: str,
+    field_payload: str | None = None,
+    document_id: str | None = None,
+) -> dict[str, Any]:
     if sys.platform != "win32":
         raise WordCitationError("Word 引用功能目前仅支持 Windows 桌面版 Microsoft Word。")
     script = Path(__file__).with_name("word_automation.ps1")
@@ -108,6 +113,8 @@ def _run_word_action(action: str, field_payload: str | None = None) -> dict[str,
     request = {"action": action}
     if field_payload:
         request["field_payload"] = field_payload
+    if document_id:
+        request["document_id"] = document_id
 
     with tempfile.TemporaryDirectory(prefix="workmode-word-") as temp_dir:
         request_path = Path(temp_dir) / "request.json"
@@ -158,9 +165,20 @@ def _run_word_action(action: str, field_payload: str | None = None) -> dict[str,
         return result
 
 
-def insert_word_citation(payload: dict[str, Any]) -> dict[str, Any]:
-    return _run_word_action("insert_citation", encode_field_payload(payload))
+def list_word_documents() -> dict[str, Any]:
+    return _run_word_action("list_documents")
 
 
-def insert_word_bibliography() -> dict[str, Any]:
-    return _run_word_action("insert_bibliography")
+def insert_word_citation(
+    payload: dict[str, Any],
+    document_id: str | None = None,
+) -> dict[str, Any]:
+    return _run_word_action(
+        "insert_citation",
+        encode_field_payload(payload),
+        document_id,
+    )
+
+
+def insert_word_bibliography(document_id: str | None = None) -> dict[str, Any]:
+    return _run_word_action("insert_bibliography", None, document_id)

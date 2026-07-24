@@ -15,6 +15,38 @@ function Write-WorkmodeResult {
     $Value | ConvertTo-Json -Depth 8 -Compress | Set-Content -LiteralPath $OutputPath -Encoding UTF8
 }
 
+function Get-WorkmodeDocumentId {
+    param($Document)
+    if ([string]$Document.Path) {
+        return [string]$Document.FullName
+    }
+    return "unsaved::$([string]$Document.Name)"
+}
+
+function Get-WorkmodeDocumentList {
+    param($Word)
+    $activeId = $null
+    if ($null -ne $Word.ActiveDocument) {
+        $activeId = Get-WorkmodeDocumentId $Word.ActiveDocument
+    }
+    $documents = New-Object System.Collections.Generic.List[object]
+    for ($index = 1; $index -le $Word.Documents.Count; $index++) {
+        $document = $Word.Documents.Item($index)
+        $id = Get-WorkmodeDocumentId $document
+        $fullPath = if ([string]$document.Path) { [string]$document.FullName } else { $null }
+        $documents.Add([pscustomobject]@{
+            id = $id
+            name = [string]$document.Name
+            full_path = $fullPath
+            active = ($id -eq $activeId)
+        })
+    }
+    return [pscustomobject]@{
+        Documents = $documents.ToArray()
+        ActiveDocumentId = $activeId
+    }
+}
+
 function Decode-WorkmodePayload {
     param([string]$Encoded)
     $base64 = $Encoded.Replace("-", "+").Replace("_", "/")
@@ -142,12 +174,47 @@ try {
     try {
         $word = [Runtime.InteropServices.Marshal]::GetActiveObject("Word.Application")
     } catch {
+        if ($request.action -eq "list_documents") {
+            Write-WorkmodeResult @{
+                ok = $true
+                documents = @()
+                active_document_id = $null
+            }
+            exit 0
+        }
         throw "WORD_NOT_RUNNING"
     }
-    if ($null -eq $word.ActiveDocument) {
-        throw "WORD_NO_DOCUMENT"
+
+    if ($request.action -eq "list_documents") {
+        $listed = Get-WorkmodeDocumentList $word
+        Write-WorkmodeResult @{
+            ok = $true
+            documents = $listed.Documents
+            active_document_id = $listed.ActiveDocumentId
+        }
+        exit 0
     }
-    $document = $word.ActiveDocument
+
+    $document = $null
+    if ($request.document_id) {
+        $targetId = [string]$request.document_id
+        for ($index = 1; $index -le $word.Documents.Count; $index++) {
+            $candidate = $word.Documents.Item($index)
+            if ((Get-WorkmodeDocumentId $candidate) -eq $targetId) {
+                $document = $candidate
+                break
+            }
+        }
+        if ($null -eq $document) {
+            throw "WORD_DOCUMENT_NOT_FOUND"
+        }
+        $document.Activate()
+    } else {
+        $document = $word.ActiveDocument
+        if ($null -eq $document) {
+            throw "WORD_NO_DOCUMENT"
+        }
+    }
 
     if ($request.action -eq "insert_citation") {
         if (-not $request.field_payload) {
@@ -193,6 +260,8 @@ try {
         citation_count = $updated.CitationCount
         reference_count = $updated.ReferenceCount
         bibliography_count = $updated.BibliographyCount
+        document_id = Get-WorkmodeDocumentId $document
+        document_name = [string]$document.Name
     }
 } catch {
     Write-WorkmodeResult @{ ok = $false; error = $_.Exception.Message }

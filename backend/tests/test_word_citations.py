@@ -64,6 +64,7 @@ class WordCitationModelTest(unittest.TestCase):
 
     def test_word_actions_forward_the_selected_document(self) -> None:
         from app.word_citations import (
+            encode_field_payload,
             insert_word_bibliography,
             insert_word_citation,
             list_word_documents,

@@ -697,17 +697,48 @@ export interface WordCitationResult {
   citation_count: number
   reference_count: number
   bibliography_count: number
+  document_id: string
+  document_name: string
 }
 
-export async function insertBackendWordCitation(paperId: string): Promise<WordCitationResult> {
+export interface WordDocumentInfo {
+  id: string
+  name: string
+  full_path: string | null
+  active: boolean
+}
+
+export interface WordDocumentsResult {
+  ok: true
+  documents: WordDocumentInfo[]
+  active_document_id: string | null
+}
+
+export async function listBackendWordDocuments(): Promise<WordDocumentsResult> {
+  return literatureRequest<WordDocumentsResult>('/word/documents')
+}
+
+function wordTargetRequest(documentId?: string): RequestInit {
+  if (!documentId) return { method: 'POST' }
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ document_id: documentId }),
+  }
+}
+
+export async function insertBackendWordCitation(
+  paperId: string,
+  documentId?: string,
+): Promise<WordCitationResult> {
   return literatureRequest<WordCitationResult>(
     `/word/citations/${encodeURIComponent(paperId)}`,
-    { method: 'POST' },
+    wordTargetRequest(documentId),
   )
 }
 
-export async function insertBackendWordBibliography(): Promise<WordCitationResult> {
-  return literatureRequest<WordCitationResult>('/word/bibliography', { method: 'POST' })
+export async function insertBackendWordBibliography(documentId?: string): Promise<WordCitationResult> {
+  return literatureRequest<WordCitationResult>('/word/bibliography', wordTargetRequest(documentId))
 }
 
 export async function uploadPaper(file: File): Promise<{ paper: BackendPaper; duplicate: boolean }> {

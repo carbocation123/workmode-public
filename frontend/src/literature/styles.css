@@ -523,12 +523,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .literature-project-create button { min-width: 86px; color: var(--color-on-primary, var(--bg)); border-color: var(--cyan); background: var(--cyan); }
 .literature-project-create small { color: var(--faint); font-size: 8.5px; line-height: 1.55; }
 .literature-project-manager-error { margin: 12px 0 0; color: var(--danger); font-size: 9px; }
-.paper-detail-header-actions { display: flex; align-items: center; gap: 8px; }
+.paper-detail-header-actions { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .paper-detail-header-actions button { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-control-bg); cursor: pointer; }
 .paper-detail-header-actions button:last-child { width: 32px; padding: 0; }
 .paper-detail-header-actions button svg { width: 14px; }
 .paper-detail-header-actions .paper-delete-button { color: var(--danger); border-color: var(--lit-danger-border); background: var(--lit-danger-soft); font-size: 9px; }
 .paper-detail-header-actions button:disabled { opacity: .4; cursor: default; }
+.word-target-picker { min-width: 0; height: 32px; display: flex; align-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-control-bg); }
+.word-target-picker > span { flex: 0 0 auto; padding: 0 7px 0 9px; color: var(--faint); font: 8px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.word-target-picker select { width: clamp(112px, 15vw, 210px); min-width: 0; height: 30px; padding: 0 22px 0 4px; overflow: hidden; border: 0; outline: 0; color: var(--text); background: transparent; font: 9px var(--font-sans); text-overflow: ellipsis; cursor: pointer; }
+.word-target-picker select:disabled { color: var(--faint); cursor: default; }
+.paper-detail-header-actions .word-target-picker button { width: 30px; height: 30px; flex: 0 0 30px; padding: 0; border-width: 0 0 0 1px; border-radius: 0; font-size: 15px; }
+.word-target-picker:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--lit-accent-soft); }
+.word-target-picker.has-error { border-color: var(--lit-danger-border); }
 .paper-detail-modal .modal-header > div:first-child { min-width: 0; }
 .paper-detail-modal .modal-header h2 { max-width: min(560px, 48vw); margin: 0; overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .paper-detail-more-menu { position: relative; }
@@ -1117,6 +1124,10 @@ body {
 }
 
 @media (max-width: 760px) {
+  .paper-detail-modal .modal-header { height: auto; min-height: 64px; align-items: flex-start; gap: 10px; padding-block: 14px; }
+  .paper-detail-header-actions { flex-wrap: wrap; }
+  .word-target-picker { order: 10; width: 100%; }
+  .word-target-picker select { width: 100%; flex: 1; }
   .literature-project-list article { grid-template-columns: 1fr; }
   .literature-project-row-actions { justify-content: flex-end; }
   .literature-project-rename { grid-template-columns: 1fr auto; }
