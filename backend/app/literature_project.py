@@ -479,16 +479,21 @@ def _migrate_literature_project_schema(root: Path) -> None:
         registry = _read_json(tags_path)
         version = registry.get("schema_version")
         if version in {1, SCHEMA_VERSION} and isinstance(registry.get("tags"), list):
+            changed = version != SCHEMA_VERSION
             groups = registry.get("groups")
             if not isinstance(groups, list):
                 groups = []
                 registry["groups"] = groups
-            groups[:] = [
+                changed = True
+            retained_groups = [
                 group
                 for group in groups
                 if isinstance(group, dict)
                 and str(group.get("id") or "") not in RETIRED_FAKE_TAG_GROUP_IDS
             ]
+            if retained_groups != groups:
+                groups[:] = retained_groups
+                changed = True
             needs_ungrouped = False
             for tag in registry["tags"]:
                 if not isinstance(tag, dict):
@@ -498,12 +503,15 @@ def _migrate_literature_project_schema(root: Path) -> None:
                 if category or not group_id or group_id in RETIRED_FAKE_TAG_GROUP_IDS:
                     tag["group_id"] = "ungrouped"
                     needs_ungrouped = True
+                    changed = True
             if needs_ungrouped and not any(
                 str(group.get("id") or "") == "ungrouped" for group in groups
             ):
                 groups.append(dict(UNGROUPED_TAG_GROUP))
-            registry["schema_version"] = SCHEMA_VERSION
-            _atomic_write_json(tags_path, registry)
+                changed = True
+            if changed:
+                registry["schema_version"] = SCHEMA_VERSION
+                _atomic_write_json(tags_path, registry)
 
     groups_path = root / "groups.json"
     if not groups_path.exists():
@@ -512,36 +520,37 @@ def _migrate_literature_project_schema(root: Path) -> None:
 
 def initialize_literature_project(root: Path, *, name: str) -> None:
     root = root.expanduser().resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    for rel in FIXED_DIRECTORIES:
-        (root / rel).mkdir(parents=True, exist_ok=True)
-    _migrate_literature_project_schema(root)
+    with _catalog_lock(root):
+        root.mkdir(parents=True, exist_ok=True)
+        for rel in FIXED_DIRECTORIES:
+            (root / rel).mkdir(parents=True, exist_ok=True)
+        _migrate_literature_project_schema(root)
 
-    defaults: dict[str, str] = {
-        MANIFEST_FILENAME: json.dumps(
-            {
-                "project_type": PROJECT_TYPE,
-                "schema_version": SCHEMA_VERSION,
-                "tool_profile": TOOL_PROFILE,
-                "frontend_projection": "literature-library",
-            },
-            ensure_ascii=False,
-            indent=2,
-        ) + "\n",
-        "WORKMODE.md": "# Literature library Workmode project\n\n@LITERATURE_PROJECT.md\n",
-        "LITERATURE_PROJECT.md": LITERATURE_PROTOCOL.rstrip() + "\n",
-        "README.md": f"# {name}\n\nThis folder is a fixed-structure Workmode literature library.\n",
-        "catalog.json": json.dumps({"schema_version": SCHEMA_VERSION, "papers": []}, ensure_ascii=False, indent=2) + "\n",
-        "tags.json": json.dumps(_default_tag_registry(), ensure_ascii=False, indent=2) + "\n",
-        "groups.json": json.dumps({"schema_version": 1, "groups": []}, ensure_ascii=False, indent=2) + "\n",
-        "processed-index.md": "# Processed literature index\n\nNo processed papers yet.\n",
-        "papers/README.md": "# Papers\n\nPDF and extraction trees are maintained by literature-domain services.\n",
-        "notes/README.md": "# Notes\n\nProject-level Markdown notes. Keep citations and distinguish facts from discussion.\n",
-    }
-    for rel, content in defaults.items():
-        target = root / rel
-        if not target.exists():
-            _atomic_write_text(target, content)
+        defaults: dict[str, str] = {
+            MANIFEST_FILENAME: json.dumps(
+                {
+                    "project_type": PROJECT_TYPE,
+                    "schema_version": SCHEMA_VERSION,
+                    "tool_profile": TOOL_PROFILE,
+                    "frontend_projection": "literature-library",
+                },
+                ensure_ascii=False,
+                indent=2,
+            ) + "\n",
+            "WORKMODE.md": "# Literature library Workmode project\n\n@LITERATURE_PROJECT.md\n",
+            "LITERATURE_PROJECT.md": LITERATURE_PROTOCOL.rstrip() + "\n",
+            "README.md": f"# {name}\n\nThis folder is a fixed-structure Workmode literature library.\n",
+            "catalog.json": json.dumps({"schema_version": SCHEMA_VERSION, "papers": []}, ensure_ascii=False, indent=2) + "\n",
+            "tags.json": json.dumps(_default_tag_registry(), ensure_ascii=False, indent=2) + "\n",
+            "groups.json": json.dumps({"schema_version": 1, "groups": []}, ensure_ascii=False, indent=2) + "\n",
+            "processed-index.md": "# Processed literature index\n\nNo processed papers yet.\n",
+            "papers/README.md": "# Papers\n\nPDF and extraction trees are maintained by literature-domain services.\n",
+            "notes/README.md": "# Notes\n\nProject-level Markdown notes. Keep citations and distinguish facts from discussion.\n",
+        }
+        for rel, content in defaults.items():
+            target = root / rel
+            if not target.exists():
+                _atomic_write_text(target, content)
 
 
 def load_manifest(root: Path) -> dict[str, Any] | None:
