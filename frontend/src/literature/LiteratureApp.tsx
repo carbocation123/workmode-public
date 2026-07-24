@@ -15,7 +15,7 @@ import { SkinChrome } from '../SkinChrome'
 import { THEMES, type ThemeId } from '../theme'
 import { isNearBottom } from '../conversation'
 import { projectRefreshTargets, type ProjectRefreshTarget } from '../projectChanges'
-import { chooseEndNoteLibrary } from '../desktop'
+import { chooseEndNoteLibrary, chooseZoteroLibrary } from '../desktop'
 import {
   chatActionMessageForEvent,
   createLiveChatState,
@@ -35,7 +35,9 @@ import {
   getBackendMemory,
   getFactReport,
   findEndNoteLibraries,
+  findZoteroLibraries,
   importEndNoteLibrary,
+  importZoteroLibrary,
   listBackendPapers,
   listBackendGroups,
   listDeletedBackendPapers,
@@ -48,6 +50,7 @@ import {
   openBackendSiFolder,
   paperPdfUrl,
   previewEndNoteLibrary,
+  previewZoteroLibrary,
   recordImportedPapers,
   removeBackendProject,
   renameBackendProject,
@@ -74,6 +77,9 @@ import {
   type EndNotePreview,
   type TagRegistryMutation,
   type WorkmodeProject,
+  type ZoteroImportResult,
+  type ZoteroLibraryCandidate,
+  type ZoteroPreview,
 } from './literatureApi'
 import {
   attachPapers,
@@ -229,6 +235,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [duplicateResult, setDuplicateResult] = useState<DuplicateScanResult | null>(null)
   const [endNoteBusy, setEndNoteBusy] = useState(false)
   const [endNoteError, setEndNoteError] = useState('')
+  const [zoteroOpen, setZoteroOpen] = useState(false)
+  const [zoteroCandidates, setZoteroCandidates] = useState<ZoteroLibraryCandidate[]>([])
+  const [zoteroPath, setZoteroPath] = useState('')
+  const [zoteroPreview, setZoteroPreview] = useState<ZoteroPreview | null>(null)
+  const [zoteroResult, setZoteroResult] = useState<ZoteroImportResult | null>(null)
+  const [zoteroDuplicateResult, setZoteroDuplicateResult] = useState<DuplicateScanResult | null>(null)
+  const [zoteroBusy, setZoteroBusy] = useState(false)
+  const [zoteroError, setZoteroError] = useState('')
   const [renameSessionOpen, setRenameSessionOpen] = useState(false)
   const [renameSessionTitle, setRenameSessionTitle] = useState('')
   const [renamingSession, setRenamingSession] = useState(false)
@@ -1127,6 +1141,89 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     }
   }
 
+  function openZoteroImport() {
+    setZoteroCandidates([])
+    setZoteroPath('')
+    setZoteroPreview(null)
+    setZoteroResult(null)
+    setZoteroDuplicateResult(null)
+    setZoteroError('')
+    setZoteroOpen(true)
+  }
+
+  async function loadZoteroPreview(path: string) {
+    setZoteroBusy(true)
+    setZoteroError('')
+    try {
+      const preview = await previewZoteroLibrary(path)
+      setZoteroPath(path)
+      setZoteroPreview(preview)
+    } catch (error) {
+      setZoteroError(`无法读取这个 Zotero 文献库：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setZoteroBusy(false)
+    }
+  }
+
+  async function autoFindZotero() {
+    setZoteroBusy(true)
+    setZoteroError('')
+    try {
+      const candidates = await findZoteroLibraries()
+      setZoteroCandidates(candidates)
+      if (!candidates.length) {
+        setZoteroError('没有自动找到 Zotero 文献库。可以改用“手动选择”。')
+      } else if (candidates.length === 1) {
+        await loadZoteroPreview(candidates[0].path)
+      }
+    } catch (error) {
+      setZoteroError(`自动查找失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setZoteroBusy(false)
+    }
+  }
+
+  async function manuallyChooseZotero() {
+    try {
+      const path = await chooseZoteroLibrary()
+      if (!path) {
+        setZoteroError('当前浏览器不能直接选择本机 Zotero 数据库；请使用 Workmode 桌面版。')
+        return
+      }
+      await loadZoteroPreview(path)
+    } catch (error) {
+      setZoteroError(`选择文件失败：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  async function confirmZoteroImport() {
+    if (!zoteroPath || !zoteroPreview || zoteroBusy) return
+    setZoteroBusy(true)
+    setZoteroError('')
+    try {
+      const result = await importZoteroLibrary(zoteroPath)
+      setZoteroResult(result)
+      await reconcileProjection()
+      setActionMessage(`Zotero 导入完成：成功 ${result.imported_count} 篇，失败 ${result.failed_count} 篇。`)
+    } catch (error) {
+      setZoteroError(`导入失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setZoteroBusy(false)
+    }
+  }
+
+  async function scanZoteroDuplicatesAfterImport() {
+    setZoteroBusy(true)
+    setZoteroError('')
+    try {
+      setZoteroDuplicateResult(await scanBackendDuplicates())
+    } catch (error) {
+      setZoteroError(`查重失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setZoteroBusy(false)
+    }
+  }
+
   async function openPaperSiFolder(paperId: string) {
     if (siOpening) return
     setSiOpening(true)
@@ -1472,6 +1569,17 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   >
                     <Icon name="file" />
                     <span><strong>导入 EndNote</strong><small>带入分组、标签和附件</small></span>
+                  </button>
+                  <button
+                    disabled={backendMode !== 'connected'}
+                    onClick={(event) => {
+                      event.currentTarget.closest('details')?.removeAttribute('open')
+                      openZoteroImport()
+                    }}
+                    type="button"
+                  >
+                    <Icon name="file" />
+                    <span><strong>导入 Zotero</strong><small>带入分组、标签和附件</small></span>
                   </button>
                 </div>
               </details>
@@ -2551,6 +2659,122 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               ) : (
                 <button disabled={endNoteBusy} onClick={() => setEndNoteOpen(false)}>
                   {endNoteResult ? '完成' : '取消'}
+                </button>
+              )}
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {zoteroOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (!zoteroBusy) setZoteroOpen(false)
+        }}>
+          <section
+            className="endnote-import-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="zotero-import-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">ZOTERO IMPORT</span><h2 id="zotero-import-title">导入 Zotero 文献库</h2></div>
+              <button disabled={zoteroBusy} onClick={() => setZoteroOpen(false)} aria-label="关闭 Zotero 导入"><Icon name="close" /></button>
+            </header>
+            <div className="endnote-import-body">
+              {!zoteroPreview && !zoteroResult && (
+                <>
+                  <div className="endnote-intro">
+                    <strong>把 Zotero 文献库直接搬进来</strong>
+                    <p>Zotero 中可用的文献元数据、分组、标签、标签颜色和附件都会合并到当前项目。嵌套分组会拍平，原来的 Zotero 数据不会被修改。</p>
+                  </div>
+                  <div className="endnote-choice-grid">
+                    <button disabled={zoteroBusy} onClick={() => void autoFindZotero()}>
+                      <Icon name="search" /><span><strong>{zoteroBusy ? '正在扫描本机所有磁盘…' : '自动查找'}</strong><small>扫描本机所有磁盘中的 zotero.sqlite，可能需要几十秒</small></span>
+                    </button>
+                    <button disabled={zoteroBusy} onClick={() => void manuallyChooseZotero()}>
+                      <Icon name="file" /><span><strong>手动选择</strong><small>自己选择 Zotero 数据目录里的 zotero.sqlite</small></span>
+                    </button>
+                  </div>
+                  {zoteroCandidates.length > 1 && (
+                    <div className="endnote-candidate-list">
+                      <strong>找到了 {zoteroCandidates.length} 个文献库，请选择一个：</strong>
+                      {zoteroCandidates.map((candidate) => (
+                        <button key={candidate.path} onClick={() => void loadZoteroPreview(candidate.path)}>
+                          <span>{candidate.name}</span>
+                          <small>
+                            {candidate.has_storage ? '包含本地附件目录' : '没有找到 storage 附件目录'}
+                            {' · '}{candidate.path}
+                          </small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {zoteroPreview && !zoteroResult && (
+                <>
+                  <div className="endnote-warning">
+                    <Icon name="clock" />
+                    <div><strong>导入前，请先关闭 Zotero</strong><span>Zotero 正在运行时会锁定数据库。关闭后再点“开始导入”即可。</span></div>
+                  </div>
+                  <dl className="endnote-preview-stats">
+                    <div><dt>文献记录</dt><dd>{zoteroPreview.reference_count}</dd></div>
+                    <div><dt>可以导入</dt><dd>{zoteroPreview.importable_count}</dd></div>
+                    <div><dt>文献分组</dt><dd>{zoteroPreview.collection_count}</dd></div>
+                    <div><dt>标签</dt><dd>{zoteroPreview.tag_count}</dd></div>
+                    <div><dt>附件</dt><dd>{zoteroPreview.attachment_count}</dd></div>
+                    <div><dt>缺少主 PDF</dt><dd>{zoteroPreview.failed_count}</dd></div>
+                  </dl>
+                  <p className="endnote-source-path">{zoteroPreview.data_directory}</p>
+                  <p className="endnote-import-note">每条文献会从全部附件中寻找第一个有效 PDF 作为主论文；其他本地附件放进该文献的 SI 文件夹。没有有效 PDF 的记录会单独报错，不影响其余文献。</p>
+                </>
+              )}
+
+              {zoteroResult && (
+                <>
+                  <div className="endnote-result-summary">
+                    <Icon name="check" />
+                    <div><strong>导入完成</strong><span>成功 {zoteroResult.imported_count} 篇，失败 {zoteroResult.failed_count} 篇；导入过程没有调用 AI。</span></div>
+                  </div>
+                  {zoteroResult.failures.length > 0 && (
+                    <div className="endnote-failures">
+                      <strong>这些记录没有导入：</strong>
+                      {zoteroResult.failures.map((failure) => (
+                        <p key={failure.zotero_item_id}>{failure.title || `记录 ${failure.zotero_item_id}`}：{failure.reason}</p>
+                      ))}
+                    </div>
+                  )}
+                  {zoteroDuplicateResult ? (
+                    <div className="endnote-duplicates">
+                      <strong>查重结果：{zoteroDuplicateResult.group_count} 组可能重复</strong>
+                      <span>系统只列出结果，不会自动合并或覆盖。你可以稍后逐组手动处理。</span>
+                    </div>
+                  ) : (
+                    <button className="endnote-dedupe-button" disabled={zoteroBusy} onClick={() => void scanZoteroDuplicatesAfterImport()}>
+                      <Icon name="search" />导入完成后查重
+                    </button>
+                  )}
+                </>
+              )}
+
+              {zoteroError && <p className="endnote-error">{zoteroError}</p>}
+            </div>
+            <footer className="endnote-import-actions">
+              {zoteroPreview && !zoteroResult ? (
+                <>
+                  <button disabled={zoteroBusy} onClick={() => {
+                    setZoteroPreview(null)
+                    setZoteroPath('')
+                  }}>返回</button>
+                  <button disabled={zoteroBusy || zoteroPreview.importable_count === 0} onClick={() => void confirmZoteroImport()}>
+                    {zoteroBusy ? '正在导入…' : `开始导入 ${zoteroPreview.importable_count} 篇`}
+                  </button>
+                </>
+              ) : (
+                <button disabled={zoteroBusy} onClick={() => setZoteroOpen(false)}>
+                  {zoteroResult ? '完成' : '取消'}
                 </button>
               )}
             </footer>

@@ -19,6 +19,11 @@ from .endnote_import import (
     inspect_endnote_library,
     scan_literature_duplicates,
 )
+from .zotero_import import (
+    find_zotero_libraries,
+    import_zotero_library,
+    inspect_zotero_library,
+)
 from .literature_project import (
     LITERATURE_TOOL_SCHEMAS,
     LiteratureProjectError,
@@ -42,6 +47,7 @@ from .models import (
     LiteratureProjectCreate,
     LiteratureRecordUpdate,
     LiteratureTagManage,
+    ZoteroLibraryPath,
 )
 
 
@@ -243,6 +249,29 @@ def preview_endnote_library(slug: str, payload: EndNoteLibraryPath) -> dict[str,
 def import_endnote(slug: str, payload: EndNoteLibraryPath) -> dict[str, object]:
     try:
         return import_endnote_library(_project_root(slug), Path(payload.path))
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/projects/{slug}/literature/zotero/libraries")
+def search_zotero_libraries(slug: str) -> dict[str, object]:
+    _project_root(slug)
+    return {"libraries": find_zotero_libraries()}
+
+
+@router.post("/projects/{slug}/literature/zotero/preview")
+def preview_zotero_library(slug: str, payload: ZoteroLibraryPath) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return inspect_zotero_library(Path(payload.path))
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/zotero/import")
+def import_zotero(slug: str, payload: ZoteroLibraryPath) -> dict[str, object]:
+    try:
+        return import_zotero_library(_project_root(slug), Path(payload.path))
     except LiteratureProjectError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

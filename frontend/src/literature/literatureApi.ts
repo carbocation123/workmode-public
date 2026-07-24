@@ -252,6 +252,38 @@ export interface EndNoteImportResult {
   failures: EndNotePreview['failures']
 }
 
+export interface ZoteroLibraryCandidate {
+  path: string
+  name: string
+  database_path: string
+  has_storage: boolean
+  size: number
+  modified_at: number
+}
+
+export interface ZoteroPreview {
+  source_path: string
+  data_directory: string
+  database_path: string
+  reference_count: number
+  attachment_count: number
+  collection_count: number
+  tag_count: number
+  importable_count: number
+  failed_count: number
+  failures: Array<{ zotero_item_id: number; title: string; reason: string }>
+}
+
+export interface ZoteroImportResult {
+  ok: boolean
+  imported_count: number
+  failed_count: number
+  group_count: number
+  tag_count: number
+  paper_ids: string[]
+  failures: ZoteroPreview['failures']
+}
+
 export interface DuplicateScanResult {
   ok: boolean
   group_count: number
@@ -622,6 +654,26 @@ export async function previewEndNoteLibrary(path: string): Promise<EndNotePrevie
 
 export async function importEndNoteLibrary(path: string): Promise<EndNoteImportResult> {
   return literatureRequest<EndNoteImportResult>('/endnote/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+}
+
+export async function findZoteroLibraries(): Promise<ZoteroLibraryCandidate[]> {
+  return (await literatureRequest<{ libraries: ZoteroLibraryCandidate[] }>('/zotero/libraries')).libraries
+}
+
+export async function previewZoteroLibrary(path: string): Promise<ZoteroPreview> {
+  return literatureRequest<ZoteroPreview>('/zotero/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+}
+
+export async function importZoteroLibrary(path: string): Promise<ZoteroImportResult> {
+  return literatureRequest<ZoteroImportResult>('/zotero/import', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),

@@ -80,6 +80,17 @@ export async function chooseEndNoteLibrary(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null
 }
 
+export async function chooseZoteroLibrary(): Promise<string | null> {
+  if (!isDesktopApp()) return null
+  const selected = await open({
+    directory: false,
+    multiple: false,
+    title: '选择 Zotero 数据库',
+    filters: [{ name: 'Zotero 数据库', extensions: ['sqlite'] }],
+  })
+  return typeof selected === 'string' ? selected : null
+}
+
 export async function openExternalUrl(url: string) {
   if (isDesktopApp()) {
     await openUrl(url)

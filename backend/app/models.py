@@ -70,6 +70,10 @@ class EndNoteLibraryPath(BaseModel):
     path: str = Field(min_length=1, max_length=32000)
 
 
+class ZoteroLibraryPath(BaseModel):
+    path: str = Field(min_length=1, max_length=32000)
+
+
 class LiteratureCrossRelationUpdate(BaseModel):
     markdown: str = Field(max_length=2_000_000)
 
