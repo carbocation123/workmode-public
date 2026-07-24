@@ -146,8 +146,12 @@ describe('literature live interaction contracts', () => {
   })
 
   it('uses one compact library toolbar instead of unrelated stacked controls', () => {
-    expect(source).toContain('className="library-panel-header"')
-    expect(source).toContain('className="library-project-selector"')
+    expect(source).not.toContain('className="library-panel-header"')
+    expect(source).not.toContain('className="library-project-selector"')
+    expect(source).not.toContain('className="library-panel-meta"')
+    expect(source).toContain('className="literature-project-hud-actions"')
+    expect(source).toContain('className="literature-project-hud-menu"')
+    expect(source).toContain('actions={projectHudActions}')
     expect(source).toContain('className="library-command-row"')
     expect(source).toContain('className="library-import-menu"')
     expect(source).toContain('导入 PDF')
