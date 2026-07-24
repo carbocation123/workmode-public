@@ -466,6 +466,51 @@ class EndNoteImportTest(unittest.TestCase):
         self.assertIn(("a", "c"), pairs)
         self.assertIn("main_pdf_sha256", pairs[("a", "c")])
 
+    def test_default_auto_search_uses_all_local_volumes_without_vendor_paths(self) -> None:
+        from app.endnote_import import _default_search_roots
+
+        volumes = [Path("C:/"), Path("D:/"), Path("E:/")]
+        with patch(
+            "app.endnote_import._local_volume_roots",
+            create=True,
+            return_value=volumes,
+        ):
+            roots = _default_search_roots()
+
+        self.assertEqual(roots, volumes)
+        self.assertFalse(any("baidu" in str(root).casefold() for root in roots))
+
+    def test_full_disk_search_aggregates_variants_and_skips_data_attachment_trees(self) -> None:
+        from app.endnote_import import find_endnote_libraries
+
+        volume = self.base / "volume"
+        work_library = volume / "research" / "My Library.enl"
+        compressed_copy = volume / "research" / "My Library.enlx"
+        standalone = volume / "archive" / "Standalone.enlx"
+        attachment_false_positive = (
+            volume / "research" / "My Library.Data" / "PDF" / "nested" / "Not A Library.enl"
+        )
+        for path in (work_library, compressed_copy, standalone, attachment_false_positive):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"fixture")
+
+        found = find_endnote_libraries([volume])
+
+        self.assertEqual(
+            {item["path"] for item in found},
+            {str(work_library.resolve()), str(standalone.resolve())},
+        )
+        working = next(item for item in found if item["path"] == str(work_library.resolve()))
+        self.assertTrue(working["has_data_folder"])
+        self.assertEqual(working["recommended_reason"], "complete_working_library")
+        self.assertEqual(
+            [(variant["type"], variant["path"]) for variant in working["variants"]],
+            [
+                ("enl", str(work_library.resolve())),
+                ("enlx", str(compressed_copy.resolve())),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
