@@ -153,19 +153,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   align-items: flex-start;
   gap: 3px;
   padding-left: 22px;
-  border: 0;
   border-left: 1px solid var(--line);
   color: var(--text);
-  background: transparent;
   text-align: left;
-  cursor: pointer;
 }
 
 .project-heading strong { font-size: 14px; font-weight: 600; }
-.project-heading:hover strong { color: var(--cyan); }
 .project-heading-action { color: var(--faint); font-size: 8px; }
 .eyebrow { color: var(--cyan); font-size: 9px; letter-spacing: .18em; text-transform: uppercase; }
 .topbar-spacer { flex: 1; }
+.skin-chrome-actions { position: relative; z-index: 2; align-self: stretch; display: flex; align-items: center; padding: 0 10px; border-left: 1px solid var(--line); }
+.literature-project-hud-actions { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.literature-project-paper-count { min-width: 42px; color: var(--muted); font: 9px ui-monospace, monospace; text-align: center; }
+.literature-project-hud-menu { display: flex; align-items: center; gap: 6px; }
+.literature-project-hud-menu button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--lit-control-bg); cursor: pointer; }
+.literature-project-hud-menu button:hover { color: var(--cyan); border-color: var(--lit-accent-border); background: var(--lit-accent-soft); }
+.literature-project-hud-menu button svg { width: 14px; }
 
 .workspace {
   grid-column: 2;
@@ -179,33 +182,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .library-panel { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
 .conversation-panel { position: relative; display: grid; grid-template-rows: 70px minmax(0, 1fr) auto; min-width: 0; }
 
-.library-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 13px 14px 9px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-}
-
 .conversation-header h2 { margin: 4px 0 0; font-size: 18px; font-weight: 650; letter-spacing: .01em; }
-.library-project-selector { min-width: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; padding: 0; border: 0; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
-.library-project-selector > span { grid-column: 1; color: var(--faint); font-size: 7.5px; letter-spacing: .12em; }
-.library-project-selector strong { grid-column: 1; overflow: hidden; color: var(--text); font-size: 12px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
-.library-project-selector em { grid-column: 2; grid-row: 1 / -1; align-self: center; color: var(--muted); font: 13px ui-monospace, monospace; font-style: normal; }
-.library-project-selector:hover strong, .library-project-selector:hover em { color: var(--cyan); }
-.library-panel-meta { display: flex; align-items: center; gap: 6px; }
-.library-paper-count { color: var(--muted); font: 9px ui-monospace, monospace; white-space: nowrap; }
-.library-more-menu, .library-import-menu { position: relative; }
-.library-more-menu summary, .library-import-menu summary { list-style: none; cursor: pointer; }
-.library-more-menu summary::-webkit-details-marker, .library-import-menu summary::-webkit-details-marker { display: none; }
-.library-more-menu > summary { width: var(--library-control-height); height: var(--library-control-height); display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--lit-control-bg); font: 700 9px ui-monospace, monospace; letter-spacing: -.06em; }
-.library-more-menu[open] > summary, .library-more-menu > summary:hover { color: var(--cyan); border-color: var(--lit-accent-border); background: var(--lit-accent-soft); }
-.library-more-menu > div, .library-import-menu > div { position: absolute; z-index: 30; right: 0; display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--lit-floating-bg); box-shadow: 0 16px 45px var(--lit-shadow); }
-.library-more-menu > div { top: calc(var(--library-control-height) + 5px); width: 160px; }
-.library-more-menu button { height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 9px; border: 0; border-radius: 7px; color: var(--lit-control-text); background: transparent; font-size: 9px; cursor: pointer; }
-.library-more-menu button:hover { color: var(--text); background: var(--lit-accent-soft); }
-.library-more-menu button svg { width: 14px; }
+.library-import-menu { position: relative; }
+.library-import-menu summary { list-style: none; cursor: pointer; }
+.library-import-menu summary::-webkit-details-marker { display: none; }
+.library-import-menu > div { position: absolute; z-index: 30; right: 0; display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--lit-floating-bg); box-shadow: 0 16px 45px var(--lit-shadow); }
 .library-toolbar { position: relative; display: grid; gap: 7px; padding: 9px 12px 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent); }
 
 .search-box {
@@ -859,7 +840,7 @@ body {
 .literature-group-filter select,
 .tag-filter-trigger,
 .library-import-menu > summary,
-.library-more-menu > summary,
+.literature-project-hud-menu button,
 .tag-filter-popover,
 .paper-row,
 .tool-event-card,
@@ -879,7 +860,6 @@ body {
 .notes-sidebar,
 .note-markdown-editor { background: var(--bg); }
 .paper-main h2,
-.library-project-selector strong,
 .conversation-header h2,
 .message-bubble p,
 .message-bubble li,
@@ -934,7 +914,6 @@ body {
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 10px);
 }
 
-:root[data-theme="neon-space-lab"] .library-panel-header,
 :root[data-theme="neon-space-lab"] .conversation-header,
 :root[data-theme="neon-space-lab"] .composer-wrap {
   border-color: color-mix(in srgb, var(--neon-panel-edge) 62%, transparent);
@@ -942,7 +921,7 @@ body {
   background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 7%, transparent), transparent 72%);
 }
 
-:root[data-theme="neon-space-lab"] .library-project-selector,
+:root[data-theme="neon-space-lab"] .literature-project-hud-actions,
 :root[data-theme="neon-space-lab"] .conversation-header h2,
 :root[data-theme="neon-space-lab"] .eyebrow,
 :root[data-theme="neon-space-lab"] .session-switcher,
@@ -955,7 +934,7 @@ body {
 :root[data-theme="neon-space-lab"] .literature-group-filter select,
 :root[data-theme="neon-space-lab"] .tag-filter-trigger,
 :root[data-theme="neon-space-lab"] .library-import-menu > summary,
-:root[data-theme="neon-space-lab"] .library-more-menu > summary,
+:root[data-theme="neon-space-lab"] .literature-project-hud-menu button,
 :root[data-theme="neon-space-lab"] .session-switcher select,
 :root[data-theme="neon-space-lab"] .session-switcher button,
 :root[data-theme="neon-space-lab"] .compact-button,

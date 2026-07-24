@@ -10,7 +10,7 @@ interface NeonHudProps extends SkinRuntimeProps {
   chrome?: DeclarativeHudChrome
 }
 
-export function NeonHud({ projectName, projectPath, modelName, streaming, status, chrome }: NeonHudProps) {
+export function NeonHud({ projectName, projectPath, modelName, streaming, status, actions, chrome }: NeonHudProps) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -35,6 +35,7 @@ export function NeonHud({ projectName, projectPath, modelName, streaming, status
         <span><small>{chrome?.modelLabel || 'MODEL LINK'}</small><strong>{modelName || 'NOT CONFIGURED'}</strong></span>
         <span><small>{chrome?.stateLabel || 'CORE STATE'}</small><strong className={streaming ? 'live' : ''}>{streaming ? 'GENERATING' : status || 'READY'}</strong></span>
         <span><small>{chrome?.timeLabel || 'LOCAL TIME'}</small><strong>{formatClock(now)}</strong></span>
+        {actions && <div className="skin-chrome-actions">{actions}</div>}
       </div>
     </header>
   )

@@ -32,7 +32,7 @@ const CHROME_COPY: Record<PresetChromeProps['preset'], {
   }
 }
 
-export function PresetChrome({ preset, projectName, projectPath, modelName, streaming, status }: PresetChromeProps) {
+export function PresetChrome({ preset, projectName, projectPath, modelName, streaming, status, actions }: PresetChromeProps) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
@@ -47,6 +47,7 @@ export function PresetChrome({ preset, projectName, projectPath, modelName, stre
       <span className="preset-chrome-field"><small>{copy.modelLabel}</small><strong>{modelName || 'NOT CONFIGURED'}</strong></span>
       <span className="preset-chrome-field"><small>{copy.stateLabel}</small><strong className={streaming ? 'live' : ''}>{streaming ? 'GENERATING' : status || 'READY'}</strong></span>
       <span className="preset-chrome-clock">{now.toLocaleTimeString('zh-CN', { hour12: false })}</span>
+      {actions && <div className="skin-chrome-actions">{actions}</div>}
     </header>
   )
 }

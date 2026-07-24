@@ -1158,6 +1158,20 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       })
   }
 
+  const projectHudActions = (
+    <div className="literature-project-hud-actions">
+      <span className="literature-project-paper-count">{papers.length} 篇</span>
+      <div className="literature-project-hud-menu">
+        <button type="button" onClick={() => void openProjectManager()} aria-label="管理项目" title="管理项目">
+          <Icon name="layers" />
+        </button>
+        <button type="button" onClick={() => void openPaperTrash()} aria-label="打开文献回收站" title="打开文献回收站">
+          <Icon name="trash" />
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div
       className={`app-shell${dragActive ? ' is-dragging' : ''}${hudLayoutActive ? ' hud-layout' : ''}`}
@@ -1194,6 +1208,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           modelName="LITERATURE PROFILE"
           streaming={streaming}
           status={backendMode === 'connected' ? 'READY' : backendMode === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
+          actions={projectHudActions}
         />
       )}
       <nav className="activity-bar" data-skin-slot="activity-navigation" aria-label="主活动栏">
@@ -1231,55 +1246,17 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
           <strong>WORKMODE / LITERA</strong>
           <span>轻量文献智库工作台</span>
         </div>
-        <button className="project-heading" type="button" onClick={() => void openProjectManager()} title="切换或新建文献项目">
+        <div className="project-heading">
           <span className="eyebrow">当前项目</span>
           <strong>{projectInfo?.name || '等待文献项目'}</strong>
-          <span className="project-heading-action">管理项目</span>
-        </button>
+          <span className="project-heading-action">文献项目</span>
+        </div>
         <div className="topbar-spacer" />
+        {!hudLayoutActive && projectHudActions}
       </header>
 
       <main className="workspace" data-skin-slot="literature-workspace">
         <aside className="library-panel" data-skin-slot="literature-library">
-          <div className="library-panel-header">
-            <button
-              className="library-project-selector"
-              type="button"
-              onClick={() => void openProjectManager()}
-              title="切换或管理项目"
-            >
-              <span>当前项目</span>
-              <strong>{projectInfo?.name || '等待项目'}</strong>
-              <em aria-hidden>⌄</em>
-            </button>
-            <div className="library-panel-meta">
-              <span className="library-paper-count">{papers.length} 篇</span>
-              <details className="library-more-menu">
-                <summary aria-label="更多项目操作" title="更多项目操作">•••</summary>
-                <div>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.currentTarget.closest('details')?.removeAttribute('open')
-                      void openProjectManager()
-                    }}
-                  >
-                    <Icon name="layers" />管理项目
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.currentTarget.closest('details')?.removeAttribute('open')
-                      void openPaperTrash()
-                    }}
-                  >
-                    <Icon name="trash" />文献回收站
-                  </button>
-                </div>
-              </details>
-            </div>
-          </div>
-
           <div className="library-toolbar">
             <label className="search-box">
               <Icon name="search" />

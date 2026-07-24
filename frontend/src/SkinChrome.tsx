@@ -10,6 +10,7 @@ export interface SkinRuntimeProps {
   modelName?: string
   streaming: boolean
   status: string
+  actions?: ReactNode
 }
 
 interface SkinChromeProps extends SkinRuntimeProps {
