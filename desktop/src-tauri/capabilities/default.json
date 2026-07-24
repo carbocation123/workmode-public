@@ -17,6 +17,7 @@
         { "url": "mailto:*" }
       ]
     },
+    "opener:allow-open-path",
     "opener:allow-reveal-item-in-dir",
     "process:allow-restart",
     "updater:default"

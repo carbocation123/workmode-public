@@ -85,6 +85,12 @@ class EndNoteImportTest(unittest.TestCase):
                     id INTEGER PRIMARY KEY,
                     c0 TEXT
                 );
+                CREATE TABLE misc(
+                    code INTEGER NOT NULL,
+                    subcode INTEGER NOT NULL,
+                    value BLOB NOT NULL,
+                    PRIMARY KEY(code, subcode)
+                );
                 """
             )
             connection.executemany(
@@ -158,6 +164,17 @@ class EndNoteImportTest(unittest.TestCase):
             connection.executemany(
                 "INSERT INTO tag_members_content(id, c0) VALUES (?, ?)",
                 [(1, "1 2"), (2, ""), (3, "2")],
+            )
+            connection.execute(
+                "INSERT INTO misc(code, subcode, value) VALUES (17, 1, ?)",
+                (
+                    (
+                        '<?xml version="1.0" encoding="UTF-8"?>'
+                        "<groupset version=\"1\"><ids><id>research-uuid</id>"
+                        "<name>Research</name></ids><members complex=\"true\">"
+                        "<member>Catalysis-uuid</member></members></groupset>"
+                    ).encode("utf-8"),
+                ),
             )
             connection.commit()
         finally:
@@ -241,10 +258,14 @@ class EndNoteImportTest(unittest.TestCase):
         self.assertEqual(paper["publication_date"], "")
         self.assertEqual(paper["group_ids"], [])
         self.assertEqual(paper["paths"]["si_folder"], "papers/unprocessed/SI/legacy-paper")
-        self.assertEqual(tags["tags"][0]["group_id"], "characterization")
+        self.assertEqual(tags["tags"][0]["group_id"], "ungrouped")
         self.assertNotIn("category", tags["tags"][0])
         self.assertTrue(
-            any(group["id"] == "characterization" and group["color"] for group in tags["groups"])
+            any(group["id"] == "ungrouped" and group["color"] for group in tags["groups"])
+        )
+        self.assertFalse(
+            {"characterization", "material", "mechanism", "performance", "uncategorized"}
+            .intersection(group["id"] for group in tags["groups"])
         )
 
     def test_inspection_and_import_preserve_groups_tags_colors_and_si_files(self) -> None:
@@ -276,6 +297,7 @@ class EndNoteImportTest(unittest.TestCase):
         self.assertEqual(first["publication_date"], "2024-03-18")
         self.assertEqual(first["paper_type"], "unknown")
         self.assertEqual(first["group_ids"], [groups["groups"][0]["id"]])
+        self.assertEqual(groups["groups"][0]["name"], "Research - Catalysis")
         self.assertEqual(len(first["tag_ids"]), 2)
         self.assertTrue(first["paths"]["pdf"].endswith("main-article.PDF"))
         self.assertTrue((self.project_root / first["paths"]["pdf"]).exists())

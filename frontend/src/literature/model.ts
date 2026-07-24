@@ -6,13 +6,6 @@ export type PaperStatus =
   | 'ready'
   | 'failed'
 
-export type TagCategory =
-  | 'characterization'
-  | 'material'
-  | 'mechanism'
-  | 'performance'
-  | 'uncategorized'
-
 export type PaperType = 'research' | 'review' | 'unknown'
 export type MetadataSource = 'cite_this' | 'layout_json_fallback' | 'manual_review' | 'pending'
 export type ArchiveLocation = '文献/未处理' | '文献/已处理'
@@ -22,7 +15,7 @@ export interface TagDefinition {
   id: string
   name: string
   aliases: string[]
-  category: TagCategory
+  groupId: string
   status: 'confirmed' | 'provisional'
 }
 
@@ -51,9 +44,12 @@ export interface PaperRecord {
   title: string
   authors: string
   year: number | null
+  publicationDate: string
   journal: string
   status: PaperStatus
   tagIds: string[]
+  groupIds: string[]
+  siFolder: string | null
   focus: string
   summary: string
   facts: string[]
@@ -111,9 +107,12 @@ export function createImportedPapers(filenames: string[]): PaperRecord[] {
       title: titleFromFilename(filename),
       authors: '等待元数据识别',
       year: null,
+      publicationDate: '',
       journal: '等待元数据识别',
       status: 'pending' as const,
       tagIds: [],
+      groupIds: [],
+      siFolder: null,
       focus: '',
       summary: '',
       facts: [],
@@ -153,7 +152,7 @@ export function normalizeSuggestedTag(
     id: id || `tag_${registry.length + 1}`,
     name: suggestion.trim(),
     aliases: [],
-    category: 'uncategorized',
+    groupId: 'ungrouped',
     status: 'provisional',
   }
 }

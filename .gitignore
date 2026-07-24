@@ -39,3 +39,4 @@ desktop/src-tauri/icons/workmode-public.svg
 *.pfx
 .DS_Store
 Thumbs.db
+/TODO.local.md

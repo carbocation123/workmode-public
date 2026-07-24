@@ -19,7 +19,7 @@ from .project_tools import ProjectToolResult
 MANIFEST_FILENAME = "literature-project.json"
 PROJECT_TYPE = "literature-library"
 TOOL_PROFILE = "literature"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_TEXT_RESULT_CHARS = 120_000
 LITERATURE_PROCESS_CONCURRENCY = 3
 LITERATURE_READ_CONCURRENCY = 3
@@ -41,12 +41,45 @@ _CATALOG_LOCKS_GUARD = threading.Lock()
 
 FIXED_DIRECTORIES = (
     "papers/unprocessed/pdf",
+    "papers/unprocessed/SI",
     "papers/unprocessed/extracted",
     "papers/processed/pdf",
+    "papers/processed/SI",
     "papers/processed/extracted",
     "papers/.trash",
     "notes",
     "exports",
+)
+
+RETIRED_FAKE_TAG_GROUP_IDS = {
+    "characterization",
+    "material",
+    "mechanism",
+    "performance",
+    "uncategorized",
+}
+UNGROUPED_TAG_GROUP = {
+    "id": "ungrouped",
+    "name": "未分组",
+    "color": "#94A3B8",
+    "order": 1,
+}
+
+LITERATURE_FIELD_REGISTRY = (
+    {"key": "title", "label": "标题", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": True, "available_to_ai": True},
+    {"key": "authors", "label": "作者", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": True, "available_to_ai": True},
+    {"key": "year", "label": "年份", "type": "integer", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "available_to_ai": True},
+    {"key": "publication_date", "label": "发表日期", "type": "date_text", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": False, "available_to_ai": True},
+    {"key": "journal", "label": "期刊", "type": "text", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "available_to_ai": True},
+    {"key": "doi", "label": "DOI", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "paper_type", "label": "文章类型", "type": "enum", "editable": True, "searchable": False, "filterable": True, "sortable": True, "visible_by_default": False, "available_to_ai": True},
+    {"key": "group_ids", "label": "分组", "type": "id_list", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "tag_ids", "label": "标签", "type": "id_list", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "focus", "label": "关注点", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "summary", "label": "概要", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "status", "label": "处理状态", "type": "enum", "editable": False, "searchable": False, "filterable": True, "sortable": True, "visible_by_default": True, "available_to_ai": True},
+    {"key": "paths.pdf", "label": "主论文 PDF", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "paths.si_folder", "label": "SI 文件夹", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
 )
 
 LITERATURE_PROTOCOL = """# Literature library collaboration protocol
@@ -59,8 +92,10 @@ remain the conversation kernel.
 ## Fixed structure
 
 - `catalog.json`: authoritative paper records and project-relative paths.
-- `tags.json`: the semi-open tag registry. Paper records store tag IDs.
+- `groups.json`: real manual literature groups. Paper records store group IDs.
+- `tags.json`: real tag groups with colors plus the semi-open tag registry. Paper records store tag IDs.
 - `papers/unprocessed/pdf/`: imported PDFs awaiting discussion or archival checks.
+- `papers/unprocessed/SI/<paper-id>/`: supporting files associated with one paper.
 - `papers/unprocessed/extracted/<paper-id>/`: MinerU text, layout, images and facts.
 - `papers/processed/`: archived PDF and extraction trees.
 - `papers/.trash/`: recoverable paper deletions. Each entry keeps the catalog
@@ -104,11 +139,12 @@ content. Offer MinerU enhanced parsing when useful, but do not start the time-co
 pipeline without the user's agreement.
 
 Before assigning or replacing paper tags, call `literature_tag_list` and inspect the
-canonical registry. Reuse existing names or aliases whenever possible; create a new
-provisional tag only when no existing tag expresses the same concept.
+real tag groups and canonical registry. Reuse existing names or aliases whenever
+possible; create a new provisional tag only when no existing tag expresses the same
+concept. Never invent hard-coded subject categories that are not present in tags.json.
 
 Delete a paper only when the user asks to remove it. `literature_delete` moves the
-catalog record, PDF and extraction artifacts into the project recycle bin; it does
+catalog record, main PDF, SI folder and extraction artifacts into the project recycle bin; it does
 not rewrite historical session messages. Use `literature_restore` with the returned
 trash ID when the user asks to undo that deletion.
 
@@ -158,12 +194,12 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "literature_tag_list",
-            "description": "List the canonical semi-open tag registry before assigning tags. Returns tag IDs, names, aliases, categories, status and usage counts so existing tags can be reused instead of duplicated.",
+            "description": "List the canonical semi-open tag registry before assigning tags. Returns real tag groups with colors plus tag IDs, names, aliases, status and usage counts so existing tags can be reused instead of duplicated.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Optional text matched against tag ID, name, aliases and category."},
-                    "category": {"type": "string", "description": "Optional exact category filter."},
+                    "query": {"type": "string", "description": "Optional text matched against tag ID, name, aliases and group."},
+                    "group_id": {"type": "string", "description": "Optional exact tag-group filter."},
                     "status": {"type": "string", "description": "Optional exact status filter, such as confirmed or provisional."},
                     "limit": {"type": "integer", "default": 200, "minimum": 1, "maximum": 500},
                 },
@@ -240,10 +276,10 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                             "type": "object",
                             "properties": {
                                 "name": {"type": "string"},
-                                "category": {"type": "string"},
+                                "group_id": {"type": "string"},
                                 "aliases": {"type": "array", "items": {"type": "string"}, "default": []},
                             },
-                            "required": ["name", "category"],
+                            "required": ["name", "group_id"],
                         },
                     },
                     "focus": {"type": "string"},
@@ -252,13 +288,14 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "authors": {"type": "string"},
                     "first_author_surname": {"type": "string"},
                     "year": {"type": "integer"},
+                    "publication_date": {"type": "string"},
                     "journal": {"type": "string"},
                     "journal_abbreviation": {
                         "type": "string",
                         "description": "Human-readable journal abbreviation is accepted. Dots, spaces and punctuation are removed automatically for the canonical filename, e.g. 'Angew. Chem. Int. Ed.' becomes 'AngewChemIntEd'.",
                     },
                     "doi": {"type": "string"},
-                    "paper_type": {"type": "string", "enum": ["research", "review"]},
+                    "paper_type": {"type": "string", "enum": ["research", "review", "unknown"]},
                     "metadata_source": {"type": "string", "enum": ["cite_this", "layout_json", "manual", "pending"]},
                 },
                 "required": ["paper_id"],
@@ -382,11 +419,103 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _default_tag_registry() -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "groups": [],
+        "tags": [],
+    }
+
+
+def _migrate_literature_project_schema(root: Path) -> None:
+    manifest_path = root / MANIFEST_FILENAME
+    if manifest_path.exists():
+        manifest = _read_json(manifest_path)
+        if (
+            manifest.get("project_type") == PROJECT_TYPE
+            and manifest.get("schema_version") == 1
+        ):
+            manifest["schema_version"] = SCHEMA_VERSION
+            _atomic_write_json(manifest_path, manifest)
+
+    catalog_path = root / "catalog.json"
+    if catalog_path.exists():
+        catalog = _read_json(catalog_path)
+        version = catalog.get("schema_version")
+        if version in {1, SCHEMA_VERSION} and isinstance(catalog.get("papers"), list):
+            changed = version != SCHEMA_VERSION
+            for paper in catalog["papers"]:
+                if not isinstance(paper, dict) or not isinstance(paper.get("id"), str):
+                    continue
+                if "publication_date" not in paper:
+                    paper["publication_date"] = ""
+                    changed = True
+                if "group_ids" not in paper:
+                    paper["group_ids"] = []
+                    changed = True
+                paths = paper.get("paths")
+                if not isinstance(paths, dict):
+                    paths = {}
+                    paper["paths"] = paths
+                    changed = True
+                paper_id = str(paper["id"])
+                location = (
+                    "processed"
+                    if str(paper.get("archive_location") or "").endswith("processed")
+                    and not str(paper.get("archive_location") or "").endswith("unprocessed")
+                    else "unprocessed"
+                )
+                si_folder = f"papers/{location}/SI/{paper_id}"
+                if not paths.get("si_folder"):
+                    paths["si_folder"] = si_folder
+                    changed = True
+                _resolve(root, str(paths["si_folder"])).mkdir(parents=True, exist_ok=True)
+            if changed:
+                catalog["schema_version"] = SCHEMA_VERSION
+                _atomic_write_json(catalog_path, catalog)
+
+    tags_path = root / "tags.json"
+    if tags_path.exists():
+        registry = _read_json(tags_path)
+        version = registry.get("schema_version")
+        if version in {1, SCHEMA_VERSION} and isinstance(registry.get("tags"), list):
+            groups = registry.get("groups")
+            if not isinstance(groups, list):
+                groups = []
+                registry["groups"] = groups
+            groups[:] = [
+                group
+                for group in groups
+                if isinstance(group, dict)
+                and str(group.get("id") or "") not in RETIRED_FAKE_TAG_GROUP_IDS
+            ]
+            needs_ungrouped = False
+            for tag in registry["tags"]:
+                if not isinstance(tag, dict):
+                    continue
+                category = str(tag.pop("category", "") or "")
+                group_id = str(tag.get("group_id") or "")
+                if category or not group_id or group_id in RETIRED_FAKE_TAG_GROUP_IDS:
+                    tag["group_id"] = "ungrouped"
+                    needs_ungrouped = True
+            if needs_ungrouped and not any(
+                str(group.get("id") or "") == "ungrouped" for group in groups
+            ):
+                groups.append(dict(UNGROUPED_TAG_GROUP))
+            registry["schema_version"] = SCHEMA_VERSION
+            _atomic_write_json(tags_path, registry)
+
+    groups_path = root / "groups.json"
+    if not groups_path.exists():
+        _atomic_write_json(groups_path, {"schema_version": 1, "groups": []})
+
+
 def initialize_literature_project(root: Path, *, name: str) -> None:
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     for rel in FIXED_DIRECTORIES:
         (root / rel).mkdir(parents=True, exist_ok=True)
+    _migrate_literature_project_schema(root)
 
     defaults: dict[str, str] = {
         MANIFEST_FILENAME: json.dumps(
@@ -403,7 +532,8 @@ def initialize_literature_project(root: Path, *, name: str) -> None:
         "LITERATURE_PROJECT.md": LITERATURE_PROTOCOL.rstrip() + "\n",
         "README.md": f"# {name}\n\nThis folder is a fixed-structure Workmode literature library.\n",
         "catalog.json": json.dumps({"schema_version": SCHEMA_VERSION, "papers": []}, ensure_ascii=False, indent=2) + "\n",
-        "tags.json": json.dumps({"schema_version": SCHEMA_VERSION, "tags": []}, ensure_ascii=False, indent=2) + "\n",
+        "tags.json": json.dumps(_default_tag_registry(), ensure_ascii=False, indent=2) + "\n",
+        "groups.json": json.dumps({"schema_version": 1, "groups": []}, ensure_ascii=False, indent=2) + "\n",
         "processed-index.md": "# Processed literature index\n\nNo processed papers yet.\n",
         "papers/README.md": "# Papers\n\nPDF and extraction trees are maintained by literature-domain services.\n",
         "notes/README.md": "# Notes\n\nProject-level Markdown notes. Keep citations and distinguish facts from discussion.\n",
@@ -611,6 +741,8 @@ def literature_snapshot(root: Path) -> dict[str, Any]:
         "manifest": load_manifest(root),
         "catalog": _catalog(root),
         "tags": _tags(root),
+        "groups": _groups(root),
+        "fields": [dict(field) for field in LITERATURE_FIELD_REGISTRY],
         "notes": list_literature_notes(root),
     }
 
@@ -655,10 +787,10 @@ def _catalog_lock(root: Path) -> threading.RLock:
 
 def update_literature_paper(root: Path, paper_id: str, **updates: Any) -> dict[str, Any]:
     allowed = {
-        "title", "authors", "first_author_surname", "year", "journal",
+        "title", "authors", "first_author_surname", "year", "publication_date", "journal",
         "journal_abbreviation", "doi", "paper_type", "status", "archive_location",
         "archive_filename", "metadata_source", "metadata_trust", "tag_ids", "focus",
-        "summary", "paths", "verification_status", "stage", "error", "metadata_issue",
+        "summary", "paths", "verification_status", "stage", "error", "metadata_issue", "group_ids",
     }
     unexpected = set(updates) - allowed
     if unexpected:
@@ -824,6 +956,7 @@ def register_staged_pdf(root: Path, staged_path: Path, *, original_filename: str
         "authors": "",
         "first_author_surname": "",
         "year": None,
+        "publication_date": "",
         "journal": "",
         "journal_abbreviation": "",
         "doi": "",
@@ -836,13 +969,21 @@ def register_staged_pdf(root: Path, staged_path: Path, *, original_filename: str
         "metadata_trust": "pending",
         "metadata_issue": "",
         "tag_ids": [],
+        "group_ids": [],
         "focus": "",
         "summary": "",
-        "paths": {"pdf": rel, "mineru_dir": "", "full_md": "", "fact_report": ""},
+        "paths": {
+            "pdf": rel,
+            "si_folder": f"papers/unprocessed/SI/{paper_id}",
+            "mineru_dir": "",
+            "full_md": "",
+            "fact_report": "",
+        },
         "verification_status": "pending",
         "created_at": now,
         "updated_at": now,
     }
+    _resolve(root, paper["paths"]["si_folder"]).mkdir(parents=True, exist_ok=True)
     catalog["papers"].append(paper)
     _write_catalog(root, catalog)
     return {"paper": paper, "duplicate": False, "changed_files": ["catalog.json", rel]}
@@ -910,7 +1051,10 @@ def _search(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             continue
         haystack = "\n".join(
             str(paper.get(key) or "")
-            for key in ("title", "authors", "journal", "doi", "focus", "summary", "original_filename", "archive_filename")
+            for key in (
+                "title", "authors", "year", "publication_date", "journal", "doi",
+                "focus", "summary", "original_filename", "archive_filename",
+            )
         )
         haystack += "\n" + " ".join(
             str(tags_by_id.get(tag_id, {}).get("name") or tag_id) for tag_id in tag_ids
@@ -925,17 +1069,18 @@ def _search(root: Path, args: dict[str, Any]) -> ProjectToolResult:
 
 def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     query = str(args.get("query") or "").strip().casefold()
-    requested_category = str(args.get("category") or "").strip().casefold()
+    requested_group = str(args.get("group_id") or args.get("category") or "").strip().casefold()
     requested_status = str(args.get("status") or "").strip().casefold()
     limit = min(max(int(args.get("limit") or 200), 1), 500)
 
-    registry = _tags(root)["tags"]
+    registry_payload = _tags(root)
+    registry = registry_payload["tags"]
     usage_counts: dict[str, int] = {}
     for paper in _catalog(root)["papers"]:
         for tag_id in set(str(item) for item in (paper.get("tag_ids") or [])):
             usage_counts[tag_id] = usage_counts.get(tag_id, 0) + 1
 
-    category_counts: dict[str, int] = {}
+    group_counts: dict[str, int] = {}
     matched: list[dict[str, Any]] = []
     for raw_tag in registry:
         if not isinstance(raw_tag, dict) or not isinstance(raw_tag.get("id"), str):
@@ -943,14 +1088,14 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
         tag_id = str(raw_tag["id"])
         name = str(raw_tag.get("name") or tag_id)
         aliases = [str(item) for item in (raw_tag.get("aliases") or [])]
-        category = str(raw_tag.get("category") or "uncategorized")
+        group_id = str(raw_tag.get("group_id") or "ungrouped")
         status = str(raw_tag.get("status") or "confirmed")
-        category_counts[category] = category_counts.get(category, 0) + 1
-        if requested_category and category.casefold() != requested_category:
+        group_counts[group_id] = group_counts.get(group_id, 0) + 1
+        if requested_group and group_id.casefold() != requested_group:
             continue
         if requested_status and status.casefold() != requested_status:
             continue
-        haystack = "\n".join([tag_id, name, category, *aliases]).casefold()
+        haystack = "\n".join([tag_id, name, group_id, *aliases]).casefold()
         if query and query not in haystack:
             continue
         matched.append(
@@ -958,17 +1103,17 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
                 "id": tag_id,
                 "name": name,
                 "aliases": aliases,
-                "category": category,
+                "group_id": group_id,
                 "status": status,
                 "usage_count": usage_counts.get(tag_id, 0),
             }
         )
 
-    matched.sort(key=lambda item: (item["category"].casefold(), item["name"].casefold(), item["id"].casefold()))
+    matched.sort(key=lambda item: (item["group_id"].casefold(), item["name"].casefold(), item["id"].casefold()))
     visible = matched[:limit]
-    categories = [
-        {"id": category, "tag_count": count}
-        for category, count in sorted(category_counts.items(), key=lambda item: item[0].casefold())
+    groups = [
+        {"id": group_id, "tag_count": count}
+        for group_id, count in sorted(group_counts.items(), key=lambda item: item[0].casefold())
     ]
     return _json_result(
         {
@@ -978,7 +1123,8 @@ def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             "matched_count": len(matched),
             "count": len(visible),
             "truncated": len(visible) < len(matched),
-            "categories": categories,
+            "group_counts": groups,
+            "groups": registry_payload["groups"],
             "tags": visible,
         }
     )
@@ -1140,6 +1286,7 @@ def _import_pdf(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             "authors": "",
             "first_author_surname": "",
             "year": None,
+            "publication_date": "",
             "journal": "",
             "journal_abbreviation": "",
             "doi": "",
@@ -1152,14 +1299,22 @@ def _import_pdf(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             "metadata_trust": "pending",
             "metadata_issue": "",
             "tag_ids": [],
+            "group_ids": [],
             "focus": "",
             "summary": "",
-            "paths": {"pdf": rel, "mineru_dir": "", "full_md": "", "fact_report": ""},
+            "paths": {
+                "pdf": rel,
+                "si_folder": f"papers/unprocessed/SI/{paper_id}",
+                "mineru_dir": "",
+                "full_md": "",
+                "fact_report": "",
+            },
             "verification_status": "pending",
             "created_at": now,
             "updated_at": now,
         }
     )
+    _resolve(root, f"papers/unprocessed/SI/{paper_id}").mkdir(parents=True, exist_ok=True)
     _write_catalog(root, catalog)
     return _json_result(
         {"ok": True, "operation": "literature_import", "paper_id": paper_id, "duplicate": False, "changed_files": ["catalog.json", rel]},
@@ -1246,6 +1401,7 @@ def _update_record(root: Path, args: dict[str, Any]) -> ProjectToolResult:
         "authors",
         "first_author_surname",
         "year",
+        "publication_date",
         "journal",
         "journal_abbreviation",
         "doi",
@@ -1384,6 +1540,11 @@ def _archive(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     target_extract = root / "papers/processed/extracted" / paper_id
     if source_extract and source_extract.exists() and target_extract.exists():
         raise LiteratureProjectError(f"Archive extraction target already exists: {target_extract.relative_to(root).as_posix()}")
+    source_si_rel = str(paths.get("si_folder") or "")
+    source_si = _resolve(root, source_si_rel) if source_si_rel else None
+    target_si = root / "papers/processed/SI" / paper_id
+    if source_si and source_si.exists() and target_si.exists():
+        raise LiteratureProjectError(f"Archive SI target already exists: {target_si.relative_to(root).as_posix()}")
 
     # Validate every destination before moving either tree.  A collision in the
     # extraction directory must never leave the PDF stranded in processed/ while
@@ -1397,6 +1558,10 @@ def _archive(root: Path, args: dict[str, Any]) -> ProjectToolResult:
             candidate = target_extract / filename
             if candidate.exists():
                 paths[key] = candidate.relative_to(root).as_posix()
+    if source_si and source_si.exists():
+        target_si.parent.mkdir(parents=True, exist_ok=True)
+        source_si.replace(target_si)
+        paths["si_folder"] = target_si.relative_to(root).as_posix()
     paths["pdf"] = target_pdf.relative_to(root).as_posix()
     paper["archive_location"] = "papers/processed"
     paper["status"] = "ready"
@@ -1405,6 +1570,8 @@ def _archive(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     _write_catalog(root, catalog)
     _rebuild_processed_index(root, catalog)
     changed = ["catalog.json", "processed-index.md", paths["pdf"]]
+    if paths.get("si_folder"):
+        changed.append(str(paths["si_folder"]))
     return _json_result(
         {"ok": True, "operation": "literature_archive", "paper_id": paper_id, "changed_files": changed},
         changed_paths=changed,
@@ -1431,14 +1598,18 @@ def _paper_material_sources(root: Path, paper: dict[str, Any]) -> list[tuple[str
     paper_id = str(paper.get("id") or "")
     raw_paths.extend(
         [
+            f"papers/unprocessed/SI/{paper_id}",
+            f"papers/processed/SI/{paper_id}",
             f"papers/unprocessed/extracted/{paper_id}",
             f"papers/processed/extracted/{paper_id}",
         ]
     )
     allowed_roots = [
         (root / "papers" / "unprocessed" / "pdf").resolve(),
+        (root / "papers" / "unprocessed" / "SI").resolve(),
         (root / "papers" / "unprocessed" / "extracted").resolve(),
         (root / "papers" / "processed" / "pdf").resolve(),
+        (root / "papers" / "processed" / "SI").resolve(),
         (root / "papers" / "processed" / "extracted").resolve(),
     ]
     candidates: dict[str, Path] = {}
@@ -1691,7 +1862,7 @@ def _note_export(root: Path, args: dict[str, Any]) -> ProjectToolResult:
 def _catalog(root: Path) -> dict[str, Any]:
     payload = _read_json(root / "catalog.json")
     if payload.get("schema_version") != SCHEMA_VERSION or not isinstance(payload.get("papers"), list):
-        raise LiteratureProjectError("catalog.json does not match schema version 1")
+        raise LiteratureProjectError(f"catalog.json does not match schema version {SCHEMA_VERSION}")
     for paper in payload["papers"]:
         if not isinstance(paper, dict) or not isinstance(paper.get("id"), str):
             raise LiteratureProjectError("catalog.json contains an invalid paper record")
@@ -1700,8 +1871,19 @@ def _catalog(root: Path) -> dict[str, Any]:
 
 def _tags(root: Path) -> dict[str, Any]:
     payload = _read_json(root / "tags.json")
-    if payload.get("schema_version") != SCHEMA_VERSION or not isinstance(payload.get("tags"), list):
-        raise LiteratureProjectError("tags.json does not match schema version 1")
+    if (
+        payload.get("schema_version") != SCHEMA_VERSION
+        or not isinstance(payload.get("groups"), list)
+        or not isinstance(payload.get("tags"), list)
+    ):
+        raise LiteratureProjectError("tags.json does not match schema version 2")
+    return payload
+
+
+def _groups(root: Path) -> dict[str, Any]:
+    payload = _read_json(root / "groups.json")
+    if payload.get("schema_version") != 1 or not isinstance(payload.get("groups"), list):
+        raise LiteratureProjectError("groups.json does not match schema version 1")
     return payload
 
 
@@ -1711,6 +1893,10 @@ def _write_catalog(root: Path, payload: dict[str, Any]) -> None:
 
 def _write_tags(root: Path, payload: dict[str, Any]) -> None:
     _atomic_write_json(root / "tags.json", payload)
+
+
+def _write_groups(root: Path, payload: dict[str, Any]) -> None:
+    _atomic_write_json(root / "groups.json", payload)
 
 
 def _paper(root: Path, paper_id: str) -> dict[str, Any]:
@@ -1728,7 +1914,8 @@ def _paper_summary(paper: dict[str, Any]) -> dict[str, Any]:
     return {
         key: paper.get(key)
         for key in (
-            "id", "title", "authors", "year", "journal", "doi", "status", "tag_ids",
+            "id", "title", "authors", "year", "publication_date", "journal", "doi",
+            "status", "tag_ids", "group_ids",
             "focus", "summary", "original_filename", "archive_filename", "archive_location", "paths",
         )
     }
@@ -1736,10 +1923,16 @@ def _paper_summary(paper: dict[str, Any]) -> dict[str, Any]:
 
 def _upsert_tag(registry: dict[str, Any], raw: dict[str, Any]) -> str:
     name = str(raw.get("name") or "").strip()
-    category = str(raw.get("category") or "").strip()
+    group_id = str(raw.get("group_id") or raw.get("category") or "ungrouped").strip()
     aliases = [str(item).strip() for item in (raw.get("aliases") or []) if str(item).strip()]
-    if not name or not category:
-        raise LiteratureProjectError("tag name and category are required")
+    if not name or not group_id:
+        raise LiteratureProjectError("tag name and group are required")
+    if group_id == "ungrouped" and not any(
+        str(group.get("id") or "") == group_id for group in registry.get("groups") or []
+    ):
+        registry.setdefault("groups", []).append(dict(UNGROUPED_TAG_GROUP))
+    if not any(str(group.get("id") or "") == group_id for group in registry.get("groups") or []):
+        raise LiteratureProjectError(f"Unknown tag group: {group_id}")
     wanted = {name.casefold(), *(item.casefold() for item in aliases)}
     for tag in registry["tags"]:
         existing = {str(tag.get("name") or "").casefold(), *(str(item).casefold() for item in tag.get("aliases") or [])}
@@ -1753,7 +1946,7 @@ def _upsert_tag(registry: dict[str, Any], raw: dict[str, Any]) -> str:
         tag_id = f"{base}-{suffix}"
         suffix += 1
     registry["tags"].append(
-        {"id": tag_id, "name": name, "aliases": aliases, "category": category, "status": "provisional"}
+        {"id": tag_id, "name": name, "aliases": aliases, "group_id": group_id, "status": "provisional"}
     )
     return tag_id
 

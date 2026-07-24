@@ -39,11 +39,16 @@ class LiteratureRecordUpdate(BaseModel):
     authors: str | None = Field(default=None, max_length=10000)
     first_author_surname: str | None = Field(default=None, max_length=500)
     year: int | None = Field(default=None, ge=1000, le=3000)
+    publication_date: str | None = Field(default=None, max_length=500)
     journal: str | None = Field(default=None, max_length=2000)
     journal_abbreviation: str | None = Field(default=None, max_length=200)
     doi: str | None = Field(default=None, max_length=1000)
-    paper_type: Literal["research", "review"] | None = None
+    paper_type: Literal["research", "review", "unknown"] | None = None
     metadata_source: Literal["cite_this", "layout_json", "manual", "pending"] | None = None
+
+
+class EndNoteLibraryPath(BaseModel):
+    path: str = Field(min_length=1, max_length=32000)
 
 
 class LiteratureCrossRelationUpdate(BaseModel):

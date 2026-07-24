@@ -10,6 +10,12 @@ from fastapi.responses import PlainTextResponse
 
 from . import files, storage
 from .config import managed_projects_dir
+from .endnote_import import (
+    find_endnote_libraries,
+    import_endnote_library,
+    inspect_endnote_library,
+    scan_literature_duplicates,
+)
 from .literature_project import (
     LITERATURE_TOOL_SCHEMAS,
     LiteratureProjectError,
@@ -26,6 +32,7 @@ from .literature_project import (
 )
 from .models import (
     LiteratureCrossRelationUpdate,
+    EndNoteLibraryPath,
     LiteratureImportNotice,
     LiteratureNoteUpdate,
     LiteratureProjectCreate,
@@ -150,6 +157,52 @@ def list_tags(slug: str) -> list[dict[str, object]]:
     return literature_snapshot(_project_root(slug))["tags"]["tags"]
 
 
+@router.get("/projects/{slug}/literature/tag-registry")
+def read_tag_registry(slug: str) -> dict[str, object]:
+    return literature_snapshot(_project_root(slug))["tags"]
+
+
+@router.get("/projects/{slug}/literature/groups")
+def list_groups(slug: str) -> list[dict[str, object]]:
+    return literature_snapshot(_project_root(slug))["groups"]["groups"]
+
+
+@router.get("/projects/{slug}/literature/fields")
+def list_literature_fields(slug: str) -> list[dict[str, object]]:
+    return literature_snapshot(_project_root(slug))["fields"]
+
+
+@router.get("/projects/{slug}/literature/endnote/libraries")
+def search_endnote_libraries(slug: str) -> dict[str, object]:
+    _project_root(slug)
+    return {"libraries": find_endnote_libraries()}
+
+
+@router.post("/projects/{slug}/literature/endnote/preview")
+def preview_endnote_library(slug: str, payload: EndNoteLibraryPath) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return inspect_endnote_library(Path(payload.path))
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/endnote/import")
+def import_endnote(slug: str, payload: EndNoteLibraryPath) -> dict[str, object]:
+    try:
+        return import_endnote_library(_project_root(slug), Path(payload.path))
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/duplicates/scan")
+def scan_duplicates(slug: str) -> dict[str, object]:
+    try:
+        return scan_literature_duplicates(_project_root(slug))
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/projects/{slug}/literature/notes")
 def list_notes(slug: str) -> list[dict[str, object]]:
     return literature_snapshot(_project_root(slug))["notes"]
@@ -189,6 +242,22 @@ def read_pdf(slug: str, paper_id: str):
             raise LiteratureProjectError("原始 PDF 路径不存在")
         return files.media_response(slug, rel)
     except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/projects/{slug}/literature/papers/{paper_id}/si-folder")
+def read_si_folder(slug: str, paper_id: str) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        paper = literature_paper(root, paper_id)
+        relative = str((paper.get("paths") or {}).get("si_folder") or "")
+        if not relative:
+            raise LiteratureProjectError("该文献没有 SI 文件夹")
+        path = (root / relative).resolve()
+        path.relative_to(root)
+        path.mkdir(parents=True, exist_ok=True)
+        return {"path": str(path), "relative_path": relative}
+    except (LiteratureProjectError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 

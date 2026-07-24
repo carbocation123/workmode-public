@@ -91,13 +91,19 @@ class LiteratureModeTest(unittest.TestCase):
             }
         )
         catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tags_path = self.root / "tags.json"
+        tags = json.loads(tags_path.read_text(encoding="utf-8"))
+        tags["groups"].append(
+            {"id": "spectroscopy", "name": "光谱", "color": "#EAB308", "order": 1}
+        )
+        tags_path.write_text(json.dumps(tags, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
         result = execute_literature_tool(
             self.project.slug,
             "literature_update_record",
             {
                 "paper_id": "paper-1",
-                "tags": [{"name": "EPR", "category": "characterization"}],
+                "tags": [{"name": "EPR", "group_id": "spectroscopy"}],
                 "focus": "缺陷电子结构",
                 "summary": "讨论 EPR 证据链。",
             },
@@ -116,7 +122,7 @@ class LiteratureModeTest(unittest.TestCase):
         tag_result = execute_literature_tool(
             self.project.slug,
             "literature_tag_list",
-            {"query": "epr", "category": "characterization"},
+            {"query": "epr", "group_id": "spectroscopy"},
         )
         self.assertTrue(tag_result.ok, tag_result.content)
         tag_payload = json.loads(tag_result.content)
@@ -128,7 +134,7 @@ class LiteratureModeTest(unittest.TestCase):
                 "id": "epr",
                 "name": "EPR",
                 "aliases": [],
-                "category": "characterization",
+                "group_id": "spectroscopy",
                 "status": "provisional",
                 "usage_count": 1,
             },

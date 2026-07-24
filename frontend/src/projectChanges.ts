@@ -1,4 +1,4 @@
-export type ProjectRefreshTarget = 'tree' | 'papers' | 'tags' | 'notes'
+export type ProjectRefreshTarget = 'tree' | 'papers' | 'tags' | 'groups' | 'notes'
 
 export function projectRefreshTargets(paths: string[]): Set<ProjectRefreshTarget> {
   const targets = new Set<ProjectRefreshTarget>()
@@ -8,6 +8,7 @@ export function projectRefreshTargets(paths: string[]): Set<ProjectRefreshTarget
     targets.add('tree')
     if (path === 'catalog.json' || path.startsWith('papers/')) targets.add('papers')
     if (path === 'tags.json') targets.add('tags')
+    if (path === 'groups.json') targets.add('groups')
     if (path.startsWith('notes/')) targets.add('notes')
   }
   return targets

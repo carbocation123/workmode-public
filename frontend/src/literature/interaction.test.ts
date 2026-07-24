@@ -6,6 +6,8 @@ const styles = new TextDecoder().decode(readFileSync(new URL('./styles.css', imp
 const appStyles = new TextDecoder().decode(readFileSync(new URL('../styles.css', import.meta.url)))
 const onboarding = new TextDecoder().decode(readFileSync(new URL('../OnboardingUI.tsx', import.meta.url)))
 const literatureOnboarding = new TextDecoder().decode(readFileSync(new URL('./LiteratureOnboarding.tsx', import.meta.url)))
+const literatureApi = new TextDecoder().decode(readFileSync(new URL('./literatureApi.ts', import.meta.url)))
+const desktop = new TextDecoder().decode(readFileSync(new URL('../desktop.ts', import.meta.url)))
 
 describe('literature live interaction contracts', () => {
   it('uses VS Code-style follow-latest behavior instead of forcing every delta into view', () => {
@@ -68,5 +70,27 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('attachedPaperIds: session.attachedPaperIds.filter')
     expect(source).toContain('restoreBackendPaper')
     expect(styles).toContain('.literature-trash-modal')
+  })
+
+  it('imports an EndNote library into the current project with plain-language safeguards', () => {
+    expect(source).toContain('导入 EndNote 文献库')
+    expect(source).toContain('合并到当前项目')
+    expect(source).toContain('请先关闭 EndNote')
+    expect(source).toContain('自动查找')
+    expect(source).toContain('手动选择')
+    expect(source).toContain('导入完成后查重')
+    expect(literatureApi).toContain('findEndNoteLibraries')
+    expect(literatureApi).toContain('previewEndNoteLibrary')
+    expect(literatureApi).toContain('importEndNoteLibrary')
+    expect(literatureApi).toContain('scanBackendDuplicates')
+    expect(desktop).toContain("extensions: ['enl', 'enlx']")
+    expect(styles).toContain('.endnote-import-modal')
+  })
+
+  it('uses project tag groups and exposes each paper SI folder', () => {
+    expect(source).not.toContain('const TAG_CATEGORIES')
+    expect(source).toContain('tagGroups')
+    expect(source).toContain('打开 SI 文件夹')
+    expect(literatureApi).toContain('openBackendSiFolder')
   })
 })

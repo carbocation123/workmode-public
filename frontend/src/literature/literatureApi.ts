@@ -87,9 +87,11 @@ export interface BackendPaper {
   title: string
   authors: string
   year: number | null
+  publication_date?: string
   journal: string
   status: PaperRecord['status']
   tags: string[]
+  group_ids?: string[]
   focus: string
   summary: string
   paper_type: PaperRecord['paperType']
@@ -101,7 +103,7 @@ export interface BackendPaper {
   stage?: string
   error?: string | null
   verification_status?: PaperRecord['verificationStatus']
-  paths?: { pdf?: string; mineru_dir?: string; full_md?: string; fact_report?: string }
+  paths?: { pdf?: string; si_folder?: string; mineru_dir?: string; full_md?: string; fact_report?: string }
 }
 
 interface CatalogPaper {
@@ -112,9 +114,11 @@ interface CatalogPaper {
   title?: string
   authors?: string
   year?: number | null
+  publication_date?: string
   journal?: string
   status?: PaperRecord['status']
   tag_ids?: string[]
+  group_ids?: string[]
   focus?: string
   summary?: string
   paper_type?: PaperRecord['paperType']
@@ -124,7 +128,7 @@ interface CatalogPaper {
   verification_status?: PaperRecord['verificationStatus']
   stage?: string
   error?: string | null
-  paths?: { pdf?: string; mineru_dir?: string; full_md?: string; fact_report?: string }
+  paths?: { pdf?: string; si_folder?: string; mineru_dir?: string; full_md?: string; fact_report?: string }
 }
 
 interface ImportResult {
@@ -160,8 +164,60 @@ export interface BackendTag {
   id: string
   name: string
   aliases: string[]
-  category: 'characterization' | 'material' | 'mechanism' | 'performance' | 'uncategorized'
+  group_id: string
   status: 'confirmed' | 'provisional'
+}
+
+export interface BackendTagGroup {
+  id: string
+  name: string
+  color: string
+  order: number
+}
+
+export interface BackendLiteratureGroup {
+  id: string
+  name: string
+}
+
+export interface EndNoteLibraryCandidate {
+  path: string
+  name: string
+  type: 'enl' | 'enlx'
+  size: number
+  modified_at: number
+}
+
+export interface EndNotePreview {
+  source_path: string
+  source_type: 'enl' | 'enlx'
+  reference_count: number
+  attachment_count: number
+  manual_group_count: number
+  tag_count: number
+  importable_count: number
+  failed_count: number
+  failures: Array<{ endnote_record_id: number; title: string; reason: string }>
+}
+
+export interface EndNoteImportResult {
+  ok: boolean
+  imported_count: number
+  failed_count: number
+  group_count: number
+  tag_count: number
+  paper_ids: string[]
+  failures: EndNotePreview['failures']
+}
+
+export interface DuplicateScanResult {
+  ok: boolean
+  group_count: number
+  groups: Array<{
+    paper_ids: string[]
+    reasons: Array<'doi' | 'main_pdf_sha256' | 'title_year_first_author'>
+    confidence: 'exact' | 'possible'
+  }>
 }
 
 export interface BackendNote {
@@ -284,9 +340,11 @@ function fromCatalogPaper(paper: CatalogPaper): BackendPaper {
     title: paper.title || '',
     authors: paper.authors || '',
     year: paper.year ?? null,
+    publication_date: paper.publication_date || '',
     journal: paper.journal || '',
     status: paper.status || 'pending',
     tags: paper.tag_ids || [],
+    group_ids: paper.group_ids || [],
     focus: paper.focus || '',
     summary: paper.summary || '',
     paper_type: paper.paper_type || 'research',
@@ -414,9 +472,12 @@ export function mapBackendPaper(paper: BackendPaper): PaperRecord {
     title: paper.title || paper.original_filename.replace(/\.pdf$/i, ''),
     authors: paper.authors || '等待首页元数据识别',
     year: paper.year,
+    publicationDate: paper.publication_date || '',
     journal: paper.journal || '等待首页元数据识别',
     status: paper.status,
     tagIds: paper.tags || [],
+    groupIds: paper.group_ids || [],
+    siFolder: paper.paths?.si_folder || null,
     focus: paper.focus || '',
     summary: paper.summary || paper.stage || '',
     facts: paper.error ? [`处理错误：${paper.error}`] : [],
@@ -466,7 +527,46 @@ export async function restoreBackendPaper(trashId: string): Promise<BackendPaper
 }
 
 export async function listBackendTags(): Promise<BackendTag[]> {
-  return literatureRequest<BackendTag[]>('/tags')
+  return (await listBackendTagRegistry()).tags
+}
+
+export async function listBackendTagRegistry(): Promise<{ groups: BackendTagGroup[]; tags: BackendTag[] }> {
+  return literatureRequest<{ groups: BackendTagGroup[]; tags: BackendTag[] }>('/tag-registry')
+}
+
+export async function listBackendGroups(): Promise<BackendLiteratureGroup[]> {
+  return literatureRequest<BackendLiteratureGroup[]>('/groups')
+}
+
+export async function findEndNoteLibraries(): Promise<EndNoteLibraryCandidate[]> {
+  return (await literatureRequest<{ libraries: EndNoteLibraryCandidate[] }>('/endnote/libraries')).libraries
+}
+
+export async function previewEndNoteLibrary(path: string): Promise<EndNotePreview> {
+  return literatureRequest<EndNotePreview>('/endnote/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+}
+
+export async function importEndNoteLibrary(path: string): Promise<EndNoteImportResult> {
+  return literatureRequest<EndNoteImportResult>('/endnote/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+}
+
+export async function scanBackendDuplicates(): Promise<DuplicateScanResult> {
+  return literatureRequest<DuplicateScanResult>('/duplicates/scan', { method: 'POST' })
+}
+
+export async function openBackendSiFolder(paperId: string): Promise<string> {
+  const result = await literatureRequest<{ path: string }>(
+    `/papers/${encodeURIComponent(paperId)}/si-folder`,
+  )
+  return result.path
 }
 
 export async function uploadPaper(file: File): Promise<{ paper: BackendPaper; duplicate: boolean }> {
@@ -613,7 +713,7 @@ export async function getBackendMemory(): Promise<string> {
 
 export async function saveBackendPaperReview(
   paperId: string,
-  payload: { tags: Array<{ name: string; category: string }>; focus: string; summary: string },
+  payload: { tags: Array<{ name: string; group_id: string }>; focus: string; summary: string },
 ): Promise<BackendPaper> {
   return fromCatalogPaper(await literatureRequest<CatalogPaper>(`/papers/${encodeURIComponent(paperId)}`, {
     method: 'PATCH',

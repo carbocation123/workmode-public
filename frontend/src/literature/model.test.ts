@@ -20,7 +20,7 @@ const canonicalTags: TagDefinition[] = [
     id: 'in_situ_characterization',
     name: '原位表征',
     aliases: ['原位测试', 'in-situ', 'operando'],
-    category: 'characterization',
+    groupId: 'spectroscopy',
     status: 'confirmed',
   },
 ]
@@ -124,7 +124,7 @@ describe('literature frontend model', () => {
     })
     expect(normalizeSuggestedTag('界面电荷转移', canonicalTags)).toMatchObject({
       name: '界面电荷转移',
-      category: 'uncategorized',
+      groupId: 'ungrouped',
       status: 'provisional',
     })
   })

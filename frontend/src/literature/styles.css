@@ -511,6 +511,56 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .import-confirm-actions button:hover { color: var(--text); background: var(--lit-control-hover); }
 .import-confirm-actions button:last-child { color: var(--color-on-primary, var(--bg)); border-color: var(--cyan); background: var(--cyan); }
 .import-confirm-actions button:disabled { opacity: .45; cursor: default; }
+.endnote-import-trigger { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid var(--lit-accent-border); border-radius: 9px; color: var(--cyan); background: var(--lit-accent-soft); text-align: left; cursor: pointer; }
+.endnote-import-trigger:hover { border-color: var(--cyan); }
+.endnote-import-trigger:disabled { opacity: .45; cursor: default; }
+.endnote-import-trigger svg { width: 17px; flex: 0 0 auto; }
+.endnote-import-trigger span { min-width: 0; display: grid; gap: 3px; }
+.endnote-import-trigger strong { color: var(--text); font-size: 10px; }
+.endnote-import-trigger small { color: var(--muted); font-size: 8px; }
+.literature-group-filter { display: grid; gap: 5px; }
+.literature-group-filter > span { color: var(--faint); font-size: 8px; }
+.literature-group-filter select { width: 100%; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; outline: 0; color: var(--lit-control-text); background: var(--lit-control-bg); font-size: 9px; }
+.literature-group-filter select:focus { border-color: var(--cyan); }
+.card-groups { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.card-groups span { padding: 3px 6px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--muted); background: var(--lit-surface-soft); font-size: 7.5px; }
+.endnote-import-modal { width: min(720px, calc(100vw - 48px)); max-height: min(780px, calc(100vh - 48px)); display: grid; grid-template-rows: 64px minmax(0, 1fr) 70px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--lit-floating-bg); box-shadow: 0 34px 100px var(--lit-shadow); }
+.endnote-import-body { min-height: 0; display: grid; align-content: start; gap: 16px; overflow-y: auto; padding: 22px 24px; }
+.endnote-intro, .endnote-result-summary, .endnote-warning { display: flex; align-items: flex-start; gap: 11px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--lit-surface-soft); }
+.endnote-intro { display: grid; }
+.endnote-intro strong, .endnote-result-summary strong, .endnote-warning strong { color: var(--text); font-size: 12px; }
+.endnote-intro p, .endnote-import-note { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
+.endnote-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.endnote-choice-grid button { min-height: 86px; display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--cyan); background: var(--lit-control-bg); text-align: left; cursor: pointer; }
+.endnote-choice-grid button:hover { border-color: var(--cyan); background: var(--lit-control-hover); }
+.endnote-choice-grid button svg { width: 22px; flex: 0 0 auto; }
+.endnote-choice-grid button span { display: grid; gap: 5px; }
+.endnote-choice-grid button strong { color: var(--text); font-size: 11px; }
+.endnote-choice-grid button small { color: var(--muted); font-size: 8.5px; line-height: 1.4; }
+.endnote-candidate-list, .endnote-failures, .endnote-duplicates { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--lit-surface-soft); }
+.endnote-candidate-list > strong, .endnote-failures > strong, .endnote-duplicates > strong { color: var(--text); font-size: 10px; }
+.endnote-candidate-list button { display: grid; gap: 3px; padding: 9px; border: 1px solid var(--line); border-radius: 7px; color: var(--text); background: var(--lit-control-bg); text-align: left; cursor: pointer; }
+.endnote-candidate-list button:hover { border-color: var(--cyan); }
+.endnote-candidate-list small, .endnote-source-path { overflow-wrap: anywhere; color: var(--faint); font: 8px ui-monospace, monospace; }
+.endnote-warning { border-color: var(--lit-warning-border); background: color-mix(in srgb, var(--amber) 9%, var(--lit-surface-soft)); }
+.endnote-warning svg { width: 20px; flex: 0 0 auto; color: var(--amber); }
+.endnote-warning div, .endnote-result-summary div { display: grid; gap: 5px; }
+.endnote-warning span, .endnote-result-summary span, .endnote-duplicates span { color: var(--muted); font-size: 9px; line-height: 1.55; }
+.endnote-preview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.endnote-preview-stats div { display: grid; gap: 5px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--lit-surface-soft); }
+.endnote-preview-stats dt { color: var(--faint); font-size: 8px; }
+.endnote-preview-stats dd { margin: 0; color: var(--text); font: 16px ui-monospace, monospace; }
+.endnote-source-path { margin: 0; }
+.endnote-result-summary { border-color: var(--lit-accent-border); }
+.endnote-result-summary > svg { width: 22px; color: var(--green); }
+.endnote-failures p { margin: 0; color: var(--danger); font-size: 9px; line-height: 1.5; }
+.endnote-dedupe-button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--lit-accent-border); border-radius: 9px; color: var(--cyan); background: var(--lit-accent-soft); cursor: pointer; }
+.endnote-dedupe-button svg { width: 16px; }
+.endnote-error { margin: 0; padding: 10px 11px; border: 1px solid var(--lit-danger-border); border-radius: 8px; color: var(--danger); background: var(--lit-danger-soft); font-size: 9px; line-height: 1.5; }
+.endnote-import-actions { min-height: 70px; display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding: 0 20px; border-top: 1px solid var(--line); background: var(--lit-panel-bg); }
+.endnote-import-actions button { min-width: 92px; height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-control-bg); cursor: pointer; }
+.endnote-import-actions button:last-child { color: var(--color-on-primary, var(--bg)); border-color: var(--cyan); background: var(--cyan); }
+.endnote-import-actions button:disabled { opacity: .45; cursor: default; }
 .paper-detail-tabs { display: flex; align-items: stretch; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--lit-panel-bg); }
 .paper-detail-tabs button { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 0 15px; border: 0; color: var(--muted); background: transparent; font-size: 10px; cursor: pointer; }
 .paper-detail-tabs button::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; background: transparent; }

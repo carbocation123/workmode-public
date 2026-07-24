@@ -13,6 +13,7 @@ import { SkinChrome } from '../SkinChrome'
 import { THEMES, type ThemeId } from '../theme'
 import { isNearBottom } from '../conversation'
 import { projectRefreshTargets, type ProjectRefreshTarget } from '../projectChanges'
+import { chooseEndNoteLibrary, openLocalPath } from '../desktop'
 import {
   chatActionMessageForEvent,
   createLiveChatState,
@@ -31,14 +32,19 @@ import {
   getBackendProjectInfo,
   getBackendMemory,
   getFactReport,
+  findEndNoteLibraries,
+  importEndNoteLibrary,
   listBackendPapers,
+  listBackendGroups,
   listDeletedBackendPapers,
   listBackendSessions,
   listBackendNotes,
   listBackendLiteratureProjects,
-  listBackendTags,
+  listBackendTagRegistry,
   mapBackendPaper,
+  openBackendSiFolder,
   paperPdfUrl,
+  previewEndNoteLibrary,
   recordImportedPapers,
   removeBackendProject,
   renameBackendProject,
@@ -47,15 +53,22 @@ import {
   saveBackendPaperReview,
   saveBackendNote,
   saveCrossLiterature,
+  scanBackendDuplicates,
   stopBackendChat,
   archiveBackendPaper,
   verifyBackendArchive,
   uploadPaper,
   type ArchiveVerification,
   type BackendNote,
+  type BackendLiteratureGroup,
   type BackendSession,
   type BackendTag,
+  type BackendTagGroup,
   type DeletedBackendPaper,
+  type DuplicateScanResult,
+  type EndNoteImportResult,
+  type EndNoteLibraryCandidate,
+  type EndNotePreview,
   type WorkmodeProject,
 } from './literatureApi'
 import {
@@ -144,14 +157,6 @@ function blankNote(index: number): NoteDocument {
   }
 }
 
-const TAG_CATEGORIES = [
-  { id: 'characterization', name: '表征标签集', hint: 'XPS / EPR / 原位表征…' },
-  { id: 'material', name: '材料标签集', hint: '氧空位 / 载体 / 活性相…' },
-  { id: 'mechanism', name: '机理标签集', hint: '反应机理 / 电荷转移…' },
-  { id: 'performance', name: '性能标签集', hint: '活性 / 选择性 / 稳定性…' },
-  { id: 'uncategorized', name: '候选标签集', hint: '尚待确认分类的新概念…' },
-] as const
-
 const FACT_KIND_LABELS = {
   metadata: '基本信息',
   method: '实验条件',
@@ -213,8 +218,11 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [trashBusyId, setTrashBusyId] = useState('')
   const [trashError, setTrashError] = useState('')
   const [tagRegistry, setTagRegistry] = useState<BackendTag[]>([])
+  const [tagGroups, setTagGroups] = useState<BackendTagGroup[]>([])
+  const [literatureGroups, setLiteratureGroups] = useState<BackendLiteratureGroup[]>([])
   const [search, setSearch] = useState('')
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState('')
   const [tagFilterOpen, setTagFilterOpen] = useState(false)
   const [tagQuery, setTagQuery] = useState('')
   const hudLayoutActive = Boolean(customSkin?.enabled && skinUsesChrome(customSkin.skin))
@@ -223,6 +231,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [dragActive, setDragActive] = useState(false)
   const [pendingImportFiles, setPendingImportFiles] = useState<File[]>([])
   const [importingPapers, setImportingPapers] = useState(false)
+  const [endNoteOpen, setEndNoteOpen] = useState(false)
+  const [endNoteCandidates, setEndNoteCandidates] = useState<EndNoteLibraryCandidate[]>([])
+  const [endNotePath, setEndNotePath] = useState('')
+  const [endNotePreview, setEndNotePreview] = useState<EndNotePreview | null>(null)
+  const [endNoteResult, setEndNoteResult] = useState<EndNoteImportResult | null>(null)
+  const [duplicateResult, setDuplicateResult] = useState<DuplicateScanResult | null>(null)
+  const [endNoteBusy, setEndNoteBusy] = useState(false)
+  const [endNoteError, setEndNoteError] = useState('')
   const [renameSessionOpen, setRenameSessionOpen] = useState(false)
   const [renameSessionTitle, setRenameSessionTitle] = useState('')
   const [renamingSession, setRenamingSession] = useState(false)
@@ -285,7 +301,13 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       }))
     }
     if (targets.has('tags')) {
-      jobs.push(listBackendTags().then(setTagRegistry))
+      jobs.push(listBackendTagRegistry().then((registry) => {
+        setTagRegistry(registry.tags)
+        setTagGroups(registry.groups)
+      }))
+    }
+    if (targets.has('groups')) {
+      jobs.push(listBackendGroups().then(setLiteratureGroups))
     }
     if (targets.has('notes')) {
       jobs.push(listBackendNotes().then((storedNotes) => {
@@ -314,7 +336,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   }
 
   function reconcileProjection() {
-    return refreshProjection(new Set<ProjectRefreshTarget>(['papers', 'tags', 'notes']))
+    return refreshProjection(new Set<ProjectRefreshTarget>(['papers', 'tags', 'groups', 'notes']))
   }
 
   useEffect(() => {
@@ -350,11 +372,12 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       if (!connected) {
         throw new Error('无法连接正式 Workmode 文献项目')
       }
-      const [project, records, storedSessions, storedTags, storedNotes, storedMemory] = await Promise.all([
+      const [project, records, storedSessions, storedTagRegistry, storedGroups, storedNotes, storedMemory] = await Promise.all([
         getBackendProjectInfo(),
         listBackendPapers(),
         listBackendSessions(),
-        listBackendTags(),
+        listBackendTagRegistry(),
+        listBackendGroups(),
         listBackendNotes(),
         getBackendMemory(),
       ])
@@ -366,7 +389,9 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       if (!active) return
       setPapers(mapped)
       setProjectInfo(project)
-      setTagRegistry(storedTags)
+      setTagRegistry(storedTagRegistry.tags)
+      setTagGroups(storedTagRegistry.groups)
+      setLiteratureGroups(storedGroups)
       const mappedNotes = storedNotes.map(mapBackendNote)
       const nextNotes = mappedNotes.length ? mappedNotes : [blankNote(1)]
       setNotes(nextNotes)
@@ -391,6 +416,8 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       setProjectInfo(null)
       setNotes([])
       setTagRegistry([])
+      setTagGroups([])
+      setLiteratureGroups([])
       setMemoryState({ projectMemory: [] })
       setSessions([emptySession])
       setActiveSessionId(emptySession.id)
@@ -407,14 +434,24 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     const matchesSearch = papers.filter((paper) => {
       const matchesText =
         !query ||
-        [paper.title, paper.authors, paper.journal, paper.filename]
+        [
+          paper.title,
+          paper.authors,
+          paper.journal,
+          paper.publicationDate,
+          paper.filename,
+          ...paper.groupIds.map((id) => literatureGroups.find((group) => group.id === id)?.name || id),
+        ]
           .join(' ')
           .toLocaleLowerCase()
           .includes(query)
       return matchesText
     })
-    return filterPapersByTagIds(matchesSearch, selectedTagIds)
-  }, [papers, search, selectedTagIds])
+    const matchesGroup = selectedGroupId
+      ? matchesSearch.filter((paper) => paper.groupIds.includes(selectedGroupId))
+      : matchesSearch
+    return filterPapersByTagIds(matchesGroup, selectedTagIds)
+  }, [papers, search, selectedTagIds, selectedGroupId, literatureGroups])
 
   const tagSearchResults = useMemo(() => {
     const query = tagQuery.trim().toLocaleLowerCase()
@@ -723,16 +760,18 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       const stored = await saveBackendPaperReview(detailPaper.id, {
         tags: names.map((name) => ({
           name,
-          category: tagRegistry.find((tag) =>
+          group_id: tagRegistry.find((tag) =>
             tag.name.toLocaleLowerCase() === name.toLocaleLowerCase()
             || tag.aliases.some((alias) => alias.toLocaleLowerCase() === name.toLocaleLowerCase()),
-          )?.category || 'uncategorized',
+          )?.group_id || tagGroups[0]?.id || 'ungrouped',
         })),
         focus: reviewFocusDraft,
         summary: reviewSummaryDraft,
       })
       updatePaper(detailPaper.id, () => mapBackendPaper(stored))
-      setTagRegistry(await listBackendTags())
+      const registry = await listBackendTagRegistry()
+      setTagRegistry(registry.tags)
+      setTagGroups(registry.groups)
       setActionMessage('标签、关注点和摘要已写回文献记录。')
     } catch (error) {
       setActionMessage(`记录写入失败：${error instanceof Error ? error.message : '未知错误'}`)
@@ -870,6 +909,99 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     }
     setActionMessage('')
     setPendingImportFiles(pdfFiles)
+  }
+
+  function openEndNoteImport() {
+    setEndNoteCandidates([])
+    setEndNotePath('')
+    setEndNotePreview(null)
+    setEndNoteResult(null)
+    setDuplicateResult(null)
+    setEndNoteError('')
+    setEndNoteOpen(true)
+  }
+
+  async function loadEndNotePreview(path: string) {
+    setEndNoteBusy(true)
+    setEndNoteError('')
+    try {
+      const preview = await previewEndNoteLibrary(path)
+      setEndNotePath(path)
+      setEndNotePreview(preview)
+    } catch (error) {
+      setEndNoteError(`无法读取这个 EndNote 文献库：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setEndNoteBusy(false)
+    }
+  }
+
+  async function autoFindEndNote() {
+    setEndNoteBusy(true)
+    setEndNoteError('')
+    try {
+      const candidates = await findEndNoteLibraries()
+      setEndNoteCandidates(candidates)
+      if (!candidates.length) {
+        setEndNoteError('没有自动找到 EndNote 文献库。可以改用“手动选择”。')
+      } else if (candidates.length === 1) {
+        await loadEndNotePreview(candidates[0].path)
+      }
+    } catch (error) {
+      setEndNoteError(`自动查找失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setEndNoteBusy(false)
+    }
+  }
+
+  async function manuallyChooseEndNote() {
+    try {
+      const path = await chooseEndNoteLibrary()
+      if (!path) {
+        setEndNoteError('当前浏览器不能直接选择本机 EndNote 文献库；请使用 Workmode 桌面版。')
+        return
+      }
+      await loadEndNotePreview(path)
+    } catch (error) {
+      setEndNoteError(`选择文件失败：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  async function confirmEndNoteImport() {
+    if (!endNotePath || !endNotePreview || endNoteBusy) return
+    setEndNoteBusy(true)
+    setEndNoteError('')
+    try {
+      const result = await importEndNoteLibrary(endNotePath)
+      setEndNoteResult(result)
+      await reconcileProjection()
+      setActionMessage(`EndNote 导入完成：成功 ${result.imported_count} 篇，失败 ${result.failed_count} 篇。`)
+    } catch (error) {
+      setEndNoteError(`导入失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setEndNoteBusy(false)
+    }
+  }
+
+  async function scanDuplicatesAfterImport() {
+    setEndNoteBusy(true)
+    setEndNoteError('')
+    try {
+      setDuplicateResult(await scanBackendDuplicates())
+    } catch (error) {
+      setEndNoteError(`查重失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setEndNoteBusy(false)
+    }
+  }
+
+  async function openPaperSiFolder(paperId: string) {
+    try {
+      const path = await openBackendSiFolder(paperId)
+      const opened = await openLocalPath(path)
+      setActionMessage(opened ? '已打开 SI 文件夹。' : `SI 文件夹：${path}`)
+    } catch (error) {
+      setActionMessage(`无法打开 SI 文件夹：${error instanceof Error ? error.message : '未知错误'}`)
+    }
   }
 
   async function confirmPendingImport() {
@@ -1143,6 +1275,26 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             />
           </label>
 
+          <button
+            className="endnote-import-trigger"
+            disabled={backendMode !== 'connected'}
+            onClick={openEndNoteImport}
+            type="button"
+          >
+            <Icon name="file" />
+            <span><strong>导入 EndNote 文献库</strong><small>文献、分组、标签和附件一次带过来</small></span>
+          </button>
+
+          {literatureGroups.length > 0 && (
+            <label className="literature-group-filter">
+              <span>文献分组</span>
+              <select value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}>
+                <option value="">全部分组</option>
+                {literatureGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </select>
+            </label>
+          )}
+
           <div className="tag-filter-control">
             <button
               className={`tag-filter-trigger${tagFilterOpen ? ' active' : ''}`}
@@ -1178,23 +1330,23 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                           onChange={() => toggleTagFilter(tag.id)}
                         />
                         <span>{tag.name}</span>
-                        <small>{TAG_CATEGORIES.find((category) => category.id === tag.category)?.name ?? '未分类'}</small>
+                        <small>{tagGroups.find((group) => group.id === tag.group_id)?.name ?? '未分类'}</small>
                       </label>
                     )) : <p>没有匹配标签</p>}
                   </div>
                 ) : (
                   <div className="tag-category-list">
-                    {TAG_CATEGORIES.map((category) => {
-                      const categoryTags = tagRegistry.filter((tag) => tag.category === category.id)
-                      const selectedCount = categoryTags.filter((tag) => selectedTagIds.includes(tag.id)).length
+                    {tagGroups.map((group) => {
+                      const groupTags = tagRegistry.filter((tag) => tag.group_id === group.id)
+                      const selectedCount = groupTags.filter((tag) => selectedTagIds.includes(tag.id)).length
                       return (
-                        <details key={category.id}>
+                        <details key={group.id}>
                           <summary>
-                            <span><strong>{category.name}</strong><small>{category.hint}</small></span>
+                            <span><strong style={{ color: group.color }}>{group.name}</strong><small>{groupTags.length} 个标签</small></span>
                             {selectedCount > 0 && <em>{selectedCount}</em>}
                           </summary>
                           <div>
-                            {categoryTags.length ? categoryTags.map((tag) => (
+                            {groupTags.length ? groupTags.map((tag) => (
                               <label key={tag.id}>
                                 <input
                                   type="checkbox"
@@ -1247,6 +1399,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                     <p className="paper-filename">{paper.filename}</p>
                     {paper.archiveFilename && paper.archiveFilename !== paper.filename && (
                       <p className="original-filename">标准名：{paper.archiveFilename}</p>
+                    )}
+                    {paper.groupIds.length > 0 && (
+                      <div className="card-groups">
+                        {paper.groupIds.slice(0, 2).map((groupId) => (
+                          <span key={groupId}>{literatureGroups.find((group) => group.id === groupId)?.name || groupId}</span>
+                        ))}
+                        {paper.groupIds.length > 2 && <span>+{paper.groupIds.length - 2}</span>}
+                      </div>
                     )}
                     <div className="card-tags">
                       {paper.tagIds.slice(0, 4).map((tagId) => {
@@ -1632,6 +1792,9 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 <h2>{detailPaper.archiveFilename ?? detailPaper.filename}</h2>
               </div>
               <div className="paper-detail-header-actions">
+                <button onClick={() => void openPaperSiFolder(detailPaper.id)}>
+                  <Icon name="layers" />打开 SI 文件夹
+                </button>
                 <button className="paper-delete-button" disabled={streaming || trashBusyId === detailPaper.id} onClick={() => void deleteDetailPaper()}>
                   <Icon name="trash" />{trashBusyId === detailPaper.id ? '处理中…' : '移入回收站'}
                 </button>
@@ -1664,6 +1827,8 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                     <span><strong>原始导入名</strong>{detailPaper.filename}</span>
                     <span><strong>归档位置</strong>{detailPaper.archiveLocation}/</span>
                     <span><strong>元数据来源</strong>{METADATA_SOURCE_LABELS[detailPaper.metadataSource]}</span>
+                    <span><strong>发表日期</strong>{detailPaper.publicationDate || detailPaper.year || '未填写'}</span>
+                    <span><strong>文献分组</strong>{detailPaper.groupIds.map((id) => literatureGroups.find((group) => group.id === id)?.name || id).join(' · ') || '未分组'}</span>
                   </div>
                   <div className="archive-contract">
                     <article>
@@ -1882,6 +2047,118 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
               <button disabled={importingPapers} onClick={() => void confirmPendingImport()}>
                 {importingPapers ? '正在入库…' : `确认入库 ${pendingImportFiles.length} 篇`}
               </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {endNoteOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (!endNoteBusy) setEndNoteOpen(false)
+        }}>
+          <section
+            className="endnote-import-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="endnote-import-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div><span className="eyebrow">ENDNOTE IMPORT</span><h2 id="endnote-import-title">导入 EndNote 文献库</h2></div>
+              <button disabled={endNoteBusy} onClick={() => setEndNoteOpen(false)} aria-label="关闭 EndNote 导入"><Icon name="close" /></button>
+            </header>
+            <div className="endnote-import-body">
+              {!endNotePreview && !endNoteResult && (
+                <>
+                  <div className="endnote-intro">
+                    <strong>把旧文献库直接搬进来</strong>
+                    <p>EndNote 中可用的文献元数据、手工分组、标签、标签颜色和附件都会合并到当前项目。智能分组不会导入，原来的 EndNote 文件不会被修改。</p>
+                  </div>
+                  <div className="endnote-choice-grid">
+                    <button disabled={endNoteBusy} onClick={() => void autoFindEndNote()}>
+                      <Icon name="search" /><span><strong>自动查找</strong><small>在常用文件夹中寻找 .enl 和 .enlx</small></span>
+                    </button>
+                    <button disabled={endNoteBusy} onClick={() => void manuallyChooseEndNote()}>
+                      <Icon name="file" /><span><strong>手动选择</strong><small>自己选一个 EndNote 文献库文件</small></span>
+                    </button>
+                  </div>
+                  {endNoteCandidates.length > 1 && (
+                    <div className="endnote-candidate-list">
+                      <strong>找到了 {endNoteCandidates.length} 个文献库，请选择一个：</strong>
+                      {endNoteCandidates.map((candidate) => (
+                        <button key={candidate.path} onClick={() => void loadEndNotePreview(candidate.path)}>
+                          <span>{candidate.name}</span><small>{candidate.path}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {endNotePreview && !endNoteResult && (
+                <>
+                  <div className="endnote-warning">
+                    <Icon name="clock" />
+                    <div><strong>导入前，请先关闭 EndNote</strong><span>EndNote 占用文献库时可能导致读取失败。关闭后再点“开始导入”即可。</span></div>
+                  </div>
+                  <dl className="endnote-preview-stats">
+                    <div><dt>文献记录</dt><dd>{endNotePreview.reference_count}</dd></div>
+                    <div><dt>可以导入</dt><dd>{endNotePreview.importable_count}</dd></div>
+                    <div><dt>手工分组</dt><dd>{endNotePreview.manual_group_count}</dd></div>
+                    <div><dt>标签</dt><dd>{endNotePreview.tag_count}</dd></div>
+                    <div><dt>附件</dt><dd>{endNotePreview.attachment_count}</dd></div>
+                    <div><dt>缺少主 PDF</dt><dd>{endNotePreview.failed_count}</dd></div>
+                  </dl>
+                  <p className="endnote-source-path">{endNotePreview.source_path}</p>
+                  <p className="endnote-import-note">每条文献会从全部附件中寻找第一个有效 PDF 作为主论文；其他附件放进该文献的 SI 文件夹。没有有效 PDF 的记录会单独报错，不影响其余文献。</p>
+                </>
+              )}
+
+              {endNoteResult && (
+                <>
+                  <div className="endnote-result-summary">
+                    <Icon name="check" />
+                    <div><strong>导入完成</strong><span>成功 {endNoteResult.imported_count} 篇，失败 {endNoteResult.failed_count} 篇；导入过程没有调用 AI。</span></div>
+                  </div>
+                  {endNoteResult.failures.length > 0 && (
+                    <div className="endnote-failures">
+                      <strong>这些记录没有导入：</strong>
+                      {endNoteResult.failures.map((failure) => (
+                        <p key={failure.endnote_record_id}>{failure.title || `记录 ${failure.endnote_record_id}`}：{failure.reason}</p>
+                      ))}
+                    </div>
+                  )}
+                  {duplicateResult ? (
+                    <div className="endnote-duplicates">
+                      <strong>查重结果：{duplicateResult.group_count} 组可能重复</strong>
+                      <span>系统只列出结果，不会自动合并或覆盖。你可以稍后逐组手动处理。</span>
+                    </div>
+                  ) : (
+                    <button className="endnote-dedupe-button" disabled={endNoteBusy} onClick={() => void scanDuplicatesAfterImport()}>
+                      <Icon name="search" />导入完成后查重
+                    </button>
+                  )}
+                </>
+              )}
+
+              {endNoteError && <p className="endnote-error">{endNoteError}</p>}
+            </div>
+            <footer className="endnote-import-actions">
+              {endNotePreview && !endNoteResult ? (
+                <>
+                  <button disabled={endNoteBusy} onClick={() => {
+                    setEndNotePreview(null)
+                    setEndNotePath('')
+                  }}>返回</button>
+                  <button disabled={endNoteBusy || endNotePreview.importable_count === 0} onClick={() => void confirmEndNoteImport()}>
+                    {endNoteBusy ? '正在导入…' : `开始导入 ${endNotePreview.importable_count} 篇`}
+                  </button>
+                </>
+              ) : (
+                <button disabled={endNoteBusy} onClick={() => setEndNoteOpen(false)}>
+                  {endNoteResult ? '完成' : '取消'}
+                </button>
+              )}
             </footer>
           </section>
         </div>
