@@ -95,4 +95,15 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('打开 SI 文件夹')
     expect(literatureApi).toContain('openBackendSiFolder')
   })
+
+  it('shows and searches the same useful bibliographic and workflow fields exposed to AI', () => {
+    expect(source).toContain('paper.doi')
+    expect(source).toContain('<strong>期刊</strong>')
+    expect(source).toContain('<strong>DOI</strong>')
+    expect(source).toContain('<strong>第一作者姓</strong>')
+    expect(source).toContain('<strong>期刊缩写</strong>')
+    expect(source).toContain('<strong>处理阶段</strong>')
+    expect(source).toContain('<strong>处理错误</strong>')
+    expect(source).toContain('<strong>SI 文件夹</strong>')
+  })
 })

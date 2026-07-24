@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isCompatibleLiteratureBackend, mergeWorkmodeMessages } from './literatureApi'
+import { isCompatibleLiteratureBackend, mapBackendPaper, mergeWorkmodeMessages } from './literatureApi'
 
 describe('isCompatibleLiteratureBackend', () => {
   it('rejects a generic backend or the retired proposal contract', () => {
@@ -92,5 +92,54 @@ describe('isCompatibleLiteratureBackend', () => {
     ])
 
     expect(messages).toEqual([])
+  })
+})
+
+describe('mapBackendPaper', () => {
+  it('preserves the useful bibliographic, organization, asset and workflow fields shown to AI', () => {
+    const paper = mapBackendPaper({
+      id: 'paper-1',
+      original_filename: 'source.pdf',
+      archive_filename: 'Zhang_2024_NatCatal.pdf',
+      archive_location: '文献/未处理',
+      title: 'Catalyst paper',
+      authors: 'Zhang, San',
+      first_author_surname: 'Zhang',
+      year: 2024,
+      publication_date: '2024-05-10',
+      journal: 'Nature Catalysis',
+      journal_abbreviation: 'NatCatal',
+      doi: '10.1000/example',
+      status: 'extracting',
+      tags: ['xps'],
+      group_ids: ['doctoral'],
+      focus: '界面结构',
+      summary: '关注构效关系。',
+      paper_type: 'research',
+      metadata_source: 'manual_review',
+      metadata_trust: 'complete',
+      metadata_issue: '',
+      verification_status: 'pending',
+      stage: 'extracting_facts',
+      error: 'one page needs review',
+      paths: {
+        pdf: 'papers/unprocessed/pdf/source.pdf',
+        si_folder: 'papers/unprocessed/SI/paper-1',
+        mineru_dir: 'papers/unprocessed/extracted/paper-1',
+        full_md: 'papers/unprocessed/extracted/paper-1/full.md',
+        fact_report: 'papers/unprocessed/extracted/paper-1/facts.md',
+      },
+    })
+
+    expect(paper).toMatchObject({
+      firstAuthorSurname: 'Zhang',
+      journalAbbreviation: 'NatCatal',
+      doi: '10.1000/example',
+      processingStage: 'extracting_facts',
+      processingError: 'one page needs review',
+      groupIds: ['doctoral'],
+      tagIds: ['xps'],
+      siFolder: 'papers/unprocessed/SI/paper-1',
+    })
   })
 })

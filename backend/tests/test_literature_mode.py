@@ -40,6 +40,7 @@ class LiteratureModeTest(unittest.TestCase):
 
         expected = {
             "literature_search",
+            "literature_library_overview",
             "literature_tag_list",
             "literature_read",
             "literature_import",
@@ -72,6 +73,8 @@ class LiteratureModeTest(unittest.TestCase):
         }
         self.assertIn("before assigning tags", schemas["literature_tag_list"]["description"])
         self.assertIn("literature_tag_list", schemas["literature_update_record"]["description"])
+        self.assertIn("literature groups", schemas["literature_library_overview"]["description"])
+        self.assertIn("group_ids", schemas["literature_search"]["parameters"]["properties"])
 
     def test_record_update_executes_directly_without_approval_or_selection(self) -> None:
         from app.literature_project import execute_literature_tool
@@ -140,6 +143,249 @@ class LiteratureModeTest(unittest.TestCase):
             },
         )
 
+    def test_library_overview_distinguishes_literature_groups_from_tag_groups(self) -> None:
+        from app.literature_project import execute_literature_tool
+
+        groups_path = self.root / "groups.json"
+        groups_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "groups": [
+                        {"id": "doctoral-research-practical-system", "name": "博士科研 - 实际体系"},
+                        {"id": "doctoral-research-methods", "name": "博士科研 - 方法体系"},
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        tags_path = self.root / "tags.json"
+        tags_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "groups": [
+                        {"id": "characterization", "name": "表征", "color": "#F6CE3A", "order": 1},
+                    ],
+                    "tags": [
+                        {
+                            "id": "xps",
+                            "name": "XPS",
+                            "aliases": [],
+                            "group_id": "characterization",
+                            "status": "confirmed",
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"].extend(
+            [
+                {
+                    "id": "paper-1",
+                    "title": "Practical catalyst",
+                    "status": "pending",
+                    "group_ids": ["doctoral-research-practical-system"],
+                    "tag_ids": ["xps"],
+                    "paths": {"pdf": "papers/unprocessed/pdf/paper-1.pdf"},
+                },
+                {
+                    "id": "paper-2",
+                    "title": "Second catalyst",
+                    "status": "pending",
+                    "group_ids": ["doctoral-research-practical-system"],
+                    "tag_ids": [],
+                    "paths": {"pdf": "papers/unprocessed/pdf/paper-2.pdf"},
+                },
+            ]
+        )
+        catalog_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        result = execute_literature_tool(
+            self.project.slug,
+            "literature_library_overview",
+            {},
+        )
+
+        self.assertTrue(result.ok, result.content)
+        payload = json.loads(result.content)
+        self.assertEqual(payload["paper_count"], 2)
+        self.assertEqual(payload["paper_status_counts"], {"pending": 2})
+        self.assertEqual(payload["metadata_trust_counts"], {"unknown": 2})
+        self.assertEqual(
+            payload["asset_counts"],
+            {
+                "main_pdf_registered": 2,
+                "si_folder_registered": 0,
+                "mineru_output_registered": 0,
+                "full_text_registered": 0,
+                "fact_report_registered": 0,
+            },
+        )
+        self.assertEqual(
+            payload["literature_groups"],
+            [
+                {
+                    "id": "doctoral-research-practical-system",
+                    "name": "博士科研 - 实际体系",
+                    "paper_count": 2,
+                },
+                {
+                    "id": "doctoral-research-methods",
+                    "name": "博士科研 - 方法体系",
+                    "paper_count": 0,
+                },
+            ],
+        )
+        self.assertEqual(
+            payload["tag_groups"],
+            [
+                {
+                    "id": "characterization",
+                    "name": "表征",
+                    "color": "#F6CE3A",
+                    "tag_count": 1,
+                    "paper_count": 1,
+                },
+            ],
+        )
+        field_by_key = {field["key"]: field for field in payload["fields"]}
+        self.assertIn("文献分组", field_by_key["group_ids"]["description"])
+        self.assertIn("标签组", field_by_key["tag_ids"]["description"])
+        self.assertIn("不是 EndNote Reference Type", field_by_key["paper_type"]["description"])
+        self.assertIn("补充材料", field_by_key["paths.si_folder"]["description"])
+        self.assertIn("DOI", field_by_key)
+        self.assertIn("metadata_trust", field_by_key)
+        self.assertIn("verification_status", field_by_key)
+
+    def test_search_filters_and_resolves_literature_groups_and_tags(self) -> None:
+        from app.literature_project import execute_literature_tool
+
+        (self.root / "groups.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "groups": [{"id": "doctoral", "name": "博士科研 - 实际体系"}],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (self.root / "tags.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "groups": [{"id": "methods", "name": "表征", "color": "#F6CE3A", "order": 1}],
+                    "tags": [
+                        {
+                            "id": "xps",
+                            "name": "XPS",
+                            "aliases": [],
+                            "group_id": "methods",
+                            "status": "confirmed",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"].append(
+            {
+                "id": "paper-1",
+                "title": "Catalyst paper",
+                "authors": "A. Author",
+                "first_author_surname": "Author",
+                "year": 2024,
+                "publication_date": "2024-05",
+                "journal": "Catalysis Journal",
+                "journal_abbreviation": "CatalJ",
+                "doi": "10.1000/example",
+                "paper_type": "research",
+                "status": "pending",
+                "archive_location": "papers/unprocessed",
+                "archive_filename": "Author_2024_CatalJ.pdf",
+                "metadata_source": "manual",
+                "metadata_trust": "complete",
+                "metadata_issue": "",
+                "verification_status": "pending",
+                "stage": "metadata_ready",
+                "error": "",
+                "group_ids": ["doctoral"],
+                "tag_ids": ["xps"],
+                "paths": {
+                    "pdf": "papers/unprocessed/pdf/paper-1.pdf",
+                    "si_folder": "papers/unprocessed/SI/paper-1",
+                },
+            }
+        )
+        catalog_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        result = execute_literature_tool(
+            self.project.slug,
+            "literature_search",
+            {"group_ids": ["doctoral"]},
+        )
+
+        self.assertTrue(result.ok, result.content)
+        paper = json.loads(result.content)["papers"][0]
+        self.assertEqual(paper["paper_type"], "research")
+        self.assertEqual(paper["first_author_surname"], "Author")
+        self.assertEqual(paper["journal_abbreviation"], "CatalJ")
+        self.assertEqual(paper["doi"], "10.1000/example")
+        self.assertEqual(paper["metadata_source"], "manual")
+        self.assertEqual(paper["metadata_trust"], "complete")
+        self.assertEqual(paper["verification_status"], "pending")
+        self.assertEqual(paper["stage"], "metadata_ready")
+        self.assertEqual(paper["paths"]["si_folder"], "papers/unprocessed/SI/paper-1")
+        self.assertEqual(
+            paper["groups"],
+            [{"id": "doctoral", "name": "博士科研 - 实际体系"}],
+        )
+        self.assertEqual(
+            paper["tags"],
+            [
+                {
+                    "id": "xps",
+                    "name": "XPS",
+                    "group_id": "methods",
+                    "group_name": "表征",
+                    "color": "#F6CE3A",
+                    "status": "confirmed",
+                }
+            ],
+        )
+
+        read_result = execute_literature_tool(
+            self.project.slug,
+            "literature_read",
+            {"paper_id": "paper-1", "part": "record"},
+        )
+        self.assertTrue(read_result.ok, read_result.content)
+        read_paper = json.loads(read_result.content)["paper"]
+        self.assertEqual(read_paper, paper)
+
     def test_system_prompt_and_budget_use_literature_tool_profile(self) -> None:
         from app.prompt import build_system_prompt
 
@@ -157,9 +403,12 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertIn("默认逐图讲解", prompt)
         self.assertIn("图注或图像信息不足", prompt)
         self.assertIn("不得猜测", prompt)
+        self.assertIn("literature_library_overview", prompt)
+        self.assertIn("文献分组与标签组是两套结构", prompt)
+        self.assertIn("不能根据 papers/ 下的物理文件夹推断", prompt)
         self.assertNotIn("project_bash", prompt)
         self.assertEqual(usage["tool_profile"], "literature")
-        self.assertEqual(usage["tool_count"], 15)
+        self.assertEqual(usage["tool_count"], 16)
 
         schemas = {
             item["function"]["name"]: item["function"]
