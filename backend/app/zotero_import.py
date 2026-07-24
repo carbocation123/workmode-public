@@ -260,13 +260,24 @@ def _attachment_source(
         return None
     if raw.casefold().startswith("storage:"):
         relative = raw.split(":", 1)[1].replace("\\", "/").lstrip("/")
-        storage_folder = (data_directory / "storage" / item_key).resolve()
-        candidate = (storage_folder / relative).resolve()
+        if not re.fullmatch(r"[A-Z0-9]{8}", item_key, flags=re.IGNORECASE):
+            return None
+        try:
+            storage_root = (data_directory / "storage").resolve()
+            storage_folder = (storage_root / item_key).resolve()
+            if not _inside(storage_folder, storage_root):
+                return None
+            candidate = (storage_folder / relative).resolve()
+        except (OSError, RuntimeError, ValueError):
+            return None
         return candidate if _inside(candidate, storage_folder) else None
     if link_mode == 2:
-        candidate = Path(raw).expanduser()
-        if candidate.is_absolute():
-            return candidate.resolve()
+        try:
+            candidate = Path(raw).expanduser()
+            if candidate.is_absolute():
+                return candidate.resolve()
+        except (OSError, RuntimeError, ValueError):
+            return None
     return None
 
 
