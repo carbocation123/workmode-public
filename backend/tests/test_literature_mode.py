@@ -703,6 +703,55 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertTrue(expected.is_dir())
         opener.assert_called_once_with(expected)
 
+    def test_word_routes_insert_linked_citation_and_bibliography(self) -> None:
+        from app.main import app
+        from fastapi.testclient import TestClient
+
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"].append(
+            {
+                "id": "paper-word",
+                "title": "Linked Word citation",
+                "authors": "Yang, Jason",
+                "year": 2026,
+                "journal": "Workmode Reports",
+                "doi": "10.1000/workmode.word",
+                "original_filename": "word.pdf",
+                "status": "pending",
+                "tag_ids": [],
+                "focus": "",
+                "summary": "",
+                "paths": {},
+            }
+        )
+        catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        client = TestClient(app)
+        with patch(
+            "app.literature_routes.insert_word_citation",
+            return_value={"ok": True, "citation_count": 1, "reference_count": 0},
+        ) as insert_citation:
+            citation = client.post(
+                f"/api/work/projects/{self.project.slug}/literature/word/citations/paper-word"
+            )
+        with patch(
+            "app.literature_routes.insert_word_bibliography",
+            return_value={"ok": True, "citation_count": 1, "reference_count": 1},
+        ) as insert_bibliography:
+            bibliography = client.post(
+                f"/api/work/projects/{self.project.slug}/literature/word/bibliography"
+            )
+
+        self.assertEqual(citation.status_code, 200)
+        self.assertEqual(citation.json()["citation_count"], 1)
+        inserted_payload = insert_citation.call_args.args[0]
+        self.assertEqual(inserted_payload["paper_id"], "paper-word")
+        self.assertEqual(inserted_payload["metadata"]["title"], "Linked Word citation")
+        self.assertEqual(bibliography.status_code, 200)
+        self.assertEqual(bibliography.json()["reference_count"], 1)
+        insert_bibliography.assert_called_once_with()
+
     def test_chat_persists_active_context_as_message_metadata(self) -> None:
         from app.main import app
         from fastapi.testclient import TestClient

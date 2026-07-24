@@ -220,4 +220,14 @@ describe('literature live interaction contracts', () => {
     expect(styles).toContain('.paper-card-meta')
     expect(styles).toContain('.paper-card-focus')
   })
+
+  it('inserts linked Word citations and a refreshable bibliography from the paper detail', () => {
+    expect(source).toContain('插入 Word 引用')
+    expect(source).toContain('生成 Word 参考文献')
+    expect(source).toContain('insertBackendWordCitation')
+    expect(source).toContain('insertBackendWordBibliography')
+    expect(source).toContain("const [wordBusy, setWordBusy] = useState<'citation' | 'bibliography' | null>(null)")
+    expect(literatureApi).toContain('/word/citations/')
+    expect(literatureApi).toContain('/word/bibliography')
+  })
 })
