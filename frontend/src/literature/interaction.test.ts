@@ -108,6 +108,20 @@ describe('literature live interaction contracts', () => {
     expect(source).not.toContain('openLocalPath')
   })
 
+  it('gives people and AI the same recoverable tag-governance lifecycle', () => {
+    expect(source).toContain('管理标签')
+    expect(source).toContain('className="tag-registry-modal"')
+    expect(source).toContain('新建标签组')
+    expect(source).toContain('修改名称与颜色')
+    expect(source).toContain('移动到其他标签组')
+    expect(source).toContain('确认候选')
+    expect(source).toContain('归档标签')
+    expect(source).toContain('恢复标签')
+    expect(literatureApi).toContain('manageBackendTags')
+    expect(literatureApi).toContain('/tag-registry/manage')
+    expect(styles).toContain('.tag-registry-modal')
+  })
+
   it('keeps useful bibliographic and workflow fields available to search and AI', () => {
     expect(source).toContain('paper.doi')
     expect(literatureApi).toContain('firstAuthorSurname')

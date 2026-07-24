@@ -26,6 +26,7 @@ describe('isCompatibleLiteratureBackend', () => {
         'literature_search',
         'literature_library_overview',
         'literature_tag_list',
+        'literature_tag_manage',
         'literature_read',
         'literature_update_record',
         'literature_delete',
@@ -34,6 +35,25 @@ describe('isCompatibleLiteratureBackend', () => {
         'literature_note_delete',
       ],
     })).toBe(true)
+  })
+
+  it('rejects a literature backend that cannot govern tag groups', () => {
+    expect(isCompatibleLiteratureBackend({
+      ok: true,
+      project_type: 'literature-library',
+      tool_profile: 'literature',
+      agent_tools: [
+        'literature_search',
+        'literature_library_overview',
+        'literature_tag_list',
+        'literature_read',
+        'literature_update_record',
+        'literature_delete',
+        'literature_restore',
+        'literature_note_upsert',
+        'literature_note_delete',
+      ],
+    })).toBe(false)
   })
 
   it('keeps imported and selected literature system events in the visible timeline', () => {

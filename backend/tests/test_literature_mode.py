@@ -42,6 +42,7 @@ class LiteratureModeTest(unittest.TestCase):
             "literature_search",
             "literature_library_overview",
             "literature_tag_list",
+            "literature_tag_manage",
             "literature_read",
             "literature_import",
             "literature_process",
@@ -73,8 +74,128 @@ class LiteratureModeTest(unittest.TestCase):
         }
         self.assertIn("before assigning tags", schemas["literature_tag_list"]["description"])
         self.assertIn("literature_tag_list", schemas["literature_update_record"]["description"])
+        self.assertIn("archive", schemas["literature_tag_manage"]["description"])
         self.assertIn("literature groups", schemas["literature_library_overview"]["description"])
         self.assertIn("group_ids", schemas["literature_search"]["parameters"]["properties"])
+
+    def test_tag_governance_supports_shared_frontend_and_ai_lifecycle(self) -> None:
+        from app.literature_project import execute_literature_tool
+
+        created_group = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {"action": "create_group", "name": "表征方法", "color": "#F6CE3A"},
+        )
+        self.assertTrue(created_group.ok, created_group.content)
+        group_id = json.loads(created_group.content)["group"]["id"]
+
+        created_tag = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {
+                "action": "create_tag",
+                "group_id": group_id,
+                "name": "XPS",
+                "aliases": ["X-ray photoelectron spectroscopy"],
+            },
+        )
+        self.assertTrue(created_tag.ok, created_tag.content)
+        tag_id = json.loads(created_tag.content)["tag"]["id"]
+
+        second_group = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {"action": "create_group", "name": "电子结构", "color": "#5231DE"},
+        )
+        second_group_id = json.loads(second_group.content)["group"]["id"]
+        updated_tag = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {
+                "action": "update_tag",
+                "tag_id": tag_id,
+                "name": "X射线光电子能谱",
+                "group_id": second_group_id,
+                "aliases": ["XPS"],
+                "status": "confirmed",
+            },
+        )
+        self.assertTrue(updated_tag.ok, updated_tag.content)
+        self.assertEqual(
+            json.loads(updated_tag.content)["tag"],
+            {
+                "id": tag_id,
+                "name": "X射线光电子能谱",
+                "aliases": ["XPS"],
+                "group_id": second_group_id,
+                "status": "confirmed",
+            },
+        )
+
+        archived = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {"action": "archive_tag", "tag_id": tag_id},
+        )
+        self.assertTrue(archived.ok, archived.content)
+        active_tags = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_list",
+            {"query": "XPS"},
+        )
+        self.assertEqual(json.loads(active_tags.content)["count"], 0)
+        archived_tags = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_list",
+            {"query": "XPS", "include_archived": True},
+        )
+        self.assertEqual(json.loads(archived_tags.content)["tags"][0]["archived"], True)
+
+        restored = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {"action": "restore_tag", "tag_id": tag_id},
+        )
+        self.assertTrue(restored.ok, restored.content)
+
+        archived_group = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {"action": "archive_group", "group_id": second_group_id},
+        )
+        self.assertTrue(archived_group.ok, archived_group.content)
+        stored_registry = json.loads((self.root / "tags.json").read_text(encoding="utf-8"))
+        stored_tag = next(item for item in stored_registry["tags"] if item["id"] == tag_id)
+        self.assertEqual(stored_tag["archived_by_group_id"], second_group_id)
+
+        restored_group = execute_literature_tool(
+            self.project.slug,
+            "literature_tag_manage",
+            {"action": "restore_group", "group_id": second_group_id},
+        )
+        self.assertTrue(restored_group.ok, restored_group.content)
+        restored_registry = json.loads((self.root / "tags.json").read_text(encoding="utf-8"))
+        self.assertNotIn(
+            "archived_at",
+            next(item for item in restored_registry["groups"] if item["id"] == second_group_id),
+        )
+        self.assertNotIn(
+            "archived_at",
+            next(item for item in restored_registry["tags"] if item["id"] == tag_id),
+        )
+
+    def test_tag_governance_route_rejects_invalid_colors_without_writing(self) -> None:
+        from app.main import app
+        from fastapi.testclient import TestClient
+
+        response = TestClient(app).post(
+            f"/api/work/projects/{self.project.slug}/literature/tag-registry/manage",
+            json={"action": "create_group", "name": "无效颜色", "color": "yellow"},
+        )
+
+        self.assertEqual(response.status_code, 400, response.text)
+        registry = json.loads((self.root / "tags.json").read_text(encoding="utf-8"))
+        self.assertEqual(registry["groups"], [])
 
     def test_record_update_executes_directly_without_approval_or_selection(self) -> None:
         from app.literature_project import execute_literature_tool
