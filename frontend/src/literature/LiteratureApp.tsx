@@ -181,7 +181,6 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [activeSessionId, setActiveSessionId] = useState(emptySession.id)
   const [detailPaperId, setDetailPaperId] = useState<string | null>(null)
   const [detailTab, setDetailTab] = useState<'overview' | 'facts' | 'pdf'>('overview')
-  const [detailEditing, setDetailEditing] = useState(false)
   const [siOpening, setSiOpening] = useState(false)
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
@@ -242,7 +241,8 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   })
   const [reviewFocusDraft, setReviewFocusDraft] = useState('')
   const [reviewSummaryDraft, setReviewSummaryDraft] = useState('')
-  const [reviewTagsDraft, setReviewTagsDraft] = useState('')
+  const [reviewTagIdsDraft, setReviewTagIdsDraft] = useState<string[]>([])
+  const [reviewTagQuery, setReviewTagQuery] = useState('')
   const [crossLiteratureDraft, setCrossLiteratureDraft] = useState('')
   const [archiveVerification, setArchiveVerification] = useState<ArchiveVerification | null>(null)
   const [actionMessage, setActionMessage] = useState('')
@@ -477,6 +477,13 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
   const managedTagGroup = tagManagerRegistry.groups.find((group) => group.id === tagManagerGroupId) ?? null
   const managedTags = tagManagerRegistry.tags.filter((tag) => tag.group_id === tagManagerGroupId)
+  const reviewVisibleTags = useMemo(() => {
+    const query = reviewTagQuery.trim().toLocaleLowerCase()
+    if (!query) return tagRegistry
+    return tagRegistry.filter((tag) =>
+      [tag.name, ...tag.aliases].some((label) => label.toLocaleLowerCase().includes(query)),
+    )
+  }, [reviewTagQuery, tagRegistry])
 
   const detailPaper = papers.find((paper) => paper.id === detailPaperId) ?? null
 
@@ -484,11 +491,10 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     if (!detailPaper) return
     setReviewFocusDraft(detailPaper.focus || '')
     setReviewSummaryDraft(detailPaper.summary || '')
-    setReviewTagsDraft(
-      detailPaper.tagIds
-        .map((tagId) => tagRegistry.find((tag) => tag.id === tagId)?.name || tagId)
-        .join('，'),
-    )
+    setReviewTagIdsDraft(detailPaper.tagIds.filter((tagId) =>
+      tagRegistry.some((tag) => tag.id === tagId),
+    ))
+    setReviewTagQuery('')
     setCrossLiteratureDraft('')
     setArchiveVerification(null)
     setActionMessage('')
@@ -769,18 +775,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
 
   async function confirmPaperReview() {
     if (!detailPaper || backendMode !== 'connected') return
-    const names = reviewTagsDraft
-      .split(/[，,;；\n]+/)
-      .map((name) => name.trim())
-      .filter(Boolean)
+    const selectedTags = reviewTagIdsDraft
+      .map((tagId) => tagRegistry.find((tag) => tag.id === tagId))
+      .filter((tag): tag is BackendTag => Boolean(tag))
     try {
       const stored = await saveBackendPaperReview(detailPaper.id, {
-        tags: names.map((name) => ({
-          name,
-          group_id: tagRegistry.find((tag) =>
-            tag.name.toLocaleLowerCase() === name.toLocaleLowerCase()
-            || tag.aliases.some((alias) => alias.toLocaleLowerCase() === name.toLocaleLowerCase()),
-          )?.group_id || tagGroups[0]?.id || 'ungrouped',
+        tags: selectedTags.map((tag) => ({
+          name: tag.name,
+          group_id: tag.group_id,
         })),
         focus: reviewFocusDraft,
         summary: reviewSummaryDraft,
@@ -904,7 +906,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     setActionMessage('')
     setDetailPaperId(id)
     setDetailTab(tab)
-    setDetailEditing(false)
+  }
+
+  function toggleReviewTag(tagId: string) {
+    setReviewTagIdsDraft((current) =>
+      current.includes(tagId)
+        ? current.filter((id) => id !== tagId)
+        : [...current, tagId],
+    )
   }
 
   function toggleTagFilter(id: string) {
@@ -1569,6 +1578,9 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                         {paper.year && <span className="card-year">{paper.year}</span>}
                       </div>
                     )}
+                    <p className="paper-card-focus">
+                      <span>关注点</span><em>{paper.focus || '暂空'}</em>
+                    </p>
                     {(paper.groupIds.length > 0 || paper.tagIds.length > 0) && (
                       <div className="paper-classifiers">
                         {paper.groupIds.length > 0 && (
@@ -2134,15 +2146,6 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
             <header className="modal-header">
               <div><h2>文献详情</h2></div>
               <div className="paper-detail-header-actions">
-                {backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' && (
-                  <button
-                    className={`detail-edit-toggle${detailEditing ? ' active' : ''}`}
-                    onClick={() => setDetailEditing((editing) => !editing)}
-                    type="button"
-                  >
-                    <Icon name="edit" />{detailEditing ? '收起编辑' : '编辑信息'}
-                  </button>
-                )}
                 <button disabled={siOpening} onClick={() => void openPaperSiFolder(detailPaper.id)}>
                   <Icon name="layers" />{siOpening ? '正在打开…' : '打开 SI 文件夹'}
                 </button>
@@ -2206,39 +2209,90 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   )}
                 </div>
 
-                <div className="detail-grid">
-                  <section className="detail-section summary-section">
-                    <div className="section-title"><span>AI 提炼摘要</span></div>
-                    <p className={detailPaper.summary ? '' : 'empty-detail-copy'}>{detailPaper.summary || '暂空'}</p>
-                  </section>
-                  <section className="detail-section focus-section">
-                    <div className="section-title"><span>用户关注点</span></div>
-                    <p className={detailPaper.focus ? 'focus-note' : 'empty-detail-copy'}>{detailPaper.focus || '暂空'}</p>
-                  </section>
-                </div>
-                {detailEditing && backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' && (
+                {backendMode === 'connected' && detailPaper.archiveLocation !== '文献/已处理' ? (
                   <section className="review-confirm-panel">
-                    <div className="section-title"><span>编辑文献信息</span></div>
-                    <label>
-                      <span>文章标签</span>
-                      <input
-                        value={reviewTagsDraft}
-                        onChange={(event) => setReviewTagsDraft(event.target.value)}
-                        placeholder="EPR，氧空位，原位表征"
-                      />
-                      <small>逗号分隔；命中白名单或别名时复用，未知标签先登记为候选。</small>
-                    </label>
-                    <label>
-                      <span>用户关注点</span>
-                      <textarea value={reviewFocusDraft} onChange={(event) => setReviewFocusDraft(event.target.value)} rows={3} />
-                    </label>
-                    <label>
-                      <span>笔记摘要</span>
-                      <textarea value={reviewSummaryDraft} onChange={(event) => setReviewSummaryDraft(event.target.value)} rows={4} />
-                    </label>
-                    <button onClick={() => void confirmPaperReview()}>保存文献记录</button>
+                    <div className="review-panel-heading">
+                      <div><strong>文献信息</strong><span>关注点、摘要和标签可以直接修改</span></div>
+                      <button onClick={() => void confirmPaperReview()}>保存文献记录</button>
+                    </div>
+                    <div className="detail-edit-fields">
+                      <label>
+                        <span>用户关注点</span>
+                        <textarea value={reviewFocusDraft} onChange={(event) => setReviewFocusDraft(event.target.value)} rows={3} placeholder="暂空" />
+                      </label>
+                      <label>
+                        <span>AI 提炼摘要</span>
+                        <textarea value={reviewSummaryDraft} onChange={(event) => setReviewSummaryDraft(event.target.value)} rows={3} placeholder="暂空" />
+                      </label>
+                    </div>
+                    <div className="detail-tag-picker">
+                      <div className="detail-tag-picker-heading">
+                        <div><strong>文章标签</strong><span>直接点击添加或移除，只使用已经创建的标签</span></div>
+                        <input
+                          aria-label="搜索已有标签"
+                          value={reviewTagQuery}
+                          onChange={(event) => setReviewTagQuery(event.target.value)}
+                          placeholder="搜索已有标签"
+                        />
+                      </div>
+                      <div className="detail-selected-tags">
+                        <span>已选 {reviewTagIdsDraft.length}</span>
+                        {reviewTagIdsDraft.map((tagId) => {
+                          const tag = tagRegistry.find((item) => item.id === tagId)
+                          return tag ? (
+                            <button key={tag.id} onClick={() => toggleReviewTag(tag.id)} type="button">
+                              {tag.name}<em>×</em>
+                            </button>
+                          ) : null
+                        })}
+                        {!reviewTagIdsDraft.length && <small>暂未选择标签</small>}
+                      </div>
+                      <div className="detail-tag-options" role="group" aria-label="已有标签">
+                        {tagGroups.map((group) => {
+                          const groupTags = reviewVisibleTags.filter((tag) => tag.group_id === group.id)
+                          if (!groupTags.length) return null
+                          return (
+                            <section key={group.id}>
+                              <div className="detail-tag-group-name">
+                                <i style={{ background: group.color }} />
+                                <strong>{group.name}</strong>
+                                <span>{groupTags.length}</span>
+                              </div>
+                              <div>
+                                {groupTags.map((tag) => {
+                                  const selected = reviewTagIdsDraft.includes(tag.id)
+                                  return (
+                                    <button
+                                      aria-pressed={selected}
+                                      className={selected ? 'selected' : ''}
+                                      key={tag.id}
+                                      onClick={() => toggleReviewTag(tag.id)}
+                                      type="button"
+                                    >
+                                      {tag.name}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </section>
+                          )
+                        })}
+                        {!reviewVisibleTags.length && <p>没有匹配的已有标签，请先到“管理标签”中创建。</p>}
+                      </div>
+                    </div>
                     {actionMessage && <p className="inline-action-message">{actionMessage}</p>}
                   </section>
+                ) : (
+                  <div className="detail-grid">
+                    <section className="detail-section summary-section">
+                      <div className="section-title"><span>AI 提炼摘要</span></div>
+                      <p className={detailPaper.summary ? '' : 'empty-detail-copy'}>{detailPaper.summary || '暂空'}</p>
+                    </section>
+                    <section className="detail-section focus-section">
+                      <div className="section-title"><span>用户关注点</span></div>
+                      <p className={detailPaper.focus ? 'focus-note' : 'empty-detail-copy'}>{detailPaper.focus || '暂空'}</p>
+                    </section>
+                  </div>
                 )}
               </div>
             )}
