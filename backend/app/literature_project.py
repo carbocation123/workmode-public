@@ -66,20 +66,37 @@ UNGROUPED_TAG_GROUP = {
 }
 
 LITERATURE_FIELD_REGISTRY = (
-    {"key": "title", "label": "标题", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": True, "available_to_ai": True},
-    {"key": "authors", "label": "作者", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": True, "available_to_ai": True},
-    {"key": "year", "label": "年份", "type": "integer", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "available_to_ai": True},
-    {"key": "publication_date", "label": "发表日期", "type": "date_text", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": False, "available_to_ai": True},
-    {"key": "journal", "label": "期刊", "type": "text", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "available_to_ai": True},
-    {"key": "doi", "label": "DOI", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "available_to_ai": True},
-    {"key": "paper_type", "label": "文章类型", "type": "enum", "editable": True, "searchable": False, "filterable": True, "sortable": True, "visible_by_default": False, "available_to_ai": True},
-    {"key": "group_ids", "label": "分组", "type": "id_list", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
-    {"key": "tag_ids", "label": "标签", "type": "id_list", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
-    {"key": "focus", "label": "关注点", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "available_to_ai": True},
-    {"key": "summary", "label": "概要", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "available_to_ai": True},
-    {"key": "status", "label": "处理状态", "type": "enum", "editable": False, "searchable": False, "filterable": True, "sortable": True, "visible_by_default": True, "available_to_ai": True},
-    {"key": "paths.pdf", "label": "主论文 PDF", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
-    {"key": "paths.si_folder", "label": "SI 文件夹", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "available_to_ai": True},
+    {"key": "id", "label": "文献 ID", "type": "id", "editable": False, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "Workmode 内部稳定 paper ID；工具调用使用它，不要把它当成 DOI。"},
+    {"key": "title", "label": "标题", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": True, "visible_in_frontend": True, "available_to_ai": True, "description": "论文标题。"},
+    {"key": "authors", "label": "作者", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": True, "visible_in_frontend": True, "available_to_ai": True, "description": "作者列表，保留来源中的作者顺序。"},
+    {"key": "first_author_surname", "label": "第一作者姓", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "用于标准文件名的第一作者姓。"},
+    {"key": "year", "label": "年份", "type": "integer", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "visible_in_frontend": True, "available_to_ai": True, "description": "规范化发表年份；publication_date 保留更细的来源日期。"},
+    {"key": "publication_date", "label": "发表日期", "type": "date_text", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "来源提供的发表日期文本，可能只有年月或年份。"},
+    {"key": "journal", "label": "期刊", "type": "text", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "visible_in_frontend": True, "available_to_ai": True, "description": "期刊或出版物全名。"},
+    {"key": "journal_abbreviation", "label": "期刊缩写", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "规范化期刊缩写，用于标准文件名。"},
+    {"key": "doi", "label": "DOI", "type": "text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "论文 DOI；与 Workmode 文献 ID 不同。"},
+    {"key": "paper_type", "label": "文章类型", "type": "enum", "editable": True, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "Workmode 的 research/review/unknown 分析类型，不是 EndNote Reference Type。"},
+    {"key": "group_ids", "label": "文献分组", "type": "id_list", "editable": False, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "groups.json 中的手工文献分组，例如“博士科研 - 实际体系”；它与标签组不同。"},
+    {"key": "tag_ids", "label": "文章标签", "type": "id_list", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "tags.json 中的语义标签；每个标签属于一个带颜色的标签组，标签组不是文献分组。"},
+    {"key": "focus", "label": "用户关注点", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "用户特别关注的研究问题或证据。"},
+    {"key": "summary", "label": "AI 提炼摘要", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "围绕当前项目用途形成的简短文献概要，不替代客观事实报告。"},
+    {"key": "status", "label": "处理状态", "type": "enum", "editable": False, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "visible_in_frontend": True, "available_to_ai": True, "description": "pending/parsing/extracting/review/ready/failed 工作流状态，不代表论文质量。"},
+    {"key": "metadata_source", "label": "元数据来源", "type": "enum", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "元数据来自 Cite This、layout.json、人工/导入或仍待识别。"},
+    {"key": "metadata_trust", "label": "元数据可信状态", "type": "enum", "editable": False, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "complete/partial/unknown/pending 表示书目信息完整度，不是科学结论可信度。"},
+    {"key": "metadata_issue", "label": "元数据问题", "type": "multiline_text", "editable": False, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "待人工补齐或核验的书目信息问题。"},
+    {"key": "archive_filename", "label": "标准档名", "type": "text", "editable": False, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "按第一作者姓、年份和期刊缩写生成的受控文件名。"},
+    {"key": "archive_location", "label": "归档位置", "type": "enum", "editable": False, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "papers/unprocessed 或 papers/processed 的受控逻辑位置。"},
+    {"key": "verification_status", "label": "归档校验", "type": "enum", "editable": False, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "归档结构校验状态，不代表论文内容经过同行评议。"},
+    {"key": "stage", "label": "处理阶段", "type": "text", "editable": False, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "后台流水线当前阶段。"},
+    {"key": "error", "label": "处理错误", "type": "multiline_text", "editable": False, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "最近一次文献处理错误；为空表示没有记录错误。"},
+    {"key": "paths.pdf", "label": "主论文 PDF", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "该记录的主论文 PDF。EndNote 导入时会从全部附件中选择第一个有效 PDF。"},
+    {"key": "paths.si_folder", "label": "SI 文件夹", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "该论文的补充材料（SI）文件夹；除主 PDF 外的 EndNote 附件放在这里，文件类型不限。"},
+    {"key": "paths.mineru_dir", "label": "MinerU 产物目录", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "MinerU 版面解析产物目录。"},
+    {"key": "paths.full_md", "label": "解析全文", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "既有 MinerU Markdown 全文路径；不存在时 full_text 读取会回退 PDF 文本层。"},
+    {"key": "paths.fact_report", "label": "客观事实报告", "type": "project_path", "editable": False, "searchable": False, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "客观事实报告路径。"},
+    {"key": "content_sha256", "label": "主 PDF 内容哈希", "type": "hash", "editable": False, "searchable": False, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": False, "available_to_ai": False, "description": "内部查重字段。"},
+    {"key": "created_at", "label": "创建时间", "type": "datetime", "editable": False, "searchable": False, "filterable": False, "sortable": True, "visible_by_default": False, "visible_in_frontend": False, "available_to_ai": False, "description": "内部记录创建时间。"},
+    {"key": "updated_at", "label": "更新时间", "type": "datetime", "editable": False, "searchable": False, "filterable": False, "sortable": True, "visible_by_default": False, "visible_in_frontend": False, "available_to_ai": False, "description": "内部记录更新时间。"},
 )
 
 LITERATURE_PROTOCOL = """# Literature library collaboration protocol
@@ -143,6 +160,14 @@ real tag groups and canonical registry. Reuse existing names or aliases whenever
 possible; create a new provisional tag only when no existing tag expresses the same
 concept. Never invent hard-coded subject categories that are not present in tags.json.
 
+Manual literature groups and colored tag groups are different structures. `groups.json`
+contains literature groups such as research projects or topic folders; `tags.json`
+contains colored tag groups and their semantic tags. When the user asks about the
+library's organization, groups, metadata fields, asset coverage or workflow states,
+call `literature_library_overview`. Never infer logical literature groups from physical
+directories below `papers/`. Search and record results return both stable IDs and
+resolved human-readable group/tag names; use names in the answer and IDs in tool calls.
+
 Delete a paper only when the user asks to remove it. `literature_delete` moves the
 catalog record, main PDF, SI folder and extraction artifacts into the project recycle bin; it does
 not rewrite historical session messages. Use `literature_restore` with the returned
@@ -178,12 +203,18 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "literature_search",
-            "description": "Search the current literature project's catalog by title, author, journal, DOI, tags, focus, summary or status.",
+            "description": "Search the current literature catalog by useful metadata, literature-group names, tag names, focus, summary or workflow state. Results preserve the same bibliographic, organization, asset and workflow fields shown by the literature frontend, including resolved group/tag names.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Free-text query; empty returns recent records."},
                     "tag_ids": {"type": "array", "items": {"type": "string"}, "default": []},
+                    "group_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "default": [],
+                        "description": "Optional literature-group IDs from literature_library_overview; all supplied groups must match.",
+                    },
                     "status": {"type": "string", "description": "Optional exact paper status."},
                     "limit": {"type": "integer", "default": 20, "minimum": 1, "maximum": 100},
                 },
@@ -193,8 +224,16 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "literature_library_overview",
+            "description": "Inspect the current library structure before answering questions about literature groups, metadata fields, asset coverage or workflow states. Distinguishes manual literature groups from colored tag groups and returns authoritative usage counts plus the shared frontend/AI field contract.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "literature_tag_list",
-            "description": "List the canonical semi-open tag registry before assigning tags. Returns real tag groups with colors plus tag IDs, names, aliases, status and usage counts so existing tags can be reused instead of duplicated.",
+            "description": "List the canonical semi-open tag registry before assigning tags. Returns colored tag groups plus tag IDs, names, aliases, status and usage counts so existing tags can be reused instead of duplicated. It does not list manual literature groups; use literature_library_overview for those.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -678,6 +717,7 @@ def describe_active_context(root: Path, items: list[dict[str, Any]]) -> str:
         return ""
     catalog = _catalog(root)
     paper_by_id = {str(item["id"]): item for item in catalog["papers"]}
+    projection_lookups = _paper_projection_lookups(root)
     rows: list[dict[str, Any]] = []
     for item in items:
         kind = str(item.get("kind") or "")
@@ -689,7 +729,7 @@ def describe_active_context(root: Path, items: list[dict[str, Any]]) -> str:
                     "kind": "paper",
                     "id": reference,
                     "exists": paper is not None,
-                    "record": _paper_summary(paper) if paper else None,
+                    "record": _paper_projection(paper, projection_lookups) if paper else None,
                 }
             )
         elif kind == "note":
@@ -719,8 +759,9 @@ def describe_active_context(root: Path, items: list[dict[str, Any]]) -> str:
 def describe_imported_papers(root: Path, paper_ids: list[str]) -> str:
     catalog = _catalog(root)
     paper_by_id = {str(item["id"]): item for item in catalog["papers"]}
+    projection_lookups = _paper_projection_lookups(root)
     records = [
-        _paper_summary(paper_by_id[paper_id])
+        _paper_projection(paper_by_id[paper_id], projection_lookups)
         for paper_id in dict.fromkeys(str(item) for item in paper_ids)
         if paper_id in paper_by_id
     ]
@@ -1016,6 +1057,7 @@ def execute_literature_tool(
             raise LiteratureProjectError("Current project is not a literature-library project")
         handlers = {
             "literature_search": _search,
+            "literature_library_overview": _library_overview,
             "literature_tag_list": _tag_list,
             "literature_read": _read,
             "literature_import": _import_pdf,
@@ -1047,33 +1089,129 @@ def execute_literature_tool(
 def _search(root: Path, args: dict[str, Any]) -> ProjectToolResult:
     query = str(args.get("query") or "").strip().casefold()
     requested_tags = {str(item) for item in (args.get("tag_ids") or [])}
+    requested_groups = {str(item) for item in (args.get("group_ids") or [])}
     status = str(args.get("status") or "").strip()
     limit = min(max(int(args.get("limit") or 20), 1), 100)
     papers = _catalog(root)["papers"]
-    tags_by_id = {item["id"]: item for item in _tags(root)["tags"]}
+    lookups = _paper_projection_lookups(root)
+    tags_by_id = lookups["tags_by_id"]
+    tag_groups_by_id = lookups["tag_groups_by_id"]
+    groups_by_id = lookups["groups_by_id"]
+    searchable_keys = [
+        str(field["key"])
+        for field in LITERATURE_FIELD_REGISTRY
+        if field.get("searchable") and not str(field["key"]).startswith("paths.")
+    ]
     matches: list[dict[str, Any]] = []
     for paper in reversed(papers):
         tag_ids = {str(item) for item in paper.get("tag_ids") or []}
+        group_ids = {str(item) for item in paper.get("group_ids") or []}
         if requested_tags and not requested_tags.issubset(tag_ids):
+            continue
+        if requested_groups and not requested_groups.issubset(group_ids):
             continue
         if status and str(paper.get("status") or "") != status:
             continue
-        haystack = "\n".join(
-            str(paper.get(key) or "")
-            for key in (
-                "title", "authors", "year", "publication_date", "journal", "doi",
-                "focus", "summary", "original_filename", "archive_filename",
+        haystack = "\n".join(str(_record_value(paper, key) or "") for key in searchable_keys)
+        tag_terms: list[str] = []
+        for tag_id in tag_ids:
+            tag = tags_by_id.get(tag_id, {})
+            tag_group = tag_groups_by_id.get(str(tag.get("group_id") or ""), {})
+            tag_terms.extend(
+                [
+                    str(tag.get("name") or tag_id),
+                    str(tag_group.get("name") or ""),
+                ]
             )
-        )
+        haystack += "\n" + " ".join(tag_terms)
         haystack += "\n" + " ".join(
-            str(tags_by_id.get(tag_id, {}).get("name") or tag_id) for tag_id in tag_ids
+            str(groups_by_id.get(group_id, {}).get("name") or group_id) for group_id in group_ids
         )
         if query and query not in haystack.casefold():
             continue
-        matches.append(_paper_summary(paper))
+        matches.append(_paper_projection(paper, lookups))
         if len(matches) >= limit:
             break
     return _json_result({"ok": True, "operation": "literature_search", "count": len(matches), "papers": matches})
+
+
+def _library_overview(root: Path, args: dict[str, Any]) -> ProjectToolResult:
+    del args
+    papers = _catalog(root)["papers"]
+    literature_groups = _groups(root)["groups"]
+    tag_registry = _tags(root)
+
+    literature_group_usage: dict[str, int] = {}
+    paper_status_counts: dict[str, int] = {}
+    metadata_trust_counts: dict[str, int] = {}
+    for paper in papers:
+        for group_id in set(str(item) for item in (paper.get("group_ids") or [])):
+            literature_group_usage[group_id] = literature_group_usage.get(group_id, 0) + 1
+        paper_status = str(paper.get("status") or "unknown")
+        paper_status_counts[paper_status] = paper_status_counts.get(paper_status, 0) + 1
+        metadata_trust = str(paper.get("metadata_trust") or "unknown")
+        metadata_trust_counts[metadata_trust] = metadata_trust_counts.get(metadata_trust, 0) + 1
+
+    tags_by_group: dict[str, list[str]] = {}
+    for tag in tag_registry["tags"]:
+        group_id = str(tag.get("group_id") or "ungrouped")
+        tags_by_group.setdefault(group_id, []).append(str(tag.get("id") or ""))
+
+    tag_groups: list[dict[str, Any]] = []
+    for group in tag_registry["groups"]:
+        group_id = str(group.get("id") or "")
+        tag_ids = tags_by_group.get(group_id, [])
+        tag_groups.append(
+            {
+                "id": group_id,
+                "name": str(group.get("name") or group_id),
+                "color": str(group.get("color") or ""),
+                "tag_count": len(tag_ids),
+                "paper_count": sum(
+                    1
+                    for paper in papers
+                    if set(str(item) for item in (paper.get("tag_ids") or [])).intersection(tag_ids)
+                ),
+            }
+        )
+
+    path_keys = {
+        "main_pdf_registered": "pdf",
+        "si_folder_registered": "si_folder",
+        "mineru_output_registered": "mineru_dir",
+        "full_text_registered": "full_md",
+        "fact_report_registered": "fact_report",
+    }
+    asset_counts = {
+        output_key: sum(
+            1 for paper in papers if str((paper.get("paths") or {}).get(path_key) or "").strip()
+        )
+        for output_key, path_key in path_keys.items()
+    }
+    return _json_result(
+        {
+            "ok": True,
+            "operation": "literature_library_overview",
+            "paper_count": len(papers),
+            "paper_status_counts": paper_status_counts,
+            "metadata_trust_counts": metadata_trust_counts,
+            "asset_counts": asset_counts,
+            "literature_groups": [
+                {
+                    "id": str(group.get("id") or ""),
+                    "name": str(group.get("name") or group.get("id") or ""),
+                    "paper_count": literature_group_usage.get(str(group.get("id") or ""), 0),
+                }
+                for group in literature_groups
+            ],
+            "tag_groups": tag_groups,
+            "fields": [
+                dict(field)
+                for field in LITERATURE_FIELD_REGISTRY
+                if field.get("available_to_ai")
+            ],
+        }
+    )
 
 
 def _tag_list(root: Path, args: dict[str, Any]) -> ProjectToolResult:
@@ -1196,7 +1334,13 @@ def _read_one(
     paper = _paper(root, _require_string(args, "paper_id"))
     part = str(args.get("part") or "record")
     if part == "record":
-        return _json_result({"ok": True, "operation": "literature_read", "paper": paper})
+        return _json_result(
+            {
+                "ok": True,
+                "operation": "literature_read",
+                "paper": _paper_summary(root, paper),
+            }
+        )
     key = "fact_report" if part == "facts" else "full_md" if part == "full_text" else None
     if key is None:
         raise LiteratureProjectError("part must be record, facts or full_text")
@@ -1919,15 +2063,109 @@ def _find_paper(catalog: dict[str, Any], paper_id: str) -> dict[str, Any]:
     raise LiteratureProjectError(f"Unknown paper_id: {paper_id}")
 
 
-def _paper_summary(paper: dict[str, Any]) -> dict[str, Any]:
+def _record_value(paper: dict[str, Any], key: str) -> Any:
+    current: Any = paper
+    for segment in key.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(segment)
+    return current
+
+
+def _paper_projection_lookups(root: Path) -> dict[str, dict[str, dict[str, Any]]]:
+    tag_registry = _tags(root)
     return {
-        key: paper.get(key)
-        for key in (
-            "id", "title", "authors", "year", "publication_date", "journal", "doi",
-            "status", "tag_ids", "group_ids",
-            "focus", "summary", "original_filename", "archive_filename", "archive_location", "paths",
-        )
+        "groups_by_id": {
+            str(item.get("id")): item
+            for item in _groups(root)["groups"]
+            if isinstance(item, dict) and item.get("id")
+        },
+        "tag_groups_by_id": {
+            str(item.get("id")): item
+            for item in tag_registry["groups"]
+            if isinstance(item, dict) and item.get("id")
+        },
+        "tags_by_id": {
+            str(item.get("id")): item
+            for item in tag_registry["tags"]
+            if isinstance(item, dict) and item.get("id")
+        },
     }
+
+
+def _paper_projection(
+    paper: dict[str, Any],
+    lookups: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, Any]:
+    groups_by_id = lookups["groups_by_id"]
+    tags_by_id = lookups["tags_by_id"]
+    tag_groups_by_id = lookups["tag_groups_by_id"]
+    group_ids = list(dict.fromkeys(str(item) for item in (paper.get("group_ids") or [])))
+    tag_ids = list(dict.fromkeys(str(item) for item in (paper.get("tag_ids") or [])))
+
+    groups: list[dict[str, Any]] = []
+    for group_id in group_ids:
+        group = groups_by_id.get(group_id)
+        resolved = {"id": group_id, "name": str((group or {}).get("name") or group_id)}
+        if group is None:
+            resolved["missing_from_registry"] = True
+        groups.append(resolved)
+
+    tags: list[dict[str, Any]] = []
+    for tag_id in tag_ids:
+        tag = tags_by_id.get(tag_id)
+        tag_group_id = str((tag or {}).get("group_id") or "ungrouped")
+        tag_group = tag_groups_by_id.get(tag_group_id)
+        resolved_tag = {
+            "id": tag_id,
+            "name": str((tag or {}).get("name") or tag_id),
+            "group_id": tag_group_id,
+            "group_name": str((tag_group or {}).get("name") or tag_group_id),
+            "color": str((tag_group or {}).get("color") or ""),
+            "status": str((tag or {}).get("status") or "unknown"),
+        }
+        if tag is None:
+            resolved_tag["missing_from_registry"] = True
+        tags.append(resolved_tag)
+
+    keys = (
+        "id",
+        "title",
+        "authors",
+        "first_author_surname",
+        "year",
+        "publication_date",
+        "journal",
+        "journal_abbreviation",
+        "doi",
+        "paper_type",
+        "status",
+        "metadata_source",
+        "metadata_trust",
+        "metadata_issue",
+        "verification_status",
+        "stage",
+        "error",
+        "tag_ids",
+        "group_ids",
+        "focus",
+        "summary",
+        "original_filename",
+        "archive_filename",
+        "archive_location",
+        "paths",
+    )
+    return {
+        **{key: paper.get(key) for key in keys},
+        "group_ids": group_ids,
+        "tag_ids": tag_ids,
+        "groups": groups,
+        "tags": tags,
+    }
+
+
+def _paper_summary(root: Path, paper: dict[str, Any]) -> dict[str, Any]:
+    return _paper_projection(paper, _paper_projection_lookups(root))
 
 
 def _upsert_tag(registry: dict[str, Any], raw: dict[str, Any]) -> str:

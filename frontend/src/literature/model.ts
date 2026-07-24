@@ -43,10 +43,15 @@ export interface PaperRecord {
   verificationStatus: VerificationStatus
   title: string
   authors: string
+  firstAuthorSurname: string
   year: number | null
   publicationDate: string
   journal: string
+  journalAbbreviation: string
+  doi: string
   status: PaperStatus
+  processingStage: string
+  processingError: string
   tagIds: string[]
   groupIds: string[]
   siFolder: string | null
@@ -106,10 +111,15 @@ export function createImportedPapers(filenames: string[]): PaperRecord[] {
       verificationStatus: 'pending' as const,
       title: titleFromFilename(filename),
       authors: '等待元数据识别',
+      firstAuthorSurname: '',
       year: null,
       publicationDate: '',
       journal: '等待元数据识别',
+      journalAbbreviation: '',
+      doi: '',
       status: 'pending' as const,
+      processingStage: '',
+      processingError: '',
       tagIds: [],
       groupIds: [],
       siFolder: null,

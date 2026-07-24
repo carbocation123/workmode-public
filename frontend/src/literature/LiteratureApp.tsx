@@ -437,7 +437,10 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
         [
           paper.title,
           paper.authors,
+          paper.firstAuthorSurname,
           paper.journal,
+          paper.journalAbbreviation,
+          paper.doi,
           paper.publicationDate,
           paper.filename,
           ...paper.groupIds.map((id) => literatureGroups.find((group) => group.id === id)?.name || id),
@@ -1828,7 +1831,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                     <span><strong>归档位置</strong>{detailPaper.archiveLocation}/</span>
                     <span><strong>元数据来源</strong>{METADATA_SOURCE_LABELS[detailPaper.metadataSource]}</span>
                     <span><strong>发表日期</strong>{detailPaper.publicationDate || detailPaper.year || '未填写'}</span>
+                    <span><strong>期刊</strong>{detailPaper.journal || '未填写'}</span>
+                    <span><strong>DOI</strong>{detailPaper.doi || '未填写'}</span>
+                    <span><strong>第一作者姓</strong>{detailPaper.firstAuthorSurname || '未填写'}</span>
+                    <span><strong>期刊缩写</strong>{detailPaper.journalAbbreviation || '未填写'}</span>
                     <span><strong>文献分组</strong>{detailPaper.groupIds.map((id) => literatureGroups.find((group) => group.id === id)?.name || id).join(' · ') || '未分组'}</span>
+                    <span><strong>SI 文件夹</strong>{detailPaper.siFolder || '未登记'}</span>
+                    <span><strong>处理阶段</strong>{detailPaper.processingStage || statusLabel(detailPaper.status)}</span>
+                    <span><strong>处理错误</strong>{detailPaper.processingError || '无'}</span>
                   </div>
                   <div className="archive-contract">
                     <article>

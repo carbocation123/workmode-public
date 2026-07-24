@@ -266,7 +266,7 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertIn("标签组", field_by_key["tag_ids"]["description"])
         self.assertIn("不是 EndNote Reference Type", field_by_key["paper_type"]["description"])
         self.assertIn("补充材料", field_by_key["paths.si_folder"]["description"])
-        self.assertIn("DOI", field_by_key)
+        self.assertIn("doi", field_by_key)
         self.assertIn("metadata_trust", field_by_key)
         self.assertIn("verification_status", field_by_key)
 

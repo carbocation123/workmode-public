@@ -55,6 +55,7 @@ export interface LiteratureBackendHealth {
 
 const REQUIRED_AGENT_TOOLS = [
   'literature_search',
+  'literature_library_overview',
   'literature_tag_list',
   'literature_read',
   'literature_update_record',
@@ -86,9 +87,12 @@ export interface BackendPaper {
   archive_location: '文献/未处理' | '文献/已处理'
   title: string
   authors: string
+  first_author_surname?: string
   year: number | null
   publication_date?: string
   journal: string
+  journal_abbreviation?: string
+  doi?: string
   status: PaperRecord['status']
   tags: string[]
   group_ids?: string[]
@@ -113,9 +117,12 @@ interface CatalogPaper {
   archive_location?: string
   title?: string
   authors?: string
+  first_author_surname?: string
   year?: number | null
   publication_date?: string
   journal?: string
+  journal_abbreviation?: string
+  doi?: string
   status?: PaperRecord['status']
   tag_ids?: string[]
   group_ids?: string[]
@@ -351,9 +358,12 @@ function fromCatalogPaper(paper: CatalogPaper): BackendPaper {
     archive_location: paper.archive_location === 'papers/processed' ? '文献/已处理' : '文献/未处理',
     title: paper.title || '',
     authors: paper.authors || '',
+    first_author_surname: paper.first_author_surname || '',
     year: paper.year ?? null,
     publication_date: paper.publication_date || '',
     journal: paper.journal || '',
+    journal_abbreviation: paper.journal_abbreviation || '',
+    doi: paper.doi || '',
     status: paper.status || 'pending',
     tags: paper.tag_ids || [],
     group_ids: paper.group_ids || [],
@@ -483,15 +493,20 @@ export function mapBackendPaper(paper: BackendPaper): PaperRecord {
     verificationStatus: paper.verification_status || 'pending',
     title: paper.title || paper.original_filename.replace(/\.pdf$/i, ''),
     authors: paper.authors || '等待首页元数据识别',
+    firstAuthorSurname: paper.first_author_surname || '',
     year: paper.year,
     publicationDate: paper.publication_date || '',
     journal: paper.journal || '等待首页元数据识别',
+    journalAbbreviation: paper.journal_abbreviation || '',
+    doi: paper.doi || '',
     status: paper.status,
+    processingStage: paper.stage || '',
+    processingError: paper.error || '',
     tagIds: paper.tags || [],
     groupIds: paper.group_ids || [],
     siFolder: paper.paths?.si_folder || null,
     focus: paper.focus || '',
-    summary: paper.summary || paper.stage || '',
+    summary: paper.summary || '',
     facts: paper.error ? [`处理错误：${paper.error}`] : [],
     factReport: placeholderReport,
     metadataTrust: paper.metadata_trust === 'pending' ? 'unknown' : paper.metadata_trust,

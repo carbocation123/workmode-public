@@ -24,6 +24,7 @@ describe('isCompatibleLiteratureBackend', () => {
       tool_profile: 'literature',
       agent_tools: [
         'literature_search',
+        'literature_library_overview',
         'literature_tag_list',
         'literature_read',
         'literature_update_record',
