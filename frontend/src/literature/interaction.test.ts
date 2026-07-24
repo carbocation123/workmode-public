@@ -77,6 +77,8 @@ describe('literature live interaction contracts', () => {
     expect(source).toContain('合并到当前项目')
     expect(source).toContain('请先关闭 EndNote')
     expect(source).toContain('自动查找')
+    expect(source).toContain('扫描本机所有磁盘')
+    expect(source).toContain('可能需要几十秒')
     expect(source).toContain('手动选择')
     expect(source).toContain('导入完成后查重')
     expect(literatureApi).toContain('findEndNoteLibraries')
