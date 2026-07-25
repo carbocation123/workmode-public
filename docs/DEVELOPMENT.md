@@ -74,7 +74,7 @@ npx --yes npm@10.9.4 ci --ignore-scripts --no-audit --no-fund
 Pop-Location
 ```
 
-打开 `http://127.0.0.1:5173` 进入应用级功能大厅。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库，`http://127.0.0.1:5173/transcription/` 是无 session 的会议转写工具，`http://127.0.0.1:5173/writing/` 是无 session 的文章处理工具。五个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不启动额外前端服务。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
+打开 `http://127.0.0.1:5173` 进入应用级功能大厅。需要直接调试时，`http://127.0.0.1:5173/?surface=workbench` 是完整工作台，`http://127.0.0.1:5173/literature/` 是文献智库，`http://127.0.0.1:5173/transcription/` 是无 session 的会议转写工具，`http://127.0.0.1:5173/writing/` 是无 session 的文章处理工具。五个界面属于同一个 Vite 多页面工程、共享同一后端、浏览器存储与外观基础；不启动额外前端服务。功能大厅的普通标题栏和所有 HUD 皮肤都必须显示全局设置入口，并通过 `return=home` 返回大厅。桌面根入口每次运行只发起一次非阻塞更新检查；发现版本后共享弹窗覆盖大厅和完整工作台，手动设置入口保持不变。相关修改至少运行 `startupUpdateCheck.test.ts`、`startupUpdatePromptContract.test.ts`、`literatureNavigation.test.ts` 与 `surfaceChrome.test.ts`。Vite 开发态会自动将十项成就写为已解锁，用于检查全部内置主题和奖励皮肤入口；通过 `tauri dev` 启动桌面源码时同样生效。一键源码启动器会在自身的前端构建中注入同一维护标记，并用 `dist/.source-achievements` 区分普通生产构建；GitHub Release 与正式安装包不设置该标记。桌面开发使用：
 
 `vite.config.ts` 的多页面 `input` 必须保持为相对 frontend root 的 `index.html`、`literature/index.html`、`transcription/index.html` 与 `writing/index.html`。Vite 8/Rolldown 在 Windows 上会拒绝把绝对盘符路径直接作为生成资产名；修改入口后必须在 Windows 上执行一次 `npm run build`，不能只验证 dev server。
 

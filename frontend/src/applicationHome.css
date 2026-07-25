@@ -53,6 +53,37 @@
 .mode-hub-brand strong { font-size: 13px; letter-spacing: .15em; }
 .mode-hub-brand small { color: var(--ui-text-dim); font-size: 9px; letter-spacing: .12em; }
 .mode-hub-status { margin-left: auto; display: flex; gap: 20px; color: var(--ui-text-muted); font-size: 11px; }
+.mode-hub-settings-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-primary-border);
+  border-radius: 9px;
+  color: var(--ui-text);
+  background: var(--ui-control-background);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color .16s ease, color .16s ease, background .16s ease;
+}
+.mode-hub-settings-button:hover {
+  border-color: var(--ui-primary);
+  color: var(--ui-primary);
+  background: var(--ui-control-hover);
+}
+.mode-hub-settings-button:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.mode-hub-shell .skin-chrome-actions {
+  position: relative;
+  z-index: 2;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-left: 1px solid var(--ui-border);
+}
 
 .mode-hub-grid {
   align-self: center;

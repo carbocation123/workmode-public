@@ -201,7 +201,9 @@ meeting-transcription\
 
 ## 前端结构
 
-桌面根入口是 `frontend/src/main.tsx`。不带查询参数时渲染应用级功能大厅 `ApplicationHome.tsx`；`?surface=workbench` 渲染完整 `App.tsx`，`/literature/index.html` 渲染文献特化前端，`/transcription/index.html` 渲染无 session 的会议转写工具，`/writing/index.html` 渲染无 session 的文章处理工具。大厅是四个功能的同级导航层，使用同尺寸 2×2 卡片，窄屏退化为单列。五个前端表面复用同一桌面后端、`sessionStorage` 动态 API 地址、`localStorage` 认证与外观状态；页面切换不复制项目、session、转写任务或文章历史。
+桌面根入口是 `frontend/src/main.tsx`。不带查询参数时渲染应用级功能大厅 `ApplicationHome.tsx`；`?surface=workbench` 渲染完整 `App.tsx`，`/literature/index.html` 渲染文献特化前端，`/transcription/index.html` 渲染无 session 的会议转写工具，`/writing/index.html` 渲染无 session 的文章处理工具。大厅是四个功能的同级导航层，使用同尺寸 2×2 卡片，窄屏退化为单列，并在普通标题栏与皮肤 HUD 中提供同一个全局设置入口；设置页用 `return=home` 返回大厅。五个前端表面复用同一桌面后端、`sessionStorage` 动态 API 地址、`localStorage` 认证与外观状态；页面切换不复制项目、session、转写任务或文章历史。
+
+`main.tsx` 在桌面后端完成初始化后立即发起一次非阻塞更新检查，并在所有根表面上方挂载共享的 `StartupUpdatePrompt`。`startupUpdateCheck.ts` 缓存本次应用启动的 Promise，因此根入口、React StrictMode 与工作台状态同步只会复用同一次网络请求。没有更新或检查失败时不显示弹窗；发现新版本时先询问用户，只有确认后才调用既有 `installDesktopUpdate()` 签名下载、停止后端、安装与重启流程。设置页原有的手动检查和安装入口不变，仍可主动重试并显示错误。
 
 完整工作台采用 IDE 式布局：
 

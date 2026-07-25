@@ -4,6 +4,7 @@ import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type DownloadEvent } from '@tauri-apps/plugin-updater'
 import { runDesktopUpdateFlow } from './desktopUpdateFlow'
+import { createStartupUpdateCheck } from './startupUpdateCheck'
 
 export interface DesktopInfo {
   apiBase: string
@@ -108,6 +109,19 @@ export async function checkForDesktopUpdate(): Promise<DesktopUpdateInfo | null>
     date: pendingUpdate.date || null,
     body: pendingUpdate.body || null
   }
+}
+
+const runStartupDesktopUpdateCheck = createStartupUpdateCheck(
+  checkForDesktopUpdate,
+  (error) => {
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    void logDesktopFrontendEvent('warning', 'desktop_update_startup_check', message).catch(() => undefined)
+  },
+)
+
+export function checkForDesktopUpdateOnStartup(): Promise<DesktopUpdateInfo | null> {
+  if (!isDesktopApp()) return Promise.resolve(null)
+  return runStartupDesktopUpdateCheck()
 }
 
 export async function installDesktopUpdate(

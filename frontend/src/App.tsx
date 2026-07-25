@@ -15,6 +15,7 @@ import {
 } from './api'
 import {
   checkForDesktopUpdate,
+  checkForDesktopUpdateOnStartup,
   chooseAndMigrateLegacyPortable,
   getDesktopInfo,
   installDesktopUpdate
@@ -483,7 +484,7 @@ export default function App() {
 
   useEffect(() => {
     if (!desktopInfo) return
-    checkForDesktopUpdate()
+    checkForDesktopUpdateOnStartup()
       .then((update) => {
         if (update) {
           setDesktopUpdateVersion(update.version)
@@ -1121,6 +1122,11 @@ export default function App() {
       window.location.assign(writingWorkbenchUrl(window.location.href))
       return
     }
+    if (settingsReturnSurface === 'home') {
+      localStorage.removeItem(SKIN_RUNTIME_GUARD_KEY)
+      window.location.assign(applicationHomeUrl(window.location.href))
+      return
+    }
     setActivePanel('project')
   }
 
@@ -1173,7 +1179,9 @@ export default function App() {
                 ? '返回文献智库'
                 : settingsReturnSurface === 'transcription'
                   ? '返回会议转写'
-                  : settingsReturnSurface === 'writing' ? '返回文章处理' : '返回项目工作区'
+                  : settingsReturnSurface === 'writing'
+                    ? '返回文章处理'
+                    : settingsReturnSurface === 'home' ? '返回功能大厅' : '返回项目工作区'
               : '设置'}
             onClick={toggleSettingsPanel}
           >

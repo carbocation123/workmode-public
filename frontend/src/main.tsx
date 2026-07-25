@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import ApplicationHome from './ApplicationHome'
+import { StartupUpdatePrompt } from './StartupUpdatePrompt'
 import { setApiBase } from './api'
 import {
   applyStoredAppearance,
@@ -9,6 +10,7 @@ import {
   readStoredAppearance,
 } from './appearanceBootstrap'
 import {
+  checkForDesktopUpdateOnStartup,
   generateDesktopBugReport,
   initializeDesktop,
   isDesktopApp,
@@ -84,8 +86,10 @@ async function bootstrap() {
   try {
     const desktop = await initializeDesktop()
     if (desktop) setApiBase(desktop.apiBase)
+    if (desktop) void checkForDesktopUpdateOnStartup()
     root.render(
       <React.StrictMode>
+        <StartupUpdatePrompt />
         {initialSurface === 'workbench'
           ? <App />
           : <ApplicationHome themeId={initialThemeId} customSkin={initialAppearance.activeSkin} />}

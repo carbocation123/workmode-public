@@ -81,7 +81,7 @@ Workmode Public 是一个可独立安装、本地优先的科研工作台。它�
 ## 三分钟开始
 
 1. 从 [GitHub Releases](https://github.com/carbocation123/workmode-public/releases/latest) 下载 `workmode-public-<version>-windows-x86_64-setup.exe`。
-2. 安装并启动 Workmode Public，在功能大厅选择“科研工作台”“文献智库”“会议录音转文字”或“文章处理”。
+2. 安装并启动 Workmode Public，在功能大厅选择“科研工作台”“文献智库”“会议录音转文字”或“文章处理”；大厅右上角可直接进入全局设置。
 3. 在首次向导中填写 OpenAI-compatible Base URL、模型名和 API Key；也可以使用内置的 DeepSeek 配置引导。
 4. 创建教程项目、打开自己的项目，或新建一个本地文献库。
 5. 根据界面引导开始对话、阅读文件、导入论文、转写录音或处理文章。所有向导都可以跳过，也可以稍后在设置中重新播放。
@@ -108,7 +108,7 @@ Workmode Public 是一个可独立安装、本地优先的科研工作台。它�
 | DashScope Fun-ASR | 仅在用户上传录音并提交转写时使用；音频会上传到用户配置的 DashScope 服务，签名文件地址不会写入本地任务文件或日志 |
 | 网页检索 | 仅在模型调用网页工具时访问公开 HTTP(S) 页面 |
 | 运行日志与错误报告 | 保存在本机；报告 ZIP 由用户主动生成和发送，应用不会自动上传或删除 |
-| 应用更新 | 用户检查更新时访问 GitHub Releases，下载内容经过 Tauri 更新签名验证 |
+| 应用更新 | 桌面版每次启动会访问 GitHub Releases 检查一次；发现新版本后先询问用户，只有点击“立即更新”才会下载。设置页原有的手动检查入口继续保留，下载内容经过 Tauri 更新签名验证 |
 
 默认后端只绑定 loopback。PDF 和图片预览使用扩展名、大小与 magic bytes 白名单；网页工具拒绝 loopback、内网、链路本地地址、非常用端口和非 HTTP(S) 协议，并在重定向后重新验证目标。
 

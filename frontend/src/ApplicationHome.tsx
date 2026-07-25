@@ -3,7 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, type Project } from './api'
 import { skinUsesChrome, type ActiveCustomSkin } from './customSkin'
 import { prepareLiteratureWorkbench } from './literatureLauncher'
-import { transcriptionWorkbenchUrl, workbenchUrl, writingWorkbenchUrl } from './literatureNavigation'
+import {
+  transcriptionWorkbenchUrl,
+  workbenchSettingsUrl,
+  workbenchUrl,
+  writingWorkbenchUrl,
+} from './literatureNavigation'
 import { SkinChrome } from './SkinChrome'
 import { THEMES, type ThemeId } from './theme'
 
@@ -38,6 +43,18 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
   const literatureProjects = projects.filter((project) => project.project_type === 'literature-library')
   const hudLayoutActive = Boolean(customSkin?.enabled && skinUsesChrome(customSkin.skin))
     || THEMES.some((theme) => theme.id === themeId && theme.layout === 'hud')
+  const settingsAction = (
+    <button
+      type="button"
+      className="mode-hub-settings-button"
+      title="打开全局设置"
+      aria-label="打开全局设置"
+      onClick={() => window.location.assign(workbenchSettingsUrl(window.location.href, 'home'))}
+    >
+      <span aria-hidden>⚙</span>
+      <span>设置</span>
+    </button>
+  )
 
   async function openLiterature() {
     if (openingLiterature) return
@@ -69,6 +86,7 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
           modelName="WORKMODE CORE"
           streaming={openingLiterature}
           status={error ? 'ATTENTION' : loading ? 'SCANNING' : 'READY'}
+          actions={settingsAction}
         />
       )}
       <header className="mode-hub-header" data-skin-slot="feature-hub-header">
@@ -80,6 +98,7 @@ export default function ApplicationHome({ themeId, customSkin }: ApplicationHome
           <span>{loading ? '正在读取项目…' : `${projects.length} 个本地项目`}</span>
           <span>{activeProject ? `最近：${activeProject.name}` : '尚未选择项目'}</span>
         </div>
+        {settingsAction}
       </header>
 
       <section className="mode-hub-grid" aria-label="功能入口">
