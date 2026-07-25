@@ -917,6 +917,42 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertFalse(any("call literature_process" in item for item in injected))
         self.assertFalse(any("When the user says to continue" in item for item in injected))
 
+    def test_direct_pdf_import_returns_automatically_enriched_metadata(self) -> None:
+        from app.main import app
+        from app.literature_project import update_literature_paper
+        from fastapi.testclient import TestClient
+
+        def enrich(root: Path, paper_id: str) -> dict[str, object]:
+            return update_literature_paper(
+                root,
+                paper_id,
+                title="Automatically recognized paper",
+                authors="Alice Smith",
+                first_author_surname="Smith",
+                year=2025,
+                journal="Journal of Testing",
+                journal_abbreviation="JTest",
+                metadata_source="pdf_metadata",
+                metadata_trust="complete",
+                metadata_issue="",
+            )
+
+        with patch(
+            "app.literature_routes.enrich_imported_pdf_metadata",
+            side_effect=enrich,
+        ) as enrich_import:
+            response = TestClient(app).post(
+                f"/api/work/projects/{self.project.slug}/literature/papers/import",
+                params={"filename": "自动识别.pdf"},
+                content=b"%PDF-1.4\n%%EOF\n",
+                headers={"Content-Type": "application/pdf"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        enrich_import.assert_called_once()
+        self.assertEqual(response.json()["paper"]["title"], "Automatically recognized paper")
+        self.assertEqual(response.json()["paper"]["metadata_trust"], "complete")
+
     def test_selected_papers_are_persisted_as_system_events_before_user_messages(self) -> None:
         from app.main import app
         from fastapi.testclient import TestClient
