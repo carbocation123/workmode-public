@@ -106,6 +106,13 @@ class NativeWordAddinRegistrationScriptTest(unittest.TestCase):
                 self.assertNotIn("Start-Process", source)
                 self.assertIn("& $powerShell @arguments", source)
 
+    def test_install_hashing_does_not_require_powershell_module_autoload(
+        self,
+    ) -> None:
+        source = INSTALL_SCRIPT.read_text(encoding="utf-8")
+        self.assertNotIn("Get-FileHash", source)
+        self.assertIn("[System.Security.Cryptography.SHA256]::Create()", source)
+
     def test_registration_scripts_are_ascii_safe_for_windows_powershell_5(self) -> None:
         for script in (INSTALL_SCRIPT, UNINSTALL_SCRIPT):
             with self.subTest(script=script.name):
