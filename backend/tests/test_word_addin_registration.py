@@ -39,8 +39,12 @@ class NativeWordAddinRegistrationScriptTest(unittest.TestCase):
     def test_install_relaunch_preserves_paths_with_spaces_and_apostrophes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary_root = Path(temporary_directory)
-            script_directory = temporary_root / "script path with spaces and 'apostrophe'"
-            assembly_directory = temporary_root / "assembly path with spaces and 'apostrophe'"
+            script_directory = (
+                temporary_root / "script path; & $value (group) with 'apostrophe'"
+            )
+            assembly_directory = (
+                temporary_root / "assembly path; & $value (group) with 'apostrophe'"
+            )
             local_app_data = temporary_root / "local app data"
             script_directory.mkdir()
             assembly_directory.mkdir()
