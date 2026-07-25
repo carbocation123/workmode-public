@@ -3,7 +3,7 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use workmode_public_lib::backend::{select_free_port, BackendLaunchSpec};
+use workmode_public_lib::backend::{select_free_port, BackendLaunchSpec, WORD_ADDIN_PORT};
 use workmode_public_lib::migration::{migrate_legacy_portable, MigrationError};
 use workmode_public_lib::paths::DesktopPaths;
 
@@ -119,6 +119,14 @@ fn selected_backend_port_can_be_bound_immediately() {
     let port = select_free_port().expect("select port");
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("bind selected port");
     assert_eq!(listener.local_addr().expect("address").port(), port);
+}
+
+#[test]
+fn word_addin_uses_the_same_stable_port_as_the_desktop_backend() {
+    assert_eq!(WORD_ADDIN_PORT, 8765);
+    let manifest = include_str!("../../../frontend/word-addin/manifest.xml");
+    assert!(manifest.contains("http://localhost:8765/word-addin/commands.html"));
+    assert!(manifest.contains("http://localhost:8765/word-addin/dialog.html"));
 }
 
 #[test]
