@@ -105,6 +105,46 @@ class WordCitationModelTest(unittest.TestCase):
                 "unsaved::Document1",
             )
 
+    def test_builds_a_multi_paper_group_with_citation_modifiers(self) -> None:
+        from app.word_citations import build_citation_group_payload
+
+        payload = build_citation_group_payload(
+            "library",
+            [
+                {"id": "paper-a", "title": "A", "authors": "Zhang, San", "year": 2026},
+                {"id": "paper-b", "title": "B", "authors": "Li, Si", "year": 2025},
+            ],
+            locator_label="page",
+            locator_value="12-14",
+            prefix="参见",
+            suffix="及其补充材料",
+            suppress_author=True,
+        )
+
+        self.assertEqual(payload["schema"], "workmode-citation/v2")
+        self.assertEqual([item["paper_id"] for item in payload["items"]], ["paper-a", "paper-b"])
+        self.assertEqual(payload["items"][0]["locator"], {"label": "page", "value": "12-14"})
+        self.assertEqual(payload["items"][0]["prefix"], "参见")
+        self.assertEqual(payload["items"][0]["suffix"], "及其补充材料")
+        self.assertTrue(payload["items"][0]["suppress_author"])
+
+    def test_normalizes_existing_v1_citations_for_document_inspection(self) -> None:
+        from app.word_citations import normalize_citation_payload
+
+        normalized = normalize_citation_payload(
+            {
+                "schema": "workmode-citation/v1",
+                "project_slug": "library",
+                "paper_id": "paper-a",
+                "metadata": {"title": "Legacy citation"},
+            }
+        )
+
+        self.assertEqual(normalized["schema"], "workmode-citation/v2")
+        self.assertEqual(normalized["items"][0]["paper_id"], "paper-a")
+        self.assertIsNone(normalized["items"][0]["locator"])
+        self.assertFalse(normalized["items"][0]["suppress_author"])
+
 
 if __name__ == "__main__":
     unittest.main()
