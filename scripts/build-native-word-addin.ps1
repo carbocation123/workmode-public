@@ -20,18 +20,6 @@ if (-not (Test-Path -LiteralPath $Csc)) {
   throw ".NET Framework C# compiler was not found."
 }
 
-$Office = Get-ChildItem (Join-Path $WindowsRoot "assembly\GAC_MSIL\office") `
-  -Recurse -Filter "OFFICE.DLL" -ErrorAction SilentlyContinue |
-  Sort-Object FullName -Descending |
-  Select-Object -First 1
-$Extensibility = Get-ChildItem (Join-Path $WindowsRoot "assembly\GAC\Extensibility") `
-  -Recurse -Filter "extensibility.dll" -ErrorAction SilentlyContinue |
-  Sort-Object FullName -Descending |
-  Select-Object -First 1
-if (-not $Office -or -not $Extensibility) {
-  throw "Microsoft Office primary interop assemblies were not found."
-}
-
 $Output = Join-Path $OutputDirectory "Workmode.WordAddin.dll"
 $Arguments = @(
   "/nologo",
@@ -45,8 +33,7 @@ $Arguments = @(
   "/reference:System.Drawing.dll",
   "/reference:System.Windows.Forms.dll",
   "/reference:System.Web.Extensions.dll",
-  "/reference:$($Office.FullName)",
-  "/reference:$($Extensibility.FullName)",
+  (Join-Path $SourceRoot "OfficeInterop.cs"),
   (Join-Path $SourceRoot "WorkmodeWordAddin.cs"),
   (Join-Path $SourceRoot "CitationDialog.cs")
 )

@@ -12,7 +12,7 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 0.7.0 起 GitHub Release 只包含安装器、更新签名、更新清单和校验文件，不再附带 `.workmode-skin`。用户取得维护者手动发放的奖励皮肤后，可在「设置 → 外观与皮肤」中选择一个或多个包导入；皮肤不需要复制进安装目录，也不需要重新安装应用。
 
-安装器包含 React 功能大厅/主工作台、文献智库、会议转写、文章处理、原生 Word Ribbon DLL 与安装/卸载脚本、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。Vite 入口由同一次构建输出到 `frontend/dist`；Word 插件单独由系统 .NET Framework C# 编译器构建为 `Workmode.WordAddin.dll`，运行时调用固定 `127.0.0.1:8765` 的本地 API，不加载 Office.js 页面。文献智库、会议转写、文章处理和 Word Ribbon 都不需要用户另装 Node 或 Python。Python staging 会从 `backend/requirements.txt` 安装 DashScope SDK，因此目标电脑仍不需要预装 Node.js、Python 或 Rust；应用默认按当前用户安装，不要求管理员权限。
+安装器包含 React 功能大厅/主工作台、文献智库、会议转写、文章处理、原生 Word Ribbon DLL 与安装/卸载脚本、FastAPI 后端、Python runtime、后端依赖和官方科研协作教程初始模板。Vite 入口由同一次构建输出到 `frontend/dist`；Word 插件单独由系统 .NET Framework C# 编译器构建为 `Workmode.WordAddin.dll`，运行时调用固定 `127.0.0.1:8765` 的本地 API，不加载 Office.js 页面。插件只编译实际使用的标准 Office COM 契约，因此 GitHub Runner 不需要预装 Office 或 GAC PIA；目标电脑仍须安装 Windows 桌面版 Word。文献智库、会议转写、文章处理和 Word Ribbon 都不需要用户另装 Node 或 Python。Python staging 会从 `backend/requirements.txt` 安装 DashScope SDK，因此目标电脑仍不需要预装 Node.js、Python 或 Rust；应用默认按当前用户安装，不要求管理员权限。
 
 NSIS 安装完成后调用 `install-native-word-addin.ps1`：检测 Office x86/x64 位数，把 DLL 复制到当前用户 `%LOCALAPPDATA%\WorkmodePublic\word-native-addin\<内容哈希>\`，再写入当前 registry view 的 `HKCU\Software\Classes` COM 信息和 `HKCU\Software\Microsoft\Office\Word\Addins\Workmode.WordAddin`。版本化目录允许 Word 仍加载旧 DLL 时先部署新版本；首次安装或更新后仍必须保存文档、关闭全部 Word 窗口并重新打开。卸载前调用对应脚本精确删除同一注册项和本地插件目录。该机制仅面向 Windows 桌面版 Word，不等同于 Microsoft Marketplace 分发。
 
