@@ -104,6 +104,17 @@ class NativeWordAddinRegistrationScriptTest(unittest.TestCase):
                 self.assertIn("-EncodedCommand", source)
                 self.assertNotIn('"-File", $PSCommandPath', source)
 
+    def test_registration_scripts_are_ascii_safe_for_windows_powershell_5(self) -> None:
+        for script in (INSTALL_SCRIPT, UNINSTALL_SCRIPT):
+            with self.subTest(script=script.name):
+                try:
+                    script.read_bytes().decode("ascii")
+                except UnicodeDecodeError as error:
+                    self.fail(
+                        f"{script.name} contains source text that Windows PowerShell 5 "
+                        f"can misdecode without a BOM: {error}"
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()
