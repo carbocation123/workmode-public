@@ -797,6 +797,61 @@ class LiteratureModeTest(unittest.TestCase):
         self.assertEqual(bibliography.json()["reference_count"], 1)
         insert_bibliography.assert_called_once_with("C:\\Papers\\draft.docx")
 
+    def test_word_citation_manager_routes_build_a_group_and_expose_styles(self) -> None:
+        from app.main import app
+        from fastapi.testclient import TestClient
+
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        for paper_id, title in (("paper-word-a", "First"), ("paper-word-b", "Second")):
+            catalog["papers"].append(
+                {
+                    "id": paper_id,
+                    "title": title,
+                    "authors": "Yang, Jason",
+                    "year": 2026,
+                    "journal": "Workmode Reports",
+                    "original_filename": f"{paper_id}.pdf",
+                    "status": "pending",
+                    "tag_ids": [],
+                    "focus": "",
+                    "summary": "",
+                    "paths": {},
+                }
+            )
+        catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        client = TestClient(app)
+        styles = client.get(
+            f"/api/work/projects/{self.project.slug}/literature/word/styles"
+        )
+        with patch(
+            "app.literature_routes.insert_word_citation_group",
+            return_value={"ok": True, "citation_count": 1, "reference_count": 2},
+        ) as insert_group:
+            inserted = client.post(
+                f"/api/work/projects/{self.project.slug}/literature/word/citations/batch",
+                json={
+                    "document_id": "unsaved::Document1",
+                    "paper_ids": ["paper-word-a", "paper-word-b"],
+                    "style_id": "nature",
+                    "locator_label": "page",
+                    "locator_value": "8-9",
+                    "prefix": "see",
+                    "suffix": "for details",
+                    "suppress_author": False,
+                },
+            )
+
+        self.assertEqual(styles.status_code, 200)
+        self.assertEqual(len(styles.json()["styles"]), 5)
+        self.assertEqual(inserted.status_code, 200)
+        payload, document_id, style_id = insert_group.call_args.args
+        self.assertEqual(document_id, "unsaved::Document1")
+        self.assertEqual(style_id, "nature")
+        self.assertEqual([item["paper_id"] for item in payload["items"]], ["paper-word-a", "paper-word-b"])
+        self.assertEqual(payload["items"][0]["locator"], {"label": "page", "value": "8-9"})
+
     def test_chat_persists_active_context_as_message_metadata(self) -> None:
         from app.main import app
         from fastapi.testclient import TestClient
