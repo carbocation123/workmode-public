@@ -5,7 +5,7 @@
 ## 当前 main（尚未发布）
 
 - 文献智库新增 Zotero 本地文献库迁移：自动发现或手动选择 `zotero.sqlite`，只读导入书目元数据、拍平后的多重 Collection、普通/自动/彩色标签、主 PDF 与其它本地附件；导入前提醒关闭 Zotero，缺少有效 PDF 的记录单独失败，完成后复用现有查重。
-- Windows Word 引用已从单篇最小闭环升级为 Workmode 侧完整管理器，并增加 Word 顶部 `Workmode` Ribbon 入口：可搜索当前活动文献库、插入或替换组合引用、移除引用、刷新全文、生成参考文献并切换 GB/T 7714—2015、ACS、Nature、APA 7th 和 Vancouver。Ribbon 使用临时对话窗口而非常驻右侧任务窗格，并复用现有 COM、Content Control 和文档变量，不新增第二套存储。EndNote Traveling Library 当前仅检测和提示，不迁移私有字段；独立 Word 多进程完整枚举仍未交付。本机侧载页面当前使用固定 `localhost:8765`，正式 Marketplace HTTPS 分发尚未交付。
+- Windows Word 引用已从单篇最小闭环升级为 Workmode 侧管理器，并增加原生顶部 `Workmode` Ribbon：可搜索当前活动文献库、插入组合引用、移除引用、刷新全文、生成参考文献并切换 GB/T 7714—2015、ACS、Nature、APA 7th 和 Vancouver。Ribbon 使用 DPI 自适应临时窗口而非常驻右侧任务窗格；所有后端请求异步执行，避免 Word 主线程与反向 COM 自动化互相等待。插件复用现有 Content Control 和文档变量，不新增第二套存储。EndNote Traveling Library 当前仅检测，不迁移私有字段；独立 Word 多进程完整枚举、macOS、Word 网页版和 Marketplace 分发仍未交付。
 
 ## 已交付（v0.8.11）
 

@@ -81,7 +81,7 @@ LITERATURE_FIELD_REGISTRY = (
     {"key": "focus", "label": "用户关注点", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "用户特别关注的研究问题或证据。"},
     {"key": "summary", "label": "AI 提炼摘要", "type": "multiline_text", "editable": True, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "围绕当前项目用途形成的简短文献概要，不替代客观事实报告。"},
     {"key": "status", "label": "处理状态", "type": "enum", "editable": False, "searchable": True, "filterable": True, "sortable": True, "visible_by_default": True, "visible_in_frontend": True, "available_to_ai": True, "description": "pending/parsing/extracting/review/ready/failed 工作流状态，不代表论文质量。"},
-    {"key": "metadata_source", "label": "元数据来源", "type": "enum", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "元数据来自 Cite This、layout.json、人工/导入或仍待识别。"},
+    {"key": "metadata_source", "label": "元数据来源", "type": "enum", "editable": True, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "元数据来自 PDF 属性、Crossref、PDF 轻量 AI、Cite This、layout.json、人工/导入或仍待识别。"},
     {"key": "metadata_trust", "label": "元数据可信状态", "type": "enum", "editable": False, "searchable": True, "filterable": True, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "complete/partial/unknown/pending 表示书目信息完整度，不是科学结论可信度。"},
     {"key": "metadata_issue", "label": "元数据问题", "type": "multiline_text", "editable": False, "searchable": True, "filterable": False, "sortable": False, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "待人工补齐或核验的书目信息问题。"},
     {"key": "archive_filename", "label": "标准档名", "type": "text", "editable": False, "searchable": True, "filterable": False, "sortable": True, "visible_by_default": False, "visible_in_frontend": True, "available_to_ai": True, "description": "按第一作者姓、年份和期刊缩写生成的受控文件名。"},
@@ -379,7 +379,13 @@ LITERATURE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     },
                     "doi": {"type": "string"},
                     "paper_type": {"type": "string", "enum": ["research", "review", "unknown"]},
-                    "metadata_source": {"type": "string", "enum": ["cite_this", "layout_json", "manual", "pending"]},
+                    "metadata_source": {
+                        "type": "string",
+                        "enum": [
+                            "pdf_metadata", "crossref", "ai_pdf", "cite_this",
+                            "layout_json", "manual", "pending",
+                        ],
+                    },
                 },
                 "required": ["paper_id"],
             },

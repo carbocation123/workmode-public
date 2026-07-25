@@ -124,9 +124,8 @@ fn selected_backend_port_can_be_bound_immediately() {
 #[test]
 fn word_addin_uses_the_same_stable_port_as_the_desktop_backend() {
     assert_eq!(WORD_ADDIN_PORT, 8765);
-    let manifest = include_str!("../../../frontend/word-addin/manifest.xml");
-    assert!(manifest.contains("http://localhost:8765/word-addin/commands.html"));
-    assert!(manifest.contains("http://localhost:8765/word-addin/dialog.html"));
+    let source = include_str!("../../../word-addin-native/WorkmodeWordAddin.cs");
+    assert!(source.contains("http://127.0.0.1:8765/api/word-addin"));
 }
 
 #[test]
@@ -138,10 +137,10 @@ fn word_addin_assets_and_reversible_registration_are_packaged() {
     assert!(config.contains("\"installerHooks\": \"./windows/installer-hooks.nsh\""));
     assert!(hooks.contains("NSIS_HOOK_POSTINSTALL"));
     assert!(hooks.contains("NSIS_HOOK_PREUNINSTALL"));
-    assert!(hooks.contains("WriteRegStr HKCU"));
-    assert!(hooks.contains("DeleteRegValue HKCU"));
-    assert!(build_script.contains("frontend\\dist\\word-addin\\commands.html"));
-    assert!(build_script.contains("word-addin\\manifest.xml"));
+    assert!(hooks.contains("install-native-word-addin.ps1"));
+    assert!(hooks.contains("uninstall-native-word-addin.ps1"));
+    assert!(build_script.contains("Build-NativeWordAddin"));
+    assert!(build_script.contains("word-addin-native\\Workmode.WordAddin.dll"));
 }
 
 #[test]
@@ -159,13 +158,52 @@ fn native_word_addin_is_registered_per_user_and_reuses_the_existing_backend() {
     assert!(ribbon.contains("label=\"Workmode\""));
     assert!(ribbon.contains("onAction=\"InsertCitation\""));
     assert!(ribbon.contains("onAction=\"ManageCitations\""));
-    assert!(install.contains("Software\\Microsoft\\Office\\Word\\Addins\\Workmode.WordAddin"));
-    assert!(install.contains("Framework64\\v4.0.30319\\RegAsm.exe"));
-    assert!(uninstall.contains("/unregister"));
+    assert!(install.contains("Software\\Microsoft\\Office\\Word\\Addins\\$ProgId"));
+    assert!(install.contains("HKCU:\\Software\\Classes"));
+    assert!(install.contains("CodeBase"));
+    assert!(uninstall.contains("HKCU:\\Software\\Classes\\CLSID"));
     assert!(hooks.contains("install-native-word-addin.ps1"));
     assert!(hooks.contains("uninstall-native-word-addin.ps1"));
     assert!(build_script.contains("Build-NativeWordAddin"));
     assert!(build_script.contains("word-addin-native\\Workmode.WordAddin.dll"));
+}
+
+#[test]
+fn native_word_addin_does_not_block_word_while_the_backend_automates_the_document() {
+    let connect = include_str!("../../../word-addin-native/WorkmodeWordAddin.cs");
+    let dialog = include_str!("../../../word-addin-native/CitationDialog.cs");
+
+    assert!(connect.contains("public async void RefreshCitations"));
+    assert!(connect.contains("await ApiClient.PostAsync"));
+    assert!(dialog.contains("Shown += async delegate"));
+    assert!(dialog.contains("await ApiClient.GetAsync"));
+    assert!(dialog.contains("if (manage)"));
+    assert!(dialog.contains("正在读取当前文档中的引用"));
+}
+
+#[test]
+fn native_word_addin_update_can_be_staged_while_word_has_the_old_dll_loaded() {
+    let install = include_str!("../../../scripts/install-native-word-addin.ps1");
+
+    assert!(install.contains("Get-FileHash"));
+    assert!(install.contains("$VersionDirectory"));
+    assert!(install.contains("$InstallRoot"));
+}
+
+#[test]
+fn native_word_citation_dialog_uses_dpi_safe_adaptive_layout() {
+    let dialog = include_str!("../../../word-addin-native/CitationDialog.cs");
+
+    assert!(dialog.contains("AutoScaleMode = AutoScaleMode.None"));
+    assert!(dialog.contains("GetDpiForWindow"));
+    assert!(dialog.contains("ScalePixel"));
+    assert!(dialog.contains("paperList.Dock = DockStyle.Fill"));
+    assert!(dialog.contains("tabs.Dock = DockStyle.Fill"));
+    assert!(dialog.contains("searchButton.Dock = DockStyle.Right"));
+    assert!(dialog.contains("insertButton.Dock = DockStyle.Right"));
+    assert!(dialog.contains("optionsPanel.Dock = DockStyle.Bottom"));
+    assert!(!dialog.contains("TableLayoutPanel"));
+    assert!(dialog.contains("搜索并勾选文献，然后点击右下角「插入所选文献」"));
 }
 
 #[test]

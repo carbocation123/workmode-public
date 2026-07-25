@@ -1,10 +1,10 @@
-!define WORKMODE_WORD_ADDIN_ID "0f621bd7-1e31-47e8-8a9f-7d61fdac8805"
-
 !macro NSIS_HOOK_POSTINSTALL
-  WriteRegStr HKCU "Software\Microsoft\Office\16.0\WEF\Developer" "${WORKMODE_WORD_ADDIN_ID}" "$INSTDIR\word-addin\manifest.xml"
+  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\word-addin-native\install-native-word-addin.ps1" -AssemblyPath "$INSTDIR\word-addin-native\Workmode.WordAddin.dll"' $0
+  ${If} $0 != 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK "Workmode 已安装，但 Word 插件注册失败。请重新运行安装程序，或在 Workmode 中查看帮助。"
+  ${EndIf}
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  DeleteRegValue HKCU "Software\Microsoft\Office\16.0\WEF\Developer" "${WORKMODE_WORD_ADDIN_ID}"
-  DeleteRegKey HKCU "Software\Microsoft\Office\16.0\WEF\Developer\${WORKMODE_WORD_ADDIN_ID}"
+  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\word-addin-native\uninstall-native-word-addin.ps1"' $0
 !macroend

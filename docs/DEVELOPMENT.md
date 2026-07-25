@@ -83,7 +83,7 @@ npm ci --prefix desktop
 npm --prefix desktop run dev
 ```
 
-桌面 debug 构建会在正式 Tauri 来源之外额外允许本机 Vite 的 `127.0.0.1:5173/5174` 与对应 `localhost` 来源访问后端。桌面后端固定使用 `127.0.0.1:8765`，因为 Word Ribbon manifest 也指向该地址；端口被占用时应先停止旧 Workmode 实例，而不是更换端口。release 构建仍只允许 `tauri://localhost`、`http://tauri.localhost` 与 `https://tauri.localhost`，Word 页面和 API 均从 8765 同源加载。
+桌面 debug 构建会在正式 Tauri 来源之外额外允许本机 Vite 的 `127.0.0.1:5173/5174` 与对应 `localhost` 来源访问后端。桌面后端固定使用 `127.0.0.1:8765`，原生 Word 插件也只调用该 loopback API；端口被占用时应先停止旧 Workmode 实例，而不是更换端口。release 构建仍只允许 `tauri://localhost`、`http://tauri.localhost` 与 `https://tauri.localhost`。Word 插件没有 Office.js 页面；原生回调必须异步请求后端，凡是会让后端反向操作 Word 的请求都禁止阻塞 Word 主线程。
 
 ## MinerU 与 PDF 直接阅读
 
@@ -100,7 +100,7 @@ WORKMODE_MINERU_TIMEOUT_SECONDS=180
 
 文献记录写入测试还必须覆盖人类期刊缩写规范化与失败原子性：`J Mol Catal A Chem`、`Angew. Chem. Int. Ed.` 应直接成功并生成无点无空格的标准文件名；无法提取任何字母数字的缩写必须在改动 `catalog.json` / `tags.json` 前失败。
 
-文献 session 的默认交互契约是：新 session 先持久化一条 assistant 自我介绍；确认上传只写项目文件和 `literature_import_confirmed` system 事件，不调用模型、不自动选择文献；下一次聊天开始时通过 `system_message` SSE 显示尚未跟随用户消息的导入事件。论文选择变化由共享 chat route 写入 `literature_selection_changed`，相同选择不重复记录，取消全部选择会留下明确事件。用户明确要求精读或深度解读某一篇论文时，Prompt 必须要求先读取真实正文和图注，再默认按图与 panel 解释实验、观察、证据作用和局限；图注或图像证据不足必须明说，不得猜测，也不得未经用户同意启动耗时的 `literature_process`。这条能力同时出现在会话开场白、新手引导和输入区提示中，回归测试必须覆盖四处契约。调试这些行为时同时检查 session JSONL、`build_llm_messages()` 输出与文献时间线，不要只看 React 临时 state。
+文献 session 的默认交互契约是：新 session 先持久化一条 assistant 自我介绍；确认上传先写项目文件并同步执行轻量书目补齐，再写 `literature_import_confirmed` system 事件，但不自动选择文献、启动 MinerU 或生成事实报告。轻量补齐由 `pdf_metadata.py` 依次执行本地 PDF 属性/前两页 DOI、Crossref 精确 DOI 或标题查询、最后的已配置模型证据抽取；标题、作者、年份和期刊已经齐全时不得调用模型。Crossref 不接收 PDF 文件或正文，标题查询只接受规范化后完全一致的结果。回归测试必须覆盖本地元数据不调用模型、Crossref 完整命中跳过模型、前两层不完整才调用模型，以及中文文件名 PDF 可以生成 Latin-1 安全的 RFC 5987 内联响应头。下一次聊天开始时通过 `system_message` SSE 显示尚未跟随用户消息的导入事件。论文选择变化由共享 chat route 写入 `literature_selection_changed`，相同选择不重复记录，取消全部选择会留下明确事件。用户明确要求精读或深度解读某一篇论文时，Prompt 必须要求先读取真实正文和图注，再默认按图与 panel 解释实验、观察、证据作用和局限；图注或图像证据不足必须明说，不得猜测，也不得未经用户同意启动耗时的 `literature_process`。这条能力同时出现在会话开场白、新手引导和输入区提示中，回归测试必须覆盖四处契约。调试这些行为时同时检查 session JSONL、`build_llm_messages()` 输出与文献时间线，不要只看 React 临时 state。
 
 两个模式的会话重命名都必须调用共享 `api.updateSession()` / `PATCH /api/work/sessions/{id}`，不得在文献模块另建标题存储。修改后应验证工作台行内编辑和文献 session 选择器即时显示新名称，并确认对应 JSONL 没有被重写。
 

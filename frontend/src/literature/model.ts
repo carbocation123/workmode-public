@@ -7,7 +7,14 @@ export type PaperStatus =
   | 'failed'
 
 export type PaperType = 'research' | 'review' | 'unknown'
-export type MetadataSource = 'cite_this' | 'layout_json_fallback' | 'manual_review' | 'pending'
+export type MetadataSource =
+  | 'pdf_metadata'
+  | 'crossref'
+  | 'ai_pdf'
+  | 'cite_this'
+  | 'layout_json_fallback'
+  | 'manual_review'
+  | 'pending'
 export type ArchiveLocation = '文献/未处理' | '文献/已处理'
 export type VerificationStatus = 'pending' | 'passed' | 'needs_fix'
 

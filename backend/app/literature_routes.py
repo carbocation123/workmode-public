@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
+from starlette.concurrency import run_in_threadpool
 
 from . import files, storage
 from .config import managed_projects_dir
@@ -54,6 +55,7 @@ from .literature_project import (
     seed_literature_session,
     verify_literature_archive,
 )
+from .pdf_metadata import enrich_imported_pdf_metadata
 from .models import (
     LiteratureCrossRelationUpdate,
     EndNoteLibraryPath,
@@ -530,7 +532,13 @@ async def import_pdf(
             async for chunk in request.stream():
                 handle.write(chunk)
         result = register_staged_pdf(root, staged, original_filename=filename)
-        return {**result, "task": None}
+        paper_id = str(result["paper"]["id"])
+        enriched = await run_in_threadpool(
+            enrich_imported_pdf_metadata,
+            root,
+            paper_id,
+        )
+        return {**result, "paper": enriched, "task": None}
     except LiteratureProjectError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:

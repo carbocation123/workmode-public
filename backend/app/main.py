@@ -40,7 +40,6 @@ async def local_security_boundary(request: Request, call_next):
             return JSONResponse({"detail": "Invalid X-Workmode-Token"}, status_code=401)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    is_word_addin = request.url.path.startswith("/word-addin/")
     is_media_preview = (
         (
             request.url.path.startswith("/api/work/projects/")
@@ -52,11 +51,7 @@ async def local_security_boundary(request: Request, call_next):
             and request.url.path.endswith("/pdf")
         )
     )
-    if is_word_addin:
-        # Office loads command and dialog pages inside its own WebView frame.
-        # The pages are loopback-only and must not inherit the SPA's frame ban.
-        pass
-    elif is_media_preview:
+    if is_media_preview:
         response.headers["Content-Security-Policy"] = (
             "frame-ancestors 'self' tauri://localhost http://tauri.localhost "
             "https://tauri.localhost http://127.0.0.1:* http://localhost:*"

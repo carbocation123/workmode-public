@@ -10,9 +10,7 @@ export default defineConfig({
         main: 'index.html',
         literature: 'literature/index.html',
         transcription: 'transcription/index.html',
-        writing: 'writing/index.html',
-        wordAddinCommands: 'word-addin/commands.html',
-        wordAddinDialog: 'word-addin/dialog.html'
+        writing: 'writing/index.html'
       }
     }
   },

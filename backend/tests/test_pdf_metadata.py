@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import httpx
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
@@ -80,6 +81,59 @@ class PdfMetadataTest(unittest.TestCase):
         self.assertEqual(metadata["journal"], "Journal of Testing")
         self.assertEqual(metadata["doi"], "10.1234/test.5678")
         self.assertEqual(metadata["metadata_source"], "pdf_metadata")
+
+    def test_crossref_title_lookup_accepts_only_an_exact_normalized_title(self) -> None:
+        from app.pdf_metadata import resolve_crossref_metadata
+
+        expected_title = "CO2 conversion over FeMn@Si"
+        real_client = httpx.Client
+
+        def client_factory(**kwargs):
+            def handler(request: httpx.Request) -> httpx.Response:
+                self.assertEqual(
+                    request.url.params["query.bibliographic"],
+                    expected_title,
+                )
+                return httpx.Response(
+                    200,
+                    request=request,
+                    json={
+                        "message": {
+                            "items": [
+                                {
+                                    "title": ["CO<sub>2</sub> conversion over FeMn@Si"],
+                                    "author": [
+                                        {"given": "Alice", "family": "Smith"},
+                                        {"given": "Bob", "family": "Jones"},
+                                    ],
+                                    "container-title": ["Journal of Testing"],
+                                    "short-container-title": ["J Test"],
+                                    "published": {"date-parts": [[2024, 3, 2]]},
+                                    "DOI": "10.1234/TEST.5678",
+                                    "type": "journal-article",
+                                }
+                            ]
+                        }
+                    },
+                )
+
+            return real_client(
+                transport=httpx.MockTransport(handler),
+                headers=kwargs.get("headers"),
+                follow_redirects=kwargs.get("follow_redirects", False),
+                timeout=kwargs.get("timeout"),
+            )
+
+        with patch("app.pdf_metadata.httpx.Client", side_effect=client_factory):
+            metadata = resolve_crossref_metadata({"title": expected_title})
+
+        self.assertEqual(metadata["title"], expected_title)
+        self.assertEqual(metadata["authors"], "Alice Smith, Bob Jones")
+        self.assertEqual(metadata["first_author_surname"], "Smith")
+        self.assertEqual(metadata["year"], 2024)
+        self.assertEqual(metadata["journal_abbreviation"], "JTest")
+        self.assertEqual(metadata["doi"], "10.1234/test.5678")
+        self.assertEqual(metadata["metadata_trust"], "complete")
 
     def test_complete_crossref_metadata_skips_ai_fallback(self) -> None:
         from app.literature_project import (

@@ -44,7 +44,15 @@ class LiteratureRecordUpdate(BaseModel):
     journal_abbreviation: str | None = Field(default=None, max_length=200)
     doi: str | None = Field(default=None, max_length=1000)
     paper_type: Literal["research", "review", "unknown"] | None = None
-    metadata_source: Literal["cite_this", "layout_json", "manual", "pending"] | None = None
+    metadata_source: Literal[
+        "pdf_metadata",
+        "crossref",
+        "ai_pdf",
+        "cite_this",
+        "layout_json",
+        "manual",
+        "pending",
+    ] | None = None
 
 
 class LiteratureTagManage(BaseModel):

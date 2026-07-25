@@ -90,6 +90,7 @@ def _model_completion(
     user: str,
     *,
     response_format: dict[str, str] | None = None,
+    timeout_seconds: int | None = None,
 ) -> str:
     settings = get_settings()
     if not settings.model_base_url or not settings.model_api_key:
@@ -108,7 +109,12 @@ def _model_completion(
     }
     if response_format is not None:
         payload["response_format"] = response_format
-    timeout = httpx.Timeout(max(settings.request_timeout_seconds, 600), connect=30)
+    request_timeout = (
+        max(settings.request_timeout_seconds, 600)
+        if timeout_seconds is None
+        else min(max(timeout_seconds, 10), 120)
+    )
+    timeout = httpx.Timeout(request_timeout, connect=min(30, request_timeout))
     try:
         with httpx.Client(timeout=timeout) as client:
             response = client.post(

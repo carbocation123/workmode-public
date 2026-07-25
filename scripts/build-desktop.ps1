@@ -140,6 +140,16 @@ function Reset-Directory {
   New-Item -ItemType Directory -Force -Path $Path | Out-Null
 }
 
+function Build-NativeWordAddin {
+  param([string]$OutputDirectory)
+  Write-Step "Building native Word add-in."
+  & (Join-Path $Root "scripts\build-native-word-addin.ps1") `
+    -OutputDirectory $OutputDirectory
+  if ($LASTEXITCODE -ne 0) {
+    throw "Native Word add-in build failed."
+  }
+}
+
 function Stage-Resources {
   $started = Get-Date
   $pythonBase = Resolve-PythonBase
@@ -161,14 +171,14 @@ function Stage-Resources {
   $venvLibTarget = Join-Path $Resources "runtime\backend-venv\Lib"
   $tutorialTarget = Join-Path $Resources "tutorial-project"
   $frontendTarget = Join-Path $Resources "frontend\dist"
-  $wordAddinTarget = Join-Path $Resources "word-addin"
+  $wordAddinTarget = Join-Path $Resources "word-addin-native"
   New-Item -ItemType Directory -Force -Path $backendTarget, $configTarget, $pythonTarget, $venvLibTarget, $frontendTarget, $wordAddinTarget | Out-Null
 
   Copy-Item -LiteralPath (Join-Path $Backend "app") -Destination $backendTarget -Recurse
   Copy-Item -LiteralPath (Join-Path $Root ".env.example") -Destination (Join-Path $configTarget ".env.example")
   Copy-Item -LiteralPath $TutorialProject -Destination $tutorialTarget -Recurse
   Get-ChildItem -LiteralPath (Join-Path $Frontend "dist") -Force | Copy-Item -Destination $frontendTarget -Recurse -Force
-  Copy-Item -LiteralPath (Join-Path $Frontend "word-addin\manifest.xml") -Destination (Join-Path $wordAddinTarget "manifest.xml")
+  Build-NativeWordAddin -OutputDirectory $wordAddinTarget
   Get-ChildItem -LiteralPath $pythonBase -Force | Copy-Item -Destination $pythonTarget -Recurse -Force
   Copy-Item -LiteralPath $venvSitePackages -Destination $venvLibTarget -Recurse
 
@@ -187,9 +197,9 @@ function Stage-Resources {
       (Join-Path $Resources "runtime\python-base\pythonw.exe"),
       (Join-Path $Resources "runtime\backend-venv\Lib\site-packages\uvicorn"),
       (Join-Path $Resources "config\.env.example"),
-      (Join-Path $Resources "frontend\dist\word-addin\commands.html"),
-      (Join-Path $Resources "frontend\dist\word-addin\dialog.html"),
-      (Join-Path $Resources "word-addin\manifest.xml"),
+      (Join-Path $Resources "word-addin-native\Workmode.WordAddin.dll"),
+      (Join-Path $Resources "word-addin-native\install-native-word-addin.ps1"),
+      (Join-Path $Resources "word-addin-native\uninstall-native-word-addin.ps1"),
       (Join-Path $Resources "tutorial-project\WORKMODE_TUTORIAL.json"),
       (Join-Path $Resources "tutorial-project\WORKMODE.md"),
       (Join-Path $Resources "tutorial-project\papers\s41467-019-13638-9.pdf")
@@ -203,7 +213,7 @@ function Stage-Resources {
 
 function Build-FrontendAssets {
   $started = Get-Date
-  Write-Step "Building frontend and Word add-in assets."
+  Write-Step "Building frontend assets."
   Push-Location $Frontend
   try {
     & npm run build

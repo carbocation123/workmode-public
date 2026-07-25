@@ -240,8 +240,12 @@ def media_response(slug: str, rel_path: str) -> FileResponse:
         raise ValidationError("PNG 文件头校验失败")
     if suffix in {".jpg", ".jpeg"} and not magic.startswith(b"\xff\xd8\xff"):
         raise ValidationError("JPEG 文件头校验失败")
-    response = FileResponse(path, media_type=media_type, filename=path.name)
-    response.headers["Content-Disposition"] = f'inline; filename="{path.name}"'
+    response = FileResponse(
+        path,
+        media_type=media_type,
+        filename=path.name,
+        content_disposition_type="inline",
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cache-Control"] = "no-store"
     return response
