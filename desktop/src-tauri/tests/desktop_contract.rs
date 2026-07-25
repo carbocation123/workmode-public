@@ -198,7 +198,8 @@ fn native_word_addin_does_not_block_word_while_the_backend_automates_the_documen
 fn native_word_addin_update_can_be_staged_while_word_has_the_old_dll_loaded() {
     let install = include_str!("../../../scripts/install-native-word-addin.ps1");
 
-    assert!(install.contains("Get-FileHash"));
+    assert!(!install.contains("Get-FileHash"));
+    assert!(install.contains("[System.Security.Cryptography.SHA256]::Create()"));
     assert!(install.contains("$VersionDirectory"));
     assert!(install.contains("$InstallRoot"));
 }
