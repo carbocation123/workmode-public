@@ -42,6 +42,22 @@ function ConvertTo-PowerShellLiteral {
   return "'" + $Value.Replace("'", "''") + "'"
 }
 
+function Get-Sha256Hex {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      $hash = $sha256.ComputeHash($stream)
+      return [System.BitConverter]::ToString($hash).Replace("-", "").ToLowerInvariant()
+    } finally {
+      $sha256.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 function Relaunch-InOfficeBitness {
   param([string]$Platform)
   $isCorrect = ($Platform -eq "x64" -and [Environment]::Is64BitProcess) -or
@@ -92,8 +108,8 @@ if (-not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) {
 }
 
 $InstallRoot = Join-Path $env:LOCALAPPDATA "WorkmodePublic\word-native-addin"
-$AssemblyHash = (Get-FileHash -LiteralPath $AssemblyPath -Algorithm SHA256).Hash
-$VersionDirectory = Join-Path $InstallRoot $AssemblyHash.Substring(0, 12).ToLowerInvariant()
+$AssemblyHash = Get-Sha256Hex -Path $AssemblyPath
+$VersionDirectory = Join-Path $InstallRoot $AssemblyHash.Substring(0, 12)
 New-Item -ItemType Directory -Force -Path $VersionDirectory | Out-Null
 $InstalledAssembly = Join-Path $VersionDirectory "Workmode.WordAddin.dll"
 if ($AssemblyPath -ne $InstalledAssembly) {
