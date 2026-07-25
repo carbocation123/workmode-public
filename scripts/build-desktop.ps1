@@ -160,11 +160,15 @@ function Stage-Resources {
   $pythonTarget = Join-Path $Resources "runtime\python-base"
   $venvLibTarget = Join-Path $Resources "runtime\backend-venv\Lib"
   $tutorialTarget = Join-Path $Resources "tutorial-project"
-  New-Item -ItemType Directory -Force -Path $backendTarget, $configTarget, $pythonTarget, $venvLibTarget | Out-Null
+  $frontendTarget = Join-Path $Resources "frontend\dist"
+  $wordAddinTarget = Join-Path $Resources "word-addin"
+  New-Item -ItemType Directory -Force -Path $backendTarget, $configTarget, $pythonTarget, $venvLibTarget, $frontendTarget, $wordAddinTarget | Out-Null
 
   Copy-Item -LiteralPath (Join-Path $Backend "app") -Destination $backendTarget -Recurse
   Copy-Item -LiteralPath (Join-Path $Root ".env.example") -Destination (Join-Path $configTarget ".env.example")
   Copy-Item -LiteralPath $TutorialProject -Destination $tutorialTarget -Recurse
+  Get-ChildItem -LiteralPath (Join-Path $Frontend "dist") -Force | Copy-Item -Destination $frontendTarget -Recurse -Force
+  Copy-Item -LiteralPath (Join-Path $Frontend "word-addin\manifest.xml") -Destination (Join-Path $wordAddinTarget "manifest.xml")
   Get-ChildItem -LiteralPath $pythonBase -Force | Copy-Item -Destination $pythonTarget -Recurse -Force
   Copy-Item -LiteralPath $venvSitePackages -Destination $venvLibTarget -Recurse
 
@@ -183,6 +187,9 @@ function Stage-Resources {
       (Join-Path $Resources "runtime\python-base\pythonw.exe"),
       (Join-Path $Resources "runtime\backend-venv\Lib\site-packages\uvicorn"),
       (Join-Path $Resources "config\.env.example"),
+      (Join-Path $Resources "frontend\dist\word-addin\commands.html"),
+      (Join-Path $Resources "frontend\dist\word-addin\dialog.html"),
+      (Join-Path $Resources "word-addin\manifest.xml"),
       (Join-Path $Resources "tutorial-project\WORKMODE_TUTORIAL.json"),
       (Join-Path $Resources "tutorial-project\WORKMODE.md"),
       (Join-Path $Resources "tutorial-project\papers\s41467-019-13638-9.pdf")
@@ -192,6 +199,19 @@ function Stage-Resources {
     }
   }
   Write-Step ("Resource staging completed in {0:N1}s." -f ((Get-Date) - $started).TotalSeconds)
+}
+
+function Build-FrontendAssets {
+  $started = Get-Date
+  Write-Step "Building frontend and Word add-in assets."
+  Push-Location $Frontend
+  try {
+    & npm run build
+    if ($LASTEXITCODE -ne 0) { throw "Frontend build failed." }
+  } finally {
+    Pop-Location
+  }
+  Write-Step ("Frontend build completed in {0:N1}s." -f ((Get-Date) - $started).TotalSeconds)
 }
 
 function Invoke-Checks {
@@ -352,6 +372,7 @@ if ($ValidateOnly) {
   return
 }
 Invoke-Checks
+Build-FrontendAssets
 Stage-Resources
 Invoke-TauriBuild
 Publish-Artifacts

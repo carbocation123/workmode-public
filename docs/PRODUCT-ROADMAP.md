@@ -5,7 +5,7 @@
 ## 当前 main（尚未发布）
 
 - 文献智库新增 Zotero 本地文献库迁移：自动发现或手动选择 `zotero.sqlite`，只读导入书目元数据、拍平后的多重 Collection、普通/自动/彩色标签、主 PDF 与其它本地附件；导入前提醒关闭 Zotero，缺少有效 PDF 的记录单独失败，完成后复用现有查重。
-- Windows Word 引用已从单篇最小闭环升级为 Workmode 侧完整管理器：可选择当前 Word 实例中的目标文档，按标题、作者、日期、期刊、DOI、分组和标签检索，一次插入单篇或多篇组合引用；文档保存稳定 Workmode 身份、书目快照、locator、前后缀和隐藏作者设置。管理器可检查、编辑、删除、重排、提示失联文献并生成或刷新参考文献，首批内置 CSL 配置覆盖 GB/T 7714—2015、ACS、Nature、APA 7th 和 Vancouver。EndNote Traveling Library 当前仅检测和提示，不迁移私有字段；独立 Word 多进程完整枚举和 Word 内任务窗格仍未交付。
+- Windows Word 引用已从单篇最小闭环升级为 Workmode 侧完整管理器，并增加 Word 顶部 `Workmode` Ribbon 入口：可搜索当前活动文献库、插入或替换组合引用、移除引用、刷新全文、生成参考文献并切换 GB/T 7714—2015、ACS、Nature、APA 7th 和 Vancouver。Ribbon 使用临时对话窗口而非常驻右侧任务窗格，并复用现有 COM、Content Control 和文档变量，不新增第二套存储。EndNote Traveling Library 当前仅检测和提示，不迁移私有字段；独立 Word 多进程完整枚举仍未交付。本机侧载页面当前使用固定 `localhost:8765`，正式 Marketplace HTTPS 分发尚未交付。
 
 ## 已交付（v0.8.11）
 
@@ -102,7 +102,7 @@
 
 ### 桌面产品化
 
-- 单实例、托盘、动态本地端口和后端进程树生命周期；
+- 单实例、托盘、供桌面端与 Word Ribbon 共用的固定本地端口 8765，以及后端进程树生命周期；
 - GitHub Releases 检查更新、下载进度、Tauri 签名验证和应用内安装；
 - GitHub Actions 一次输入版本号完成同步、测试、构建、签名和发布；
 - 0.1.x 便携数据非破坏性导入。

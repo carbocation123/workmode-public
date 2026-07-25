@@ -250,7 +250,7 @@ def insert_word_bibliography(document_id: str | None = None) -> dict[str, Any]:
     return _run_word_action("insert_bibliography", None, document_id)
 
 
-def inspect_word_citations(document_id: str) -> dict[str, Any]:
+def inspect_word_citations(document_id: str | None) -> dict[str, Any]:
     result = _run_word_action("inspect_document", None, document_id)
     groups = []
     for raw in list(result.get("citation_groups") or []):
@@ -270,7 +270,7 @@ def inspect_word_citations(document_id: str) -> dict[str, Any]:
 
 
 def refresh_word_citations(
-    document_id: str,
+    document_id: str | None,
     style_id: str = DEFAULT_CITATION_STYLE,
 ) -> dict[str, Any]:
     inspected = inspect_word_citations(document_id)
@@ -297,7 +297,7 @@ def refresh_word_citations(
 
 def insert_word_citation_group(
     payload: dict[str, Any],
-    document_id: str,
+    document_id: str | None,
     style_id: str = DEFAULT_CITATION_STYLE,
 ) -> dict[str, Any]:
     validate_style_id(style_id)
@@ -306,7 +306,7 @@ def insert_word_citation_group(
 
 
 def create_word_bibliography(
-    document_id: str,
+    document_id: str | None,
     style_id: str = DEFAULT_CITATION_STYLE,
 ) -> dict[str, Any]:
     validate_style_id(style_id)
@@ -317,7 +317,7 @@ def create_word_bibliography(
 def update_word_citation_group(
     instance_id: str,
     payload: dict[str, Any],
-    document_id: str,
+    document_id: str | None,
     style_id: str = DEFAULT_CITATION_STYLE,
 ) -> dict[str, Any]:
     validate_style_id(style_id)
@@ -332,7 +332,7 @@ def update_word_citation_group(
 
 def remove_word_citation_group(
     instance_id: str,
-    document_id: str,
+    document_id: str | None,
     style_id: str = DEFAULT_CITATION_STYLE,
 ) -> dict[str, Any]:
     validate_style_id(style_id)

@@ -19,7 +19,7 @@ Workmode Public 是本地优先的科研工作助手：
 
 ```text
 Tauri 2 desktop process
-  ├─ 启动捆绑的 Python/FastAPI 后端（动态 loopback 端口）
+  ├─ 启动捆绑的 Python/FastAPI 后端（固定 loopback 端口 8765）
   ├─ 等待 /api/health
   ├─ 把 API base 交给 React 前端
   └─ 关闭、更新或退出时终止后端进程树
@@ -55,7 +55,7 @@ FastAPI backend
 - `web_tools.py`：并行网页搜索/抓取、正文提取、响应限制与 SSRF 防护。
 - `work_state.py`：项目/全局结构化记忆和当前任务计划。
 - `tutorial_project.py`：官方教程标识、安装、重置、备份和新会话切换。
-- `literature_project.py`、`endnote_import.py`、`zotero_import.py`、`word_citations.py`、`word_automation.ps1`、`literature_pipeline.py`、`literature_routes.py`：正式 Workmode 的文献项目识别、固定结构策略、EndNote/Zotero 只读迁移、Windows Word 活动引用、17 个领域工具、MinerU/事实抽取和文献前端投影 API；不复制 session、聊天循环、上下文或压缩器。
+- `literature_project.py`、`endnote_import.py`、`zotero_import.py`、`word_citations.py`、`word_automation.ps1`、`word_addin.py`、`literature_pipeline.py`、`literature_routes.py`：正式 Workmode 的文献项目识别、固定结构策略、EndNote/Zotero 只读迁移、Windows Word 活动引用、Word Ribbon 轻量入口、17 个领域工具、MinerU/事实抽取和文献前端投影 API；不复制 session、聊天循环、上下文或压缩器。
 - `transcription/`：无 session 的会议录音文件工具。`workspace.py` 只管理固定 `tools/input/output` 目录、单工作线程、任务恢复、AI 派生文件和成对回收；`dashscope_fun_asr.py` 适配 Files API、Fun-ASR 异步轮询、说话人分段和结果下载；`ai_processing.py` 复用共享 OpenAI-compatible 模型设置，执行忠实润色与分段汇总；`routes.py` 提供上传、列表、结果、重试、改名、AI 生成/读取/清除、下载、删除与恢复 API。
 - `writing/`：无 session 的文章处理工具。`skill_loader.py` 从版本化 `@.../SKILL.md` 清单展开纯文本处理规则；`processing.py` 执行忠实润色、长文分块核查、全篇合并和明确 Unicode 上下标/下标规范化；`history.py` 管理不可变成功记录与可恢复删除；`routes.py` 提供状态、处理、轻量历史列表、全文详情、删除与恢复 API。
 - `pdf_text.py`：受大小、页数和字符数约束的本地 PDF 文本层抽取；不执行 OCR，不调用外部服务，供文献全文读取在 MinerU Markdown 缺失时降级使用。
@@ -267,7 +267,7 @@ AI 回复、压缩摘要和 Markdown 文件预览共用 `MarkdownRenderer.tsx`�
 
 ## 桌面生命周期与更新
 
-`desktop/src-tauri/src/lib.rs` 负责单实例、托盘、窗口、动态端口后端和退出清理。后端使用 `PYTHONDONTWRITEBYTECODE=1`，避免在安装目录生成运行缓存。
+`desktop/src-tauri/src/lib.rs` 负责单实例、托盘、窗口、固定 `127.0.0.1:8765` 后端和退出清理。固定端口同时是 Word Ribbon manifest 的本机地址；端口被其它程序占用时桌面端必须明确启动失败，不能悄悄换端口导致 Word 插件连错服务。后端使用 `PYTHONDONTWRITEBYTECODE=1`，避免在安装目录生成运行缓存。
 
 更新器下载带 minisign/Tauri 签名的安装器。安装前，前端调用 Rust 生命周期命令停止并等待 Python 后端进程树，避免已加载 `.pyd` 锁住 NSIS 需要替换的文件；若安装启动在应用退出前失败，可以在原端口恢复后端。
 
@@ -308,7 +308,9 @@ docs/                            当前架构、开发、发行和路线图
 
 `word_citations.py` 同时兼容单篇 `workmode-citation/v1` 与组合引用 `workmode-citation/v2`。`v2` 的每个 item 保存项目 slug、稳定 paper ID、标题/作者/年份或发表日期/期刊/DOI 快照，以及 locator、前缀、后缀和隐藏作者设置；载荷以 URL-safe Base64 交给 Windows 自动化层。`citation_styles.py` 把文档中的全部引用组按正文顺序去重、编号，再用 `citeproc-py` 执行 Workmode 内置 CSL 配置并生成参考文献；首批样式 ID 固定为 GB/T 7714—2015 顺序编码、ACS、Nature、APA 7th 和 Vancouver。数字格式的连续编号由 Workmode 折叠，APA 使用作者—日期正文引用。样式是项目内可测试的内置配置，不依赖运行时联网下载样式文件。
 
-`word_automation.ps1` 保持纯 ASCII，避免 Windows PowerShell 5 在不同系统代码页下误读脚本；错误码由 Python 翻译成人类可读中文。自动化层枚举当前 Word Application 实例中的文档：已保存文档以 `FullName` 为目标 ID，未保存文档以 `unsaved::<Name>` 为目标 ID，同时返回活动文档 ID。显式目标不存在时返回 `WORD_DOCUMENT_NOT_FOUND`，绝不回退到其他文档；选择目标后先激活文档，使 Word `Selection` 与写入目标一致。每个引用对应一个标签为 `workmode-citation:<32 位实例 ID>` 的纯文本 Content Control 和一个 `WORKMODE_CITATION_DATA_<实例 ID>` 文档变量；参考文献使用 `workmode-bibliography:<实例 ID>` 富文本控件，文档级 `WORKMODE_CITATION_STYLE` 记录当前样式。inspect、insert、update、remove、apply-formatting 和 insert-bibliography 动作共同支持管理器读取、修改、删除、重排和刷新；最后一条引用删除后会删除空参考文献控件，孤立引用变量会在刷新时清理。检查动作还只读统计 `ADDIN EN.CITE` 与 `ADDIN EN.REFLIST` 字段，用于提示 EndNote Traveling Library 共存，不读取其私有载荷，也不改写或删除它。当前仅支持 Windows 桌面版 Word；同一 Word 实例中的常规多文档可选择，由彼此独立的多个 Word 进程打开的文档不保证同时可见。Content Control 数据模型仍可由后续 Office.js 任务窗格接管，无需迁移为普通文本。
+`word_automation.ps1` 保持纯 ASCII，避免 Windows PowerShell 5 在不同系统代码页下误读脚本；错误码由 Python 翻译成人类可读中文。自动化层枚举当前 Word Application 实例中的文档：已保存文档以 `FullName` 为目标 ID，未保存文档以 `unsaved::<Name>` 为目标 ID，同时返回活动文档 ID。显式目标不存在时返回 `WORD_DOCUMENT_NOT_FOUND`，绝不回退到其他文档；选择目标后先激活文档，使 Word `Selection` 与写入目标一致。每个引用对应一个标签为 `workmode-citation:<32 位实例 ID>` 的纯文本 Content Control 和一个 `WORKMODE_CITATION_DATA_<实例 ID>` 文档变量；参考文献使用 `workmode-bibliography:<实例 ID>` 富文本控件，文档级 `WORKMODE_CITATION_STYLE` 记录当前样式。inspect、insert、update、remove、apply-formatting 和 insert-bibliography 动作共同支持管理器读取、修改、删除、重排和刷新；最后一条引用删除后会删除空参考文献控件，孤立引用变量会在刷新时清理。检查动作还只读统计 `ADDIN EN.CITE` 与 `ADDIN EN.REFLIST` 字段，用于提示 EndNote Traveling Library 共存，不读取其私有载荷，也不改写或删除它。当前仅支持 Windows 桌面版 Word；同一 Word 实例中的常规多文档可选择，由彼此独立的多个 Word 进程打开的文档不保证同时可见。
+
+`frontend/word-addin/manifest.xml` 定义常驻 `Workmode` 自定义 Ribbon 选项卡，命令页和临时引文窗口随 Vite 一起构建。`word_addin.py` 只按当前活动文献项目搜索论文，并把插入、检查、更新、删除、刷新和参考文献请求转交现有 `word_citations.py`；顶部插件不直接写 Word OOXML，也不引入新的 Custom XML 或第二套引用存储。安装器通过当前用户的 Office `WEF\Developer` 注册值侧载 manifest，卸载时移除同一值。该本机版本由 `http://localhost:8765` 提供，仅用于 Windows 本地安装；Microsoft Marketplace 接受测试要求 HTTPS，若未来进入商店必须另行提供受信任 HTTPS 托管。
 
 `literature_pipeline.py` 是用户明确要求增强解析、结构化事实或归档时才进入的高级路径；PDF 入库、勾选和普通问答都不会自动调用它。它在一次正式工具调用内完成 MinerU、元数据和客观事实抽取，不建立独立任务/session 表。`literature_process` 同时接受一个 `paper_id` 或一组 `paper_ids`；批量调用使用最多 3 个工作线程，每篇独立收口成功/失败结果，并用按项目根目录分配的重入锁保护 catalog 的读改写与标准命名碰撞检查。MinerU 结果进入 `papers/unprocessed/extracted/<paper-id>/`；已有非空 `full.md` 会直接复用，后续阅读也优先使用它，事实报告为 `objective-facts.md`。同一个 `literature_read(part="full_text")` 在 `full.md` 缺失时调用 `pdf_text.py` 从原 PDF 本地文本层读取，并在工具结果中返回 `source=pdf_text_layer`、页数、截断信息和局限警告；有 MinerU 结果时返回 `source=mineru_markdown`。本地兜底不做 OCR，扫描件/纯图片 PDF 会明确要求 MinerU/OCR；复杂表格、公式和多栏版式仍推荐 MinerU。元数据只读首页 `Cite This`，ACS/Elsevier 页眉缺失时读取既有 `layout.json` DOI 邻近块；模型请求使用 Chat Completions `response_format={"type":"json_object"}`，原始响应写入解析目录，JSON 失败只进行一次同约束修复。声明的证据必须是首页或回退文本的规范化逐字子串；无法解析、缺字段或证据不成立时记录 `metadata_issue`、保持 `metadata_trust=partial`，但不阻断客观事实报告。前端在详情页明确显示人工确认提示，用户补齐作者姓、年份和期刊缩写后由 `literature_update_record` 完成标准命名。标准名为 `Surname_Year_Journal.pdf`，碰撞追加 `_2`、`_3`。默认 MinerU 等待 180 秒，设置页或 `WORKMODE_MINERU_TIMEOUT_SECONDS` 可在 60–1800 秒范围调整；流水线与设置 API 读取同一份热更新 `Settings`。停止生成把 cancellation event 传入 MinerU 与本地 PDF 阅读；网络步骤结束、轮询间隙或逐页抽取时会终止，工具结果按正式 JSONL 取消语义收口。
 

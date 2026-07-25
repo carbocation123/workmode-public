@@ -1,19 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const manifest = readFileSync(new URL('../word-addin/manifest.xml', import.meta.url), 'utf8')
-const commands = readFileSync(new URL('../word-addin/commands.ts', import.meta.url), 'utf8')
-const dialog = readFileSync(new URL('../word-addin/dialog.ts', import.meta.url), 'utf8')
-const dialogHtml = readFileSync(new URL('../word-addin/dialog.html', import.meta.url), 'utf8')
-const vite = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8')
-const installScript = readFileSync(
-  new URL('../../scripts/install-word-addin.ps1', import.meta.url),
-  'utf8',
-)
-const uninstallScript = readFileSync(
-  new URL('../../scripts/uninstall-word-addin.ps1', import.meta.url),
-  'utf8',
-)
+const decode = (url: URL) => new TextDecoder().decode(readFileSync(url))
+const manifest = decode(new URL('../word-addin/manifest.xml', import.meta.url))
+const commands = decode(new URL('../word-addin/commands.ts', import.meta.url))
+const dialog = decode(new URL('../word-addin/dialog.ts', import.meta.url))
+const dialogHtml = decode(new URL('../word-addin/dialog.html', import.meta.url))
+const vite = decode(new URL('../vite.config.ts', import.meta.url))
+const installScript = decode(new URL('../../scripts/install-word-addin.ps1', import.meta.url))
+const uninstallScript = decode(new URL('../../scripts/uninstall-word-addin.ps1', import.meta.url))
 
 describe('Word ribbon add-in contract', () => {
   it('adds one Workmode ribbon tab without a permanent task pane', () => {

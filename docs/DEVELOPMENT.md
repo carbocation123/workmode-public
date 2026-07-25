@@ -83,7 +83,7 @@ npm ci --prefix desktop
 npm --prefix desktop run dev
 ```
 
-桌面 debug 构建会在正式 Tauri 来源之外额外允许本机 Vite 的 `127.0.0.1:5173/5174` 与对应 `localhost` 来源访问动态后端，便于端口冲突时切换开发端口。release 构建仍只允许 `tauri://localhost`、`http://tauri.localhost` 与 `https://tauri.localhost`，不会把开发来源带入安装包。
+桌面 debug 构建会在正式 Tauri 来源之外额外允许本机 Vite 的 `127.0.0.1:5173/5174` 与对应 `localhost` 来源访问后端。桌面后端固定使用 `127.0.0.1:8765`，因为 Word Ribbon manifest 也指向该地址；端口被占用时应先停止旧 Workmode 实例，而不是更换端口。release 构建仍只允许 `tauri://localhost`、`http://tauri.localhost` 与 `https://tauri.localhost`，Word 页面和 API 均从 8765 同源加载。
 
 ## MinerU 与 PDF 直接阅读
 

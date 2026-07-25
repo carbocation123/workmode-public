@@ -13,6 +13,7 @@ from .history_repair import repair_stale_tool_runs
 from .literature_routes import router as literature_router
 from .transcription.routes import recover_transcription_jobs, router as transcription_router
 from .writing.routes import router as writing_router
+from .word_addin import router as word_addin_router
 from .routes import router
 from .storage import data_dir, ensure_data_dirs, sessions_dir
 
@@ -39,6 +40,7 @@ async def local_security_boundary(request: Request, call_next):
             return JSONResponse({"detail": "Invalid X-Workmode-Token"}, status_code=401)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
+    is_word_addin = request.url.path.startswith("/word-addin/")
     is_media_preview = (
         (
             request.url.path.startswith("/api/work/projects/")
@@ -50,7 +52,11 @@ async def local_security_boundary(request: Request, call_next):
             and request.url.path.endswith("/pdf")
         )
     )
-    if is_media_preview:
+    if is_word_addin:
+        # Office loads command and dialog pages inside its own WebView frame.
+        # The pages are loopback-only and must not inherit the SPA's frame ban.
+        pass
+    elif is_media_preview:
         response.headers["Content-Security-Policy"] = (
             "frame-ancestors 'self' tauri://localhost http://tauri.localhost "
             "https://tauri.localhost http://127.0.0.1:* http://localhost:*"
@@ -84,6 +90,7 @@ app.include_router(router)
 app.include_router(literature_router)
 app.include_router(transcription_router)
 app.include_router(writing_router)
+app.include_router(word_addin_router)
 
 
 FRONTEND_DIST = settings.static_dir

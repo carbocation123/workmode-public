@@ -39,7 +39,7 @@ fn desktop_paths_keep_user_data_outside_install_resources() {
 }
 
 #[test]
-fn backend_launch_spec_uses_dynamic_port_and_user_owned_paths() {
+fn backend_launch_spec_uses_requested_loopback_port_and_user_owned_paths() {
     let root = temp_dir("backend-spec");
     let app_data = root.join("app-data");
     let resources = root.join("resources");
@@ -127,6 +127,21 @@ fn word_addin_uses_the_same_stable_port_as_the_desktop_backend() {
     let manifest = include_str!("../../../frontend/word-addin/manifest.xml");
     assert!(manifest.contains("http://localhost:8765/word-addin/commands.html"));
     assert!(manifest.contains("http://localhost:8765/word-addin/dialog.html"));
+}
+
+#[test]
+fn word_addin_assets_and_reversible_registration_are_packaged() {
+    let config = include_str!("../tauri.conf.json");
+    let hooks = include_str!("../windows/installer-hooks.nsh");
+    let build_script = include_str!("../../../scripts/build-desktop.ps1");
+
+    assert!(config.contains("\"installerHooks\": \"./windows/installer-hooks.nsh\""));
+    assert!(hooks.contains("NSIS_HOOK_POSTINSTALL"));
+    assert!(hooks.contains("NSIS_HOOK_PREUNINSTALL"));
+    assert!(hooks.contains("WriteRegStr HKCU"));
+    assert!(hooks.contains("DeleteRegValue HKCU"));
+    assert!(build_script.contains("frontend\\dist\\word-addin\\commands.html"));
+    assert!(build_script.contains("word-addin\\manifest.xml"));
 }
 
 #[test]

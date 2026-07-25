@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::io;
-use std::net::TcpListener;
 use std::path::PathBuf;
 
 use crate::paths::DesktopPaths;
+
+pub const WORD_ADDIN_PORT: u16 = 8765;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BackendLaunchSpec {
@@ -66,6 +67,8 @@ impl BackendLaunchSpec {
 }
 
 pub fn select_free_port() -> io::Result<u16> {
-    let listener = TcpListener::bind(("127.0.0.1", 0))?;
-    Ok(listener.local_addr()?.port())
+    // Do not probe by binding and immediately releasing the fixed port here.
+    // On Windows that probe can make the real backend's immediate bind fail.
+    // Backend startup and readiness checks report an occupied port explicitly.
+    Ok(WORD_ADDIN_PORT)
 }

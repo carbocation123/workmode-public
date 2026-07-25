@@ -51,7 +51,8 @@
       },
       "nsis": {
         "displayLanguageSelector": false,
-        "languages": ["SimpChinese", "English"]
+        "languages": ["SimpChinese", "English"],
+        "installerHooks": "./windows/installer-hooks.nsh"
       }
     }
   },
