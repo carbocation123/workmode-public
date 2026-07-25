@@ -213,7 +213,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .search-box input { width: 100%; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 10px; }
 .search-box input::placeholder { color: var(--faint); }
 
-.library-command-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto; gap: 6px; }
+.library-command-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto auto; gap: 6px; }
 .tag-filter-control { min-width: 0; display: flex; }
 .tag-filter-trigger { width: 100%; height: var(--library-control-height); display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-control-bg); font-size: 9px; cursor: pointer; }
 .tag-filter-trigger { flex: 1; justify-content: flex-start; padding: 0 10px; }
@@ -231,6 +231,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .library-import-menu button > span { min-width: 0; display: grid; gap: 2px; }
 .library-import-menu button strong { font-size: 9px; }
 .library-import-menu button small { color: var(--faint); font-size: 7.5px; }
+.word-manager-trigger { height: var(--library-control-height); display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-control-bg); font-size: 9px; white-space: nowrap; cursor: pointer; }
+.word-manager-trigger:hover { color: var(--cyan); border-color: var(--lit-accent-border); background: var(--lit-accent-soft); }
+.word-manager-trigger:disabled { opacity: .45; cursor: default; }
+.word-manager-trigger svg { width: 13px; }
 
 .tag-filter-popover { position: absolute; z-index: 20; top: 86px; left: 12px; right: 12px; max-height: min(520px, calc(100vh - 230px)); overflow: auto; padding: 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--lit-floating-bg); box-shadow: 0 18px 55px var(--lit-shadow); }
 .tag-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--text); font-size: 9px; }
@@ -574,6 +578,51 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .literature-group-filter select:focus { border-color: var(--cyan); }
 .card-groups span { padding: 3px 5px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--muted); background: var(--lit-surface-soft); font-size: 7.5px; }
 .endnote-import-modal { width: min(720px, calc(100vw - 48px)); max-height: min(780px, calc(100vh - 48px)); display: grid; grid-template-rows: 64px minmax(0, 1fr) 70px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--lit-floating-bg); box-shadow: 0 34px 100px var(--lit-shadow); }
+.word-citation-manager { width: min(1180px, calc(100vw - 48px)); height: min(820px, calc(100vh - 48px)); display: grid; grid-template-rows: 64px auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--lit-floating-bg); box-shadow: 0 34px 100px var(--lit-shadow); }
+.word-citation-toolbar { display: flex; align-items: end; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--lit-surface-soft); }
+.word-citation-toolbar label { min-width: 190px; display: grid; gap: 4px; }
+.word-citation-toolbar label > span, .word-citation-fields label > span { color: var(--faint); font-size: 8px; }
+.word-citation-toolbar select, .word-citation-fields input, .word-citation-fields select { min-width: 0; height: 32px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; outline: 0; color: var(--text); background: var(--lit-input-bg); font-size: 9px; }
+.word-citation-toolbar select:focus, .word-citation-fields input:focus, .word-citation-fields select:focus { border-color: var(--cyan); }
+.word-citation-toolbar button, .word-citation-draft-actions button, .word-citation-existing article button { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--lit-control-text); background: var(--lit-control-bg); font-size: 9px; cursor: pointer; }
+.word-citation-toolbar button:last-child, .word-citation-draft-actions button:last-child { color: var(--lit-accent-contrast); border-color: var(--cyan); background: var(--cyan); }
+.word-citation-toolbar button:disabled, .word-citation-draft-actions button:disabled, .word-citation-existing article button:disabled { opacity: .4; cursor: default; }
+.word-citation-body { min-height: 0; display: grid; grid-template-columns: minmax(340px, .9fr) minmax(480px, 1.3fr); }
+.word-citation-picker, .word-citation-settings { min-height: 0; display: grid; overflow: hidden; padding: 16px; }
+.word-citation-picker { grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; border-right: 1px solid var(--line); }
+.word-citation-settings { grid-template-rows: auto auto auto minmax(0, 1fr) auto; gap: 12px; }
+.word-citation-picker > header, .word-citation-settings > header, .word-citation-existing > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.word-citation-picker header > div, .word-citation-existing header > div { min-width: 0; display: grid; gap: 3px; }
+.word-citation-picker header strong, .word-citation-settings header strong, .word-citation-existing header strong { color: var(--text); font-size: 10px; }
+.word-citation-picker header span, .word-citation-settings header span, .word-citation-existing header span { color: var(--faint); font-size: 8px; }
+.word-citation-picker header em, .word-citation-existing header em { color: var(--cyan); font: 8px ui-monospace, monospace; font-style: normal; }
+.word-citation-search { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); background: var(--lit-input-bg); }
+.word-citation-search svg { width: 14px; }
+.word-citation-search input { width: 100%; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 9px; }
+.word-citation-results { min-height: 0; display: grid; align-content: start; gap: 5px; overflow-y: auto; padding-right: 4px; }
+.word-citation-results label { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--lit-control-text); background: var(--lit-surface-soft); cursor: pointer; }
+.word-citation-results label.selected { border-color: var(--lit-accent-border); background: var(--lit-accent-soft); }
+.word-citation-results input { margin-top: 2px; accent-color: var(--cyan); }
+.word-citation-results label > span { min-width: 0; display: grid; gap: 3px; }
+.word-citation-results strong { overflow: hidden; color: var(--text); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.word-citation-results small { overflow: hidden; color: var(--faint); font-size: 7.5px; text-overflow: ellipsis; white-space: nowrap; }
+.word-citation-results > p, .word-citation-existing > div > p { margin: 20px 0; color: var(--faint); font-size: 9px; text-align: center; }
+.word-citation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.word-citation-fields label { min-width: 0; display: grid; gap: 4px; }
+.word-citation-fields .word-citation-checkbox { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; color: var(--lit-control-text); font-size: 9px; }
+.word-citation-checkbox input { accent-color: var(--cyan); }
+.word-citation-draft-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.word-citation-existing { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding-top: 11px; border-top: 1px solid var(--line); }
+.word-citation-existing > div { min-height: 0; display: grid; align-content: start; gap: 6px; overflow-y: auto; padding-right: 4px; }
+.word-citation-existing article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--lit-surface-soft); }
+.word-citation-existing article.missing { border-color: var(--lit-danger-border); }
+.word-citation-existing article > div { min-width: 0; display: grid; gap: 3px; }
+.word-citation-existing article strong { color: var(--cyan); font: 9px ui-monospace, monospace; }
+.word-citation-existing article span { overflow: hidden; color: var(--lit-control-text); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.word-citation-existing article small { color: var(--danger); font-size: 7.5px; }
+.word-citation-existing article button:last-child { color: var(--danger); border-color: var(--lit-danger-border); background: var(--lit-danger-soft); }
+.word-citation-endnote-warning { margin: 0; padding: 9px 10px; border: 1px solid var(--lit-warning-border); border-radius: 8px; color: var(--amber); background: color-mix(in srgb, var(--amber) 9%, var(--lit-surface-soft)); font-size: 8.5px; line-height: 1.55; }
+.word-citation-error { margin: 0; padding: 8px 10px; border: 1px solid var(--lit-danger-border); border-radius: 7px; color: var(--danger); background: var(--lit-danger-soft); font-size: 8.5px; }
 .endnote-import-body { min-height: 0; display: grid; align-content: start; gap: 16px; overflow-y: auto; padding: 22px 24px; }
 .endnote-intro, .endnote-result-summary, .endnote-warning { display: flex; align-items: flex-start; gap: 11px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--lit-surface-soft); }
 .endnote-intro { display: grid; }
@@ -1124,6 +1173,20 @@ body {
 }
 
 @media (max-width: 760px) {
+  .word-citation-manager { width: calc(100vw - 20px); height: calc(100vh - 20px); grid-template-rows: auto auto minmax(0, 1fr); }
+  .word-citation-manager .modal-header { height: auto; min-height: 58px; padding-block: 12px; }
+  .word-citation-toolbar { align-items: stretch; flex-wrap: wrap; }
+  .word-citation-toolbar label { min-width: 0; width: 100%; }
+  .word-citation-toolbar button { flex: 1 1 calc(50% - 4px); }
+  .word-citation-body { display: block; overflow-y: auto; }
+  .word-citation-picker, .word-citation-settings { min-height: 540px; overflow: visible; }
+  .word-citation-picker { border-right: 0; border-bottom: 1px solid var(--line); }
+  .word-citation-results { max-height: 350px; }
+  .word-citation-existing > div { max-height: 360px; }
+  .word-citation-fields { grid-template-columns: 1fr; }
+  .word-citation-fields .word-citation-checkbox { grid-column: 1; }
+  .word-citation-existing article { grid-template-columns: minmax(0, 1fr) auto; }
+  .word-citation-existing article button:last-child { grid-column: 2; }
   .paper-detail-modal .modal-header { height: auto; min-height: 64px; align-items: flex-start; gap: 10px; padding-block: 14px; }
   .paper-detail-header-actions { flex-wrap: wrap; }
   .word-target-picker { order: 10; width: 100%; }

@@ -224,8 +224,8 @@ describe('literature live interaction contracts', () => {
   it('inserts linked Word citations and a refreshable bibliography from the paper detail', () => {
     expect(source).toContain('插入 Word 引用')
     expect(source).toContain('生成 Word 参考文献')
-    expect(source).toContain('insertBackendWordCitation')
-    expect(source).toContain('insertBackendWordBibliography')
+    expect(source).toContain('insertBackendWordCitationGroup')
+    expect(source).toContain('createBackendWordBibliography')
     expect(source).toContain('listBackendWordDocuments')
     expect(source).toContain('Word 目标文档')
     expect(source).toContain('刷新 Word 文档列表')

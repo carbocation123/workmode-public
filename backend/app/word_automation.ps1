@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 $WdCollapseEnd = 0
 $WdContentControlRichText = 0
 $WdContentControlText = 1
+$DefaultWorkmodeStyle = "gb-t-7714-2015-numeric"
 
 function Write-WorkmodeResult {
     param([hashtable]$Value)
@@ -56,6 +57,25 @@ function Decode-WorkmodePayload {
     }
     $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($base64))
     return $json | ConvertFrom-Json
+}
+
+function Get-WorkmodeStyle {
+    param($Document)
+    try {
+        $style = [string]$Document.Variables.Item("WORKMODE_CITATION_STYLE").Value
+        if ($style.Trim()) { return $style }
+    } catch {
+    }
+    return $DefaultWorkmodeStyle
+}
+
+function Set-WorkmodeStyle {
+    param($Document, [string]$StyleId)
+    try {
+        $Document.Variables.Item("WORKMODE_CITATION_STYLE").Value = $StyleId
+    } catch {
+        $Document.Variables.Add("WORKMODE_CITATION_STYLE", $StyleId) | Out-Null
+    }
 }
 
 function Clean-Doi {
@@ -110,7 +130,10 @@ function Read-WorkmodeControls {
             try {
                 $encoded = [string]$Document.Variables.Item($variableName).Value
                 $payload = Decode-WorkmodePayload $encoded
-                if ($payload.schema -eq "workmode-citation/v1" -and $payload.paper_id) {
+                if (
+                    ($payload.schema -eq "workmode-citation/v1" -and $payload.paper_id) -or
+                    ($payload.schema -eq "workmode-citation/v2" -and $payload.items.Count -gt 0)
+                ) {
                     $citations.Add([pscustomobject]@{ Control = $control; Payload = $payload })
                 }
             } catch {
@@ -135,13 +158,22 @@ function Update-WorkmodeDocument {
     $nextNumber = 1
 
     foreach ($citation in $found.Citations) {
-        $key = "$($citation.Payload.project_slug)::$($citation.Payload.paper_id)"
-        if (-not $numbers.ContainsKey($key)) {
-            $numbers[$key] = $nextNumber
-            $metadataByNumber[$nextNumber] = $citation.Payload.metadata
-            $nextNumber++
+        $items = if ($citation.Payload.schema -eq "workmode-citation/v2") {
+            @($citation.Payload.items)
+        } else {
+            @($citation.Payload)
         }
-        $citation.Control.Range.Text = "[$($numbers[$key])]"
+        $citationNumbers = New-Object System.Collections.Generic.List[int]
+        foreach ($item in $items) {
+            $key = "$($item.project_slug)::$($item.paper_id)"
+            if (-not $numbers.ContainsKey($key)) {
+                $numbers[$key] = $nextNumber
+                $metadataByNumber[$nextNumber] = $item.metadata
+                $nextNumber++
+            }
+            $citationNumbers.Add([int]$numbers[$key])
+        }
+        $citation.Control.Range.Text = "[$($citationNumbers -join ',')]"
     }
 
     $references = New-Object System.Collections.Generic.List[string]
@@ -166,6 +198,40 @@ function Update-WorkmodeDocument {
         CitationCount = $found.Citations.Count
         ReferenceCount = $references.Count
         BibliographyCount = $found.Bibliographies.Count
+    }
+}
+
+function Get-WorkmodeInspection {
+    param($Document)
+    $found = Read-WorkmodeControls $Document
+    $groups = New-Object System.Collections.Generic.List[object]
+    foreach ($citation in $found.Citations) {
+        $tag = [string]$citation.Control.Tag
+        $instanceId = $tag.Substring("workmode-citation:".Length)
+        $variableName = "WORKMODE_CITATION_DATA_$instanceId"
+        $groups.Add([pscustomobject]@{
+            instance_id = $instanceId
+            field_payload = [string]$Document.Variables.Item($variableName).Value
+            text = [string]$citation.Control.Range.Text
+        })
+    }
+    $endNoteCitationCount = 0
+    $endNoteBibliographyCount = 0
+    for ($index = 1; $index -le $Document.Fields.Count; $index++) {
+        $code = [string]$Document.Fields.Item($index).Code.Text
+        if ($code -match "ADDIN\s+EN\.CITE") {
+            $endNoteCitationCount++
+        } elseif ($code -match "ADDIN\s+EN\.REFLIST") {
+            $endNoteBibliographyCount++
+        }
+    }
+    return [pscustomobject]@{
+        Groups = $groups.ToArray()
+        CitationCount = $found.Citations.Count
+        BibliographyCount = $found.Bibliographies.Count
+        StyleId = Get-WorkmodeStyle $Document
+        EndNoteCitationCount = $endNoteCitationCount
+        EndNoteBibliographyCount = $endNoteBibliographyCount
     }
 }
 
@@ -216,7 +282,74 @@ try {
         }
     }
 
-    if ($request.action -eq "insert_citation") {
+    if ($request.action -eq "inspect_document") {
+        $inspection = Get-WorkmodeInspection $document
+        Write-WorkmodeResult @{
+            ok = $true
+            document_id = Get-WorkmodeDocumentId $document
+            document_name = [string]$document.Name
+            style_id = $inspection.StyleId
+            citation_count = $inspection.CitationCount
+            bibliography_count = $inspection.BibliographyCount
+            citation_groups = $inspection.Groups
+            endnote_citation_count = $inspection.EndNoteCitationCount
+            endnote_bibliography_count = $inspection.EndNoteBibliographyCount
+        }
+        exit 0
+    } elseif ($request.action -eq "apply_formatting") {
+        $found = Read-WorkmodeControls $document
+        foreach ($citation in $found.Citations) {
+            $tag = [string]$citation.Control.Tag
+            $instanceId = $tag.Substring("workmode-citation:".Length)
+            $property = $request.citation_texts.PSObject.Properties[$instanceId]
+            if ($null -ne $property) {
+                $citation.Control.Range.Text = [string]$property.Value
+            }
+        }
+        $bibliographyEntries = @($request.bibliography_entries)
+        if ($bibliographyEntries.Count -eq 0) {
+            for ($index = $found.Bibliographies.Count - 1; $index -ge 0; $index--) {
+                $found.Bibliographies[$index].Delete($true)
+            }
+        } else {
+            $bibliographyText = $bibliographyEntries -join [char]11
+            foreach ($bibliography in $found.Bibliographies) {
+                $bibliography.Range.Text = $bibliographyText
+            }
+        }
+        Set-WorkmodeStyle $document ([string]$request.style_id)
+    } elseif ($request.action -eq "update_citation") {
+        if (-not $request.instance_id -or -not $request.field_payload) {
+            throw "WORD_MISSING_CITATION"
+        }
+        $variableName = "WORKMODE_CITATION_DATA_$([string]$request.instance_id)"
+        try {
+            $document.Variables.Item($variableName).Value = [string]$request.field_payload
+        } catch {
+            throw "WORD_CITATION_NOT_FOUND"
+        }
+    } elseif ($request.action -eq "remove_citation") {
+        if (-not $request.instance_id) {
+            throw "WORD_CITATION_NOT_FOUND"
+        }
+        $targetTag = "workmode-citation:$([string]$request.instance_id)"
+        $removed = $false
+        for ($index = $document.ContentControls.Count; $index -ge 1; $index--) {
+            $control = $document.ContentControls.Item($index)
+            if ([string]$control.Tag -eq $targetTag) {
+                $control.Delete($true)
+                $removed = $true
+                break
+            }
+        }
+        if (-not $removed) {
+            throw "WORD_CITATION_NOT_FOUND"
+        }
+        try {
+            $document.Variables.Item("WORKMODE_CITATION_DATA_$([string]$request.instance_id)").Delete()
+        } catch {
+        }
+    } elseif ($request.action -eq "insert_citation") {
         if (-not $request.field_payload) {
             throw "WORD_MISSING_CITATION"
         }
@@ -253,7 +386,16 @@ try {
         throw "WORD_UNSUPPORTED_ACTION"
     }
 
-    $updated = Update-WorkmodeDocument $document
+    $updated = if ($request.action -eq "apply_formatting") {
+        $found = Read-WorkmodeControls $document
+        [pscustomobject]@{
+            CitationCount = $found.Citations.Count
+            ReferenceCount = $bibliographyEntries.Count
+            BibliographyCount = $found.Bibliographies.Count
+        }
+    } else {
+        Update-WorkmodeDocument $document
+    }
     $document.Saved = $false
     Write-WorkmodeResult @{
         ok = $true

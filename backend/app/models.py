@@ -78,6 +78,29 @@ class WordDocumentTarget(BaseModel):
     document_id: str | None = Field(default=None, max_length=32768)
 
 
+class WordCitationAction(BaseModel):
+    document_id: str = Field(min_length=1, max_length=32768)
+    style_id: str = Field(default="gb-t-7714-2015-numeric", min_length=1, max_length=120)
+
+
+class WordCitationBatch(WordCitationAction):
+    paper_ids: list[str] = Field(min_length=1, max_length=50)
+    locator_label: Literal["page", "chapter", "figure", "section", "paragraph", "volume"] | None = None
+    locator_value: str = Field(default="", max_length=120)
+    prefix: str = Field(default="", max_length=200)
+    suffix: str = Field(default="", max_length=200)
+    suppress_author: bool = False
+
+
+class WordCitationUpdate(WordCitationBatch):
+    instance_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    paper_ids: list[str] = Field(min_length=1, max_length=50)
+
+
+class WordCitationRemove(WordCitationAction):
+    instance_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
 class LiteratureCrossRelationUpdate(BaseModel):
     markdown: str = Field(max_length=2_000_000)
 

@@ -714,8 +714,116 @@ export interface WordDocumentsResult {
   active_document_id: string | null
 }
 
+export interface WordCitationStyle {
+  id: string
+  label: string
+  kind: 'numeric' | 'author-date'
+}
+
+export interface WordCitationItem {
+  project_slug: string
+  paper_id: string
+  metadata: Record<string, unknown>
+  locator: { label: string; value: string } | null
+  prefix: string
+  suffix: string
+  suppress_author: boolean
+  missing?: boolean
+}
+
+export interface WordCitationGroup {
+  instance_id: string
+  text: string
+  items: WordCitationItem[]
+}
+
+export interface WordCitationInspection extends WordCitationResult {
+  style_id: string
+  citation_groups: WordCitationGroup[]
+  endnote_citation_count?: number
+  endnote_bibliography_count?: number
+}
+
+export interface WordCitationDraft {
+  document_id: string
+  paper_ids: string[]
+  style_id: string
+  locator_label?: string | null
+  locator_value: string
+  prefix: string
+  suffix: string
+  suppress_author: boolean
+}
+
 export async function listBackendWordDocuments(): Promise<WordDocumentsResult> {
   return literatureRequest<WordDocumentsResult>('/word/documents')
+}
+
+export async function listBackendWordCitationStyles(): Promise<WordCitationStyle[]> {
+  return (await literatureRequest<{ styles: WordCitationStyle[] }>('/word/styles')).styles
+}
+
+function wordCitationJson(path: string, body: unknown): Promise<WordCitationInspection> {
+  return literatureRequest<WordCitationInspection>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function inspectBackendWordCitations(
+  documentId: string,
+  styleId: string,
+): Promise<WordCitationInspection> {
+  return wordCitationJson('/word/citations/inspect', {
+    document_id: documentId,
+    style_id: styleId,
+  })
+}
+
+export function insertBackendWordCitationGroup(
+  draft: WordCitationDraft,
+): Promise<WordCitationInspection> {
+  return wordCitationJson('/word/citations/batch', draft)
+}
+
+export function refreshBackendWordCitations(
+  documentId: string,
+  styleId: string,
+): Promise<WordCitationInspection> {
+  return wordCitationJson('/word/citations/refresh', {
+    document_id: documentId,
+    style_id: styleId,
+  })
+}
+
+export function updateBackendWordCitationGroup(
+  instanceId: string,
+  draft: WordCitationDraft,
+): Promise<WordCitationInspection> {
+  return wordCitationJson('/word/citations/update', { ...draft, instance_id: instanceId })
+}
+
+export function removeBackendWordCitationGroup(
+  instanceId: string,
+  documentId: string,
+  styleId: string,
+): Promise<WordCitationInspection> {
+  return wordCitationJson('/word/citations/remove', {
+    instance_id: instanceId,
+    document_id: documentId,
+    style_id: styleId,
+  })
+}
+
+export function createBackendWordBibliography(
+  documentId: string,
+  styleId: string,
+): Promise<WordCitationInspection> {
+  return wordCitationJson('/word/citations/bibliography', {
+    document_id: documentId,
+    style_id: styleId,
+  })
 }
 
 function wordTargetRequest(documentId?: string): RequestInit {

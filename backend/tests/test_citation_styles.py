@@ -59,6 +59,7 @@ class CitationStyleTest(unittest.TestCase):
     def test_renders_grouped_citations_and_bibliographies_for_every_style(self) -> None:
         from app.citation_styles import render_citation_document
 
+        bibliographies = set()
         for style_id in (
             "gb-t-7714-2015-numeric",
             "american-chemical-society",
@@ -74,14 +75,19 @@ class CitationStyleTest(unittest.TestCase):
                 self.assertIn("及其补充材料", rendered["citation_texts"]["group-a"])
                 self.assertEqual(len(rendered["bibliography_entries"]), 2)
                 self.assertTrue(all(entry.strip() for entry in rendered["bibliography_entries"]))
+                bibliographies.add(rendered["bibliography_entries"][0])
+        self.assertEqual(len(bibliographies), 5)
 
     def test_apa_suppress_author_keeps_year_and_locator(self) -> None:
         from app.citation_styles import render_citation_document
 
-        self.groups[0]["items"] = [dict(self.groups[0]["items"][0], suppress_author=True)]
+        item = dict(self.groups[0]["items"][0], suppress_author=True)
+        item["metadata"] = dict(item["metadata"], year="", publication_date="2026-07-25")
+        self.groups[0]["items"] = [item]
         text = render_citation_document(self.groups, "apa-7th")["citation_texts"]["group-a"]
 
         self.assertIn("2026", text)
+        self.assertNotIn("2026-07-25", text)
         self.assertIn("12-14", text)
         self.assertNotIn("Zhang", text)
 

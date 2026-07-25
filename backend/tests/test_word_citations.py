@@ -145,6 +145,29 @@ class WordCitationModelTest(unittest.TestCase):
         self.assertIsNone(normalized["items"][0]["locator"])
         self.assertFalse(normalized["items"][0]["suppress_author"])
 
+    def test_invalid_style_is_rejected_before_word_is_mutated(self) -> None:
+        from app.citation_styles import CitationStyleError
+        from app.word_citations import insert_word_citation_group
+
+        payload = {
+            "schema": "workmode-citation/v2",
+            "items": [
+                {
+                    "project_slug": "library",
+                    "paper_id": "paper-a",
+                    "metadata": {"title": "Safe preflight"},
+                    "locator": None,
+                    "prefix": "",
+                    "suffix": "",
+                    "suppress_author": False,
+                }
+            ],
+        }
+        with patch("app.word_citations._run_word_action") as run_action:
+            with self.assertRaises(CitationStyleError):
+                insert_word_citation_group(payload, "unsaved::Document1", "not-a-real-style")
+            run_action.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

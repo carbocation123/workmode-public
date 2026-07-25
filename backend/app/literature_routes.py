@@ -27,10 +27,18 @@ from .zotero_import import (
 from .word_citations import (
     WordCitationError,
     build_citation_payload,
+    build_citation_group_payload,
+    create_word_bibliography,
+    inspect_word_citations,
     insert_word_bibliography,
     insert_word_citation,
+    insert_word_citation_group,
     list_word_documents,
+    refresh_word_citations,
+    remove_word_citation_group,
+    update_word_citation_group,
 )
+from .citation_styles import CitationStyleError, citation_style_options
 from .literature_project import (
     LITERATURE_TOOL_SCHEMAS,
     LiteratureProjectError,
@@ -55,6 +63,10 @@ from .models import (
     LiteratureRecordUpdate,
     LiteratureTagManage,
     WordDocumentTarget,
+    WordCitationAction,
+    WordCitationBatch,
+    WordCitationRemove,
+    WordCitationUpdate,
     ZoteroLibraryPath,
 )
 
@@ -363,6 +375,115 @@ def read_word_documents(slug: str) -> dict[str, object]:
     try:
         return list_word_documents()
     except WordCitationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/projects/{slug}/literature/word/styles")
+def read_word_citation_styles(slug: str) -> dict[str, object]:
+    _project_root(slug)
+    return {"styles": citation_style_options()}
+
+
+def _citation_group_from_request(
+    root: Path,
+    slug: str,
+    request: WordCitationBatch,
+) -> dict[str, object]:
+    papers = [literature_paper(root, paper_id) for paper_id in request.paper_ids]
+    return build_citation_group_payload(
+        slug,
+        papers,
+        locator_label=request.locator_label,
+        locator_value=request.locator_value,
+        prefix=request.prefix,
+        suffix=request.suffix,
+        suppress_author=request.suppress_author,
+    )
+
+
+@router.post("/projects/{slug}/literature/word/citations/inspect")
+def inspect_word_document(slug: str, request: WordCitationAction) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        result = inspect_word_citations(request.document_id)
+        current_ids = {
+            str(paper.get("id") or "")
+            for paper in literature_snapshot(root).get("papers", [])
+        }
+        for group in result["citation_groups"]:
+            for item in group["items"]:
+                item["missing"] = (
+                    item.get("project_slug") != slug
+                    or item.get("paper_id") not in current_ids
+                )
+        return result
+    except (WordCitationError, CitationStyleError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/word/citations/batch")
+def add_word_citation_group(slug: str, request: WordCitationBatch) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        payload = _citation_group_from_request(root, slug, request)
+        return insert_word_citation_group(payload, request.document_id, request.style_id)
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (WordCitationError, CitationStyleError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/word/citations/refresh")
+def refresh_word_document(slug: str, request: WordCitationAction) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return refresh_word_citations(request.document_id, request.style_id)
+    except (WordCitationError, CitationStyleError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/word/citations/update")
+def update_word_citation(
+    slug: str,
+    request: WordCitationUpdate,
+) -> dict[str, object]:
+    root = _project_root(slug)
+    try:
+        payload = _citation_group_from_request(root, slug, request)
+        return update_word_citation_group(
+            request.instance_id,
+            payload,
+            request.document_id,
+            request.style_id,
+        )
+    except LiteratureProjectError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (WordCitationError, CitationStyleError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/word/citations/remove")
+def remove_word_citation(
+    slug: str,
+    request: WordCitationRemove,
+) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return remove_word_citation_group(
+            request.instance_id,
+            request.document_id,
+            request.style_id,
+        )
+    except (WordCitationError, CitationStyleError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/projects/{slug}/literature/word/citations/bibliography")
+def add_styled_word_bibliography(slug: str, request: WordCitationAction) -> dict[str, object]:
+    _project_root(slug)
+    try:
+        return create_word_bibliography(request.document_id, request.style_id)
+    except (WordCitationError, CitationStyleError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 

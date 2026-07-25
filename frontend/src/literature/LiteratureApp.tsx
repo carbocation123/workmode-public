@@ -38,9 +38,11 @@ import {
   findZoteroLibraries,
   importEndNoteLibrary,
   importZoteroLibrary,
-  insertBackendWordBibliography,
-  insertBackendWordCitation,
+  createBackendWordBibliography,
+  inspectBackendWordCitations,
+  insertBackendWordCitationGroup,
   listBackendWordDocuments,
+  listBackendWordCitationStyles,
   listBackendPapers,
   listBackendGroups,
   listDeletedBackendPapers,
@@ -56,9 +58,11 @@ import {
   previewZoteroLibrary,
   recordImportedPapers,
   removeBackendProject,
+  removeBackendWordCitationGroup,
   renameBackendProject,
   renameBackendSession,
   restoreBackendPaper,
+  refreshBackendWordCitations,
   saveBackendPaperReview,
   saveBackendNote,
   saveCrossLiterature,
@@ -67,6 +71,7 @@ import {
   archiveBackendPaper,
   verifyBackendArchive,
   uploadPaper,
+  updateBackendWordCitationGroup,
   type ArchiveVerification,
   type BackendNote,
   type BackendLiteratureGroup,
@@ -81,6 +86,10 @@ import {
   type TagRegistryMutation,
   type WorkmodeProject,
   type WordDocumentInfo,
+  type WordCitationDraft,
+  type WordCitationGroup,
+  type WordCitationInspection,
+  type WordCitationStyle,
   type ZoteroImportResult,
   type ZoteroLibraryCandidate,
   type ZoteroPreview,
@@ -179,6 +188,14 @@ const FACT_KIND_LABELS = {
   excerpt: '原始内容',
 } as const
 
+const DEFAULT_WORD_CITATION_STYLES: WordCitationStyle[] = [
+  { id: 'gb-t-7714-2015-numeric', label: 'GB/T 7714—2015（顺序编码）', kind: 'numeric' },
+  { id: 'american-chemical-society', label: 'ACS', kind: 'numeric' },
+  { id: 'nature', label: 'Nature', kind: 'numeric' },
+  { id: 'apa-7th', label: 'APA 7th', kind: 'author-date' },
+  { id: 'vancouver', label: 'Vancouver', kind: 'numeric' },
+]
+
 function messageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
@@ -197,6 +214,20 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   const [wordDocumentId, setWordDocumentId] = useState('')
   const [wordDocumentsLoading, setWordDocumentsLoading] = useState(false)
   const [wordDocumentsError, setWordDocumentsError] = useState('')
+  const [citationManagerOpen, setCitationManagerOpen] = useState(false)
+  const [citationStyles, setCitationStyles] = useState<WordCitationStyle[]>(DEFAULT_WORD_CITATION_STYLES)
+  const [citationStyleId, setCitationStyleId] = useState('gb-t-7714-2015-numeric')
+  const [citationSearch, setCitationSearch] = useState('')
+  const [citationSelectedPaperIds, setCitationSelectedPaperIds] = useState<string[]>([])
+  const [citationInspection, setCitationInspection] = useState<WordCitationInspection | null>(null)
+  const [citationManagerBusy, setCitationManagerBusy] = useState(false)
+  const [citationManagerError, setCitationManagerError] = useState('')
+  const [citationPrefix, setCitationPrefix] = useState('')
+  const [citationSuffix, setCitationSuffix] = useState('')
+  const [citationLocatorLabel, setCitationLocatorLabel] = useState('page')
+  const [citationLocatorValue, setCitationLocatorValue] = useState('')
+  const [citationSuppressAuthor, setCitationSuppressAuthor] = useState(false)
+  const [editingCitationInstanceId, setEditingCitationInstanceId] = useState('')
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
   const [factReportMarkdowns, setFactReportMarkdowns] = useState<Record<string, string>>({})
   const [backendMode, setBackendMode] = useState<'connecting' | 'connected' | 'unavailable'>('connecting')
@@ -397,6 +428,14 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
   }, [detailPaperId])
 
   useEffect(() => {
+    if (citationManagerOpen && wordDocumentId) {
+      void loadCitationInspection(wordDocumentId)
+    } else if (citationManagerOpen) {
+      setCitationInspection(null)
+    }
+  }, [citationManagerOpen, wordDocumentId])
+
+  useEffect(() => {
     let active = true
     async function connectBackend() {
       const projects = await listBackendLiteratureProjects()
@@ -497,6 +536,23 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
       : matchesSearch
     return filterPapersByTagIds(matchesGroup, selectedTagIds)
   }, [papers, search, selectedTagIds, selectedGroupId, literatureGroups])
+
+  const citationSearchPapers = useMemo(() => {
+    const query = citationSearch.trim().toLocaleLowerCase()
+    if (!query) return papers
+    return papers.filter((paper) => [
+      paper.title,
+      paper.authors,
+      paper.firstAuthorSurname,
+      paper.year,
+      paper.publicationDate,
+      paper.journal,
+      paper.journalAbbreviation,
+      paper.doi,
+      ...paper.groupIds.map((id) => literatureGroups.find((group) => group.id === id)?.name || id),
+      ...paper.tagIds.map((id) => tagRegistry.find((tag) => tag.id === id)?.name || id),
+    ].join(' ').toLocaleLowerCase().includes(query))
+  }, [citationSearch, papers, literatureGroups, tagRegistry])
 
   const tagSearchResults = useMemo(() => {
     const query = tagQuery.trim().toLocaleLowerCase()
@@ -1255,6 +1311,127 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     }
   }
 
+  function resetCitationDraft(paperIds: string[] = []) {
+    setCitationSelectedPaperIds(paperIds)
+    setCitationPrefix('')
+    setCitationSuffix('')
+    setCitationLocatorLabel('page')
+    setCitationLocatorValue('')
+    setCitationSuppressAuthor(false)
+    setEditingCitationInstanceId('')
+  }
+
+  async function openCitationManager(initialPaperId?: string) {
+    resetCitationDraft(initialPaperId ? [initialPaperId] : [])
+    setCitationSearch('')
+    setCitationManagerError('')
+    setCitationManagerOpen(true)
+    try {
+      const styles = await listBackendWordCitationStyles()
+      setCitationStyles(styles)
+    } catch (error) {
+      setCitationManagerError(`无法读取引用格式：${error instanceof Error ? error.message : '未知错误'}`)
+    }
+    await refreshWordDocuments()
+  }
+
+  async function loadCitationInspection(documentId = wordDocumentId) {
+    if (!documentId) return
+    setCitationManagerBusy(true)
+    setCitationManagerError('')
+    try {
+      const inspection = await inspectBackendWordCitations(documentId, citationStyleId)
+      setCitationInspection(inspection)
+      setCitationStyleId(inspection.style_id || 'gb-t-7714-2015-numeric')
+    } catch (error) {
+      setCitationInspection(null)
+      setCitationManagerError(`无法读取当前 Word 引用：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setCitationManagerBusy(false)
+    }
+  }
+
+  function citationDraft(): WordCitationDraft {
+    return {
+      document_id: wordDocumentId,
+      paper_ids: citationSelectedPaperIds,
+      style_id: citationStyleId,
+      locator_label: citationLocatorValue.trim() ? citationLocatorLabel : null,
+      locator_value: citationLocatorValue,
+      prefix: citationPrefix,
+      suffix: citationSuffix,
+      suppress_author: citationSuppressAuthor,
+    }
+  }
+
+  async function saveCitationDraft() {
+    if (!wordDocumentId || !citationSelectedPaperIds.length || citationManagerBusy) return
+    setCitationManagerBusy(true)
+    setCitationManagerError('')
+    try {
+      const result = editingCitationInstanceId
+        ? await updateBackendWordCitationGroup(editingCitationInstanceId, citationDraft())
+        : await insertBackendWordCitationGroup(citationDraft())
+      setCitationInspection(result)
+      resetCitationDraft()
+      setActionMessage(editingCitationInstanceId ? 'Word 引用已更新。' : '所选文献已插入 Word。')
+    } catch (error) {
+      setCitationManagerError(`引用操作失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setCitationManagerBusy(false)
+    }
+  }
+
+  function editCitationGroup(group: WordCitationGroup) {
+    if (group.items.some((item) => item.missing)) {
+      setCitationManagerError('这组引用包含失联文献，需先恢复原项目记录，或移除后重新插入。')
+      return
+    }
+    const first = group.items[0]
+    setEditingCitationInstanceId(group.instance_id)
+    setCitationSelectedPaperIds(group.items.map((item) => item.paper_id))
+    setCitationPrefix(first?.prefix || '')
+    setCitationSuffix(first?.suffix || '')
+    setCitationLocatorLabel(first?.locator?.label || 'page')
+    setCitationLocatorValue(first?.locator?.value || '')
+    setCitationSuppressAuthor(Boolean(first?.suppress_author))
+  }
+
+  async function removeCitationGroup(group: WordCitationGroup) {
+    if (!window.confirm(`移除 Word 中的引用“${group.text}”？引用控件及其隐藏数据会从文档删除。`)) return
+    setCitationManagerBusy(true)
+    setCitationManagerError('')
+    try {
+      setCitationInspection(await removeBackendWordCitationGroup(
+        group.instance_id,
+        wordDocumentId,
+        citationStyleId,
+      ))
+      if (editingCitationInstanceId === group.instance_id) resetCitationDraft()
+    } catch (error) {
+      setCitationManagerError(`移除引用失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setCitationManagerBusy(false)
+    }
+  }
+
+  async function refreshCitationDocument(createBibliography = false) {
+    if (!wordDocumentId || citationManagerBusy) return
+    setCitationManagerBusy(true)
+    setCitationManagerError('')
+    try {
+      const result = createBibliography
+        ? await createBackendWordBibliography(wordDocumentId, citationStyleId)
+        : await refreshBackendWordCitations(wordDocumentId, citationStyleId)
+      setCitationInspection(result)
+      setActionMessage(createBibliography ? 'Word 参考文献表已生成或刷新。' : 'Word 引用已按当前位置重排。')
+    } catch (error) {
+      setCitationManagerError(`刷新 Word 失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setCitationManagerBusy(false)
+    }
+  }
+
   async function refreshWordDocuments() {
     if (wordDocumentsLoading) return
     setWordDocumentsLoading(true)
@@ -1287,7 +1464,15 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     setWordBusy('citation')
     setActionMessage('正在插入 Word 引用…')
     try {
-      const result = await insertBackendWordCitation(paperId, wordDocumentId)
+      const result = await insertBackendWordCitationGroup({
+        document_id: wordDocumentId,
+        paper_ids: [paperId],
+        style_id: citationStyleId,
+        locator_value: '',
+        prefix: '',
+        suffix: '',
+        suppress_author: false,
+      })
       setWordDocuments((current) => current.map((document) => ({
         ...document,
         active: document.id === result.document_id,
@@ -1305,7 +1490,7 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
     setWordBusy('bibliography')
     setActionMessage('正在生成 Word 参考文献…')
     try {
-      const result = await insertBackendWordBibliography(wordDocumentId)
+      const result = await createBackendWordBibliography(wordDocumentId, citationStyleId)
       setWordDocuments((current) => current.map((document) => ({
         ...document,
         active: document.id === result.document_id,
@@ -1663,6 +1848,16 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   </button>
                 </div>
               </details>
+              <button
+                className="word-manager-trigger"
+                disabled={backendMode !== 'connected'}
+                onClick={() => void openCitationManager()}
+                title="搜索文献并管理当前 Word 文档中的引用"
+                type="button"
+              >
+                <Icon name="book" />
+                <span>Word 引用</span>
+              </button>
             </div>
 
             {tagFilterOpen && (
@@ -2388,6 +2583,15 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                   <summary aria-label="更多文献操作" title="更多文献操作">•••</summary>
                   <div>
                     <button
+                      onClick={(event) => {
+                        event.currentTarget.closest('details')?.removeAttribute('open')
+                        void openCitationManager(detailPaper.id)
+                      }}
+                      title="搜索、多选、修改或移除当前 Word 文档中的引用"
+                    >
+                      <Icon name="book" />Word 引用管理
+                    </button>
+                    <button
                       disabled={Boolean(wordBusy) || !wordDocumentId}
                       onClick={(event) => {
                         event.currentTarget.closest('details')?.removeAttribute('open')
@@ -2678,6 +2882,191 @@ export default function LiteratureApp({ themeId, customSkin }: LiteratureAppProp
                 {importingPapers ? '正在入库…' : `确认入库 ${pendingImportFiles.length} 篇`}
               </button>
             </footer>
+          </section>
+        </div>
+      )}
+
+      {citationManagerOpen && (
+        <div className="modal-backdrop centered-dialog-backdrop" role="presentation" onMouseDown={() => {
+          if (!citationManagerBusy) setCitationManagerOpen(false)
+        }}>
+          <section
+            aria-labelledby="word-citation-manager-title"
+            aria-modal="true"
+            className="word-citation-manager"
+            role="dialog"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div>
+                <span className="eyebrow">WORD CITATIONS</span>
+                <h2 id="word-citation-manager-title">Word 引用管理</h2>
+              </div>
+              <button
+                disabled={citationManagerBusy}
+                onClick={() => setCitationManagerOpen(false)}
+                aria-label="关闭 Word 引用管理"
+              >
+                <Icon name="close" />
+              </button>
+            </header>
+
+            <div className="word-citation-toolbar">
+              <label>
+                <span>目标文档</span>
+                <select
+                  aria-label="引用管理目标 Word 文档"
+                  disabled={wordDocumentsLoading || !wordDocuments.length}
+                  onChange={(event) => setWordDocumentId(event.target.value)}
+                  value={wordDocumentId}
+                >
+                  {!wordDocuments.length && <option value="">未检测到 Word 文档</option>}
+                  {wordDocuments.map((document) => (
+                    <option key={document.id} value={document.id}>{document.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>引用格式</span>
+                <select value={citationStyleId} onChange={(event) => setCitationStyleId(event.target.value)}>
+                  {citationStyles.map((style) => (
+                    <option key={style.id} value={style.id}>{style.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button disabled={citationManagerBusy} onClick={() => void refreshWordDocuments()}>刷新文档</button>
+              <button
+                disabled={citationManagerBusy || !wordDocumentId}
+                onClick={() => void refreshCitationDocument()}
+                title="按引用在 Word 中的当前位置重新编号，并应用所选格式"
+              >
+                刷新重排
+              </button>
+              <button
+                disabled={citationManagerBusy || !wordDocumentId}
+                onClick={() => void refreshCitationDocument(true)}
+              >
+                生成参考文献
+              </button>
+            </div>
+
+            <div className="word-citation-body">
+              <section className="word-citation-picker">
+                <header>
+                  <div><strong>搜索 Workmode 文献</strong><span>按标题、作者、年份、DOI、分组和标签查找</span></div>
+                  <em>{citationSelectedPaperIds.length} / 50</em>
+                </header>
+                <label className="word-citation-search">
+                  <Icon name="search" />
+                  <input
+                    value={citationSearch}
+                    onChange={(event) => setCitationSearch(event.target.value)}
+                    placeholder="输入标题、作者、年份、DOI、分组或标签"
+                    autoFocus
+                  />
+                </label>
+                <div className="word-citation-results">
+                  {citationSearchPapers.map((paper) => {
+                    const checked = citationSelectedPaperIds.includes(paper.id)
+                    return (
+                      <label className={checked ? 'selected' : ''} key={paper.id}>
+                        <input
+                          checked={checked}
+                          onChange={() => {
+                            if (checked) {
+                              setCitationSelectedPaperIds((current) => current.filter((id) => id !== paper.id))
+                            } else if (citationSelectedPaperIds.length < 50) {
+                              setCitationSelectedPaperIds((current) => [...current, paper.id])
+                            } else {
+                              setCitationManagerError('一次最多插入 50 篇文献。')
+                            }
+                          }}
+                          type="checkbox"
+                        />
+                        <span>
+                          <strong>{paper.title || '未识别标题'}</strong>
+                          <small>{[paper.authors, paper.year, paper.journal, paper.doi].filter(Boolean).join(' · ') || '元数据暂空'}</small>
+                        </span>
+                      </label>
+                    )
+                  })}
+                  {!citationSearchPapers.length && <p>没有找到匹配文献，请换一个关键词。</p>}
+                </div>
+              </section>
+
+              <section className="word-citation-settings">
+                <header>
+                  <strong>{editingCitationInstanceId ? '编辑当前引用' : '插入所选文献'}</strong>
+                  <span>多篇文献会组成一个可以整体维护的引用</span>
+                </header>
+                <div className="word-citation-fields">
+                  <label><span>引用前缀</span><input value={citationPrefix} onChange={(event) => setCitationPrefix(event.target.value)} placeholder="例如：参见" /></label>
+                  <label><span>引用后缀</span><input value={citationSuffix} onChange={(event) => setCitationSuffix(event.target.value)} placeholder="例如：及其补充材料" /></label>
+                  <label>
+                    <span>定位类型</span>
+                    <select value={citationLocatorLabel} onChange={(event) => setCitationLocatorLabel(event.target.value)}>
+                      <option value="page">页码</option>
+                      <option value="chapter">章节</option>
+                      <option value="figure">图</option>
+                      <option value="section">小节</option>
+                      <option value="paragraph">段落</option>
+                      <option value="volume">卷</option>
+                    </select>
+                  </label>
+                  <label><span>页码或定位信息</span><input value={citationLocatorValue} onChange={(event) => setCitationLocatorValue(event.target.value)} placeholder="例如：12–14" /></label>
+                  <label className="word-citation-checkbox">
+                    <input checked={citationSuppressAuthor} onChange={(event) => setCitationSuppressAuthor(event.target.checked)} type="checkbox" />
+                    <span>隐藏作者（作者—年份格式）</span>
+                  </label>
+                </div>
+                <div className="word-citation-draft-actions">
+                  {editingCitationInstanceId && <button onClick={() => resetCitationDraft()}>取消编辑</button>}
+                  <button
+                    disabled={citationManagerBusy || !wordDocumentId || !citationSelectedPaperIds.length}
+                    onClick={() => void saveCitationDraft()}
+                  >
+                    {editingCitationInstanceId ? '更新引用' : `插入所选文献（${citationSelectedPaperIds.length}）`}
+                  </button>
+                </div>
+
+                <div className="word-citation-existing">
+                  <header>
+                    <div><strong>当前文档中的 Workmode 引用</strong><span>在 Word 中移动整块引用后点“刷新重排”即可重新编号</span></div>
+                    <em>{citationInspection?.citation_groups.length || 0}</em>
+                  </header>
+                  <div>
+                    {Boolean(
+                      citationInspection?.endnote_citation_count
+                      || citationInspection?.endnote_bibliography_count,
+                    ) && (
+                      <p className="word-citation-endnote-warning">
+                        检测到 {citationInspection?.endnote_citation_count || 0} 处 EndNote Traveling Library 引文、
+                        {citationInspection?.endnote_bibliography_count || 0} 处 EndNote 参考文献字段。
+                        Workmode 会保留原样，不会自动改写；请先保留一份 Word 备份。
+                      </p>
+                    )}
+                    {citationInspection?.citation_groups.map((group) => {
+                      const missing = group.items.some((item) => item.missing)
+                      return (
+                        <article className={missing ? 'missing' : ''} key={group.instance_id}>
+                          <div>
+                            <strong>{group.text || '未格式化引用'}</strong>
+                            <span>{group.items.map((item) => String(item.metadata.title || item.paper_id)).join('；')}</span>
+                            {missing && <small>失联：当前项目中找不到其中一条文献记录；Word 内嵌元数据仍会保留。</small>}
+                          </div>
+                          <button disabled={citationManagerBusy || missing} onClick={() => editCitationGroup(group)}>更新引用</button>
+                          <button disabled={citationManagerBusy} onClick={() => void removeCitationGroup(group)}>移除引用</button>
+                        </article>
+                      )
+                    })}
+                    {!citationInspection?.citation_groups.length && (
+                      <p>{wordDocumentId ? '当前文档还没有 Workmode 引用。' : '请先打开 Word 文档并刷新。'}</p>
+                    )}
+                  </div>
+                </div>
+                {citationManagerError && <p className="word-citation-error" role="alert">{citationManagerError}</p>}
+              </section>
+            </div>
           </section>
         </div>
       )}
