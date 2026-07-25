@@ -145,6 +145,30 @@ fn word_addin_assets_and_reversible_registration_are_packaged() {
 }
 
 #[test]
+fn native_word_addin_is_registered_per_user_and_reuses_the_existing_backend() {
+    let source = include_str!("../../../word-addin-native/WorkmodeWordAddin.cs");
+    let ribbon = include_str!("../../../word-addin-native/Ribbon.xml");
+    let install = include_str!("../../../scripts/install-native-word-addin.ps1");
+    let uninstall = include_str!("../../../scripts/uninstall-native-word-addin.ps1");
+    let hooks = include_str!("../windows/installer-hooks.nsh");
+    let build_script = include_str!("../../../scripts/build-desktop.ps1");
+
+    assert!(source.contains("IDTExtensibility2"));
+    assert!(source.contains("IRibbonExtensibility"));
+    assert!(source.contains("http://127.0.0.1:8765/api/word-addin"));
+    assert!(ribbon.contains("label=\"Workmode\""));
+    assert!(ribbon.contains("onAction=\"InsertCitation\""));
+    assert!(ribbon.contains("onAction=\"ManageCitations\""));
+    assert!(install.contains("Software\\Microsoft\\Office\\Word\\Addins\\Workmode.WordAddin"));
+    assert!(install.contains("Framework64\\v4.0.30319\\RegAsm.exe"));
+    assert!(uninstall.contains("/unregister"));
+    assert!(hooks.contains("install-native-word-addin.ps1"));
+    assert!(hooks.contains("uninstall-native-word-addin.ps1"));
+    assert!(build_script.contains("Build-NativeWordAddin"));
+    assert!(build_script.contains("word-addin-native\\Workmode.WordAddin.dll"));
+}
+
+#[test]
 fn updater_lifecycle_commands_are_registered_for_the_frontend() {
     let source = include_str!("../src/lib.rs");
 
