@@ -26,9 +26,17 @@ describe('shared structural skin chrome across application surfaces', () => {
     expect(home).toContain("import { SkinChrome } from './SkinChrome'")
     expect(home).toContain('<SkinChrome')
     expect(home).toContain('hud-layout')
+    expect(home).toContain('actions={settingsAction}')
+    expect(home).toContain('打开全局设置')
+    expect(home).toContain("workbenchSettingsUrl(window.location.href, 'home')")
     expect(literature).toContain("import { SkinChrome } from '../SkinChrome'")
     expect(literature).toContain('<SkinChrome')
     expect(literature).toContain('hud-layout')
+  })
+
+  it('checks for desktop updates from the shared startup entry', () => {
+    expect(mainEntry).toContain('checkForDesktopUpdateOnStartup')
+    expect(mainEntry).toMatch(/initializeDesktop\(\)[\s\S]*checkForDesktopUpdateOnStartup\(\)/)
   })
 
   it('defines Neon structural layouts for both non-workbench surfaces', () => {

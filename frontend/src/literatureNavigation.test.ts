@@ -51,4 +51,11 @@ describe('literature workbench navigation', () => {
     expect(url).toBe('http://tauri.localhost/index.html?surface=workbench&panel=settings&return=writing')
     expect(resolveSettingsReturnSurface(url)).toBe('writing')
   })
+
+  it('opens shared settings from the application home and returns to the home', () => {
+    const url = workbenchSettingsUrl('http://tauri.localhost/index.html', 'home')
+    expect(url).toBe('http://tauri.localhost/index.html?surface=workbench&panel=settings&return=home')
+    expect(resolveWorkbenchPanel(url)).toBe('settings')
+    expect(resolveSettingsReturnSurface(url)).toBe('home')
+  })
 })
