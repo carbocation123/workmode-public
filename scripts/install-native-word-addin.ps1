@@ -29,6 +29,11 @@ function Resolve-OfficePlatform {
   return "x64"
 }
 
+function ConvertTo-PowerShellLiteral {
+  param([AllowEmptyString()][string]$Value)
+  return "'" + $Value.Replace("'", "''") + "'"
+}
+
 function Relaunch-InOfficeBitness {
   param([string]$Platform)
   $isCorrect = ($Platform -eq "x64" -and [Environment]::Is64BitProcess) -or
@@ -44,13 +49,18 @@ function Relaunch-InOfficeBitness {
   if (-not (Test-Path -LiteralPath $powerShell)) {
     throw "PowerShell for Office $Platform was not found: $powerShell"
   }
+  $scriptLiteral = ConvertTo-PowerShellLiteral -Value $PSCommandPath
+  $assemblyLiteral = ConvertTo-PowerShellLiteral -Value $AssemblyPath
+  $platformLiteral = ConvertTo-PowerShellLiteral -Value $Platform
+  $command = "& $scriptLiteral -AssemblyPath $assemblyLiteral " +
+    "-OfficePlatform $platformLiteral -NoRelaunch"
+  $encodedCommand = [Convert]::ToBase64String(
+    [Text.Encoding]::Unicode.GetBytes($command)
+  )
   $arguments = @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
-    "-File", $PSCommandPath,
-    "-AssemblyPath", $AssemblyPath,
-    "-OfficePlatform", $Platform,
-    "-NoRelaunch"
+    "-EncodedCommand", $encodedCommand
   )
   $process = Start-Process -FilePath $powerShell -ArgumentList $arguments `
     -Wait -PassThru -WindowStyle Hidden
