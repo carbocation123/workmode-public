@@ -58,6 +58,24 @@ class FileBrowserTest(unittest.TestCase):
         self.assertNotEqual(response.headers.get("x-frame-options"), "DENY")
         self.assertIn("frame-ancestors", response.headers.get("content-security-policy", ""))
 
+    def test_pdf_media_response_supports_a_unicode_filename(self):
+        from app.main import app
+        from fastapi.testclient import TestClient
+
+        filename = "定明月-低CO2催化剂.pdf"
+        (self.root / filename).write_bytes(b"%PDF-1.4\n%%EOF\n")
+
+        response = TestClient(app).get(
+            f"/api/work/projects/{self.project.slug}/fs/media",
+            params={"path": filename},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content_disposition = response.headers["content-disposition"]
+        self.assertTrue(content_disposition.startswith("inline;"))
+        self.assertIn("filename*=utf-8''", content_disposition.lower())
+        content_disposition.encode("latin-1")
+
 
 if __name__ == "__main__":
     unittest.main()
