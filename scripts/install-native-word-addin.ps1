@@ -10,6 +10,14 @@ $ProgId = "Workmode.WordAddin"
 $ClassId = "{9A7BC47D-8D3B-4BF8-A77A-7B84EE755C2B}"
 $ClassName = "Workmode.WordAddin.Connect"
 $ManagedCategory = "{62C8FE65-4EBB-45E7-B440-6E39B2CDBF29}"
+$Description = "Workmode " + (-join @(
+    [char]0x6587,
+    [char]0x732E,
+    [char]0x5F15,
+    [char]0x7528,
+    [char]0x5DE5,
+    [char]0x5177
+  ))
 $WindowsRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::Windows)
 
 function Resolve-OfficePlatform {
@@ -134,7 +142,7 @@ New-Item -Path $OfficeAddin -Force | Out-Null
 New-ItemProperty -LiteralPath $OfficeAddin -Name "FriendlyName" -Value "Workmode" `
   -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $OfficeAddin -Name "Description" `
-  -Value "Workmode 文献引用工具" -PropertyType String -Force | Out-Null
+  -Value $Description -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $OfficeAddin -Name "LoadBehavior" -Value 3 `
   -PropertyType DWord -Force | Out-Null
 
