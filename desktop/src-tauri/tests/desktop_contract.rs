@@ -169,6 +169,19 @@ fn native_word_addin_is_registered_per_user_and_reuses_the_existing_backend() {
 }
 
 #[test]
+fn native_word_addin_build_does_not_require_office_to_be_installed_on_ci() {
+    let build_script = include_str!("../../../scripts/build-native-word-addin.ps1");
+    let interop = include_str!("../../../word-addin-native/OfficeInterop.cs");
+
+    assert!(!build_script.contains("assembly\\GAC"));
+    assert!(!build_script.contains("OFFICE.DLL"));
+    assert!(build_script.contains("OfficeInterop.cs"));
+    assert!(interop.contains("000C0396-0000-0000-C000-000000000046"));
+    assert!(interop.contains("000C0395-0000-0000-C000-000000000046"));
+    assert!(interop.contains("B65AD801-ABAF-11D0-BB8B-00A0C90F2744"));
+}
+
+#[test]
 fn native_word_addin_does_not_block_word_while_the_backend_automates_the_document() {
     let connect = include_str!("../../../word-addin-native/WorkmodeWordAddin.cs");
     let dialog = include_str!("../../../word-addin-native/CitationDialog.cs");
