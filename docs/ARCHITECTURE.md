@@ -316,7 +316,7 @@ docs/                            当前架构、开发、发行和路线图
 
 `word-addin-native/` 定义原生 COM `Workmode` Ribbon 和 WinForms 引用窗口。`WorkmodeWordAddin.cs` 实现 `IDTExtensibility2`/`IRibbonExtensibility`，`CitationDialog.cs` 使用单层 Dock/Panel 区域布局；搜索、列表、可选参数和主操作各占固定语义区域，不使用会在系统缩放下互相挤压的嵌套自动网格。由于插件运行在 Word 的 DPI 感知进程中，窗口直接读取 Word 主窗口的 `GetDpiForWindow` 结果，并按该比例同步放大窗体、边距、固定行高和控件宽度；WinForms 自身自动缩放关闭，避免字体已经放大但容器仍保持 96 DPI 像素尺寸。窗口先显示，再通过后台任务异步请求 `word_addin.py`，从而让 Word 主线程继续处理后端 PowerShell 发起的 COM 调用。`word_addin.py` 只按当前活动文献项目搜索论文，并把插入、检查、更新、删除、刷新和参考文献请求转交现有 `word_citations.py`；顶部插件不直接写 Word OOXML，也不引入新的 Custom XML 或第二套引用存储。`OfficeInterop.cs` 只声明插件实际使用的 Office Ribbon 与 `IDTExtensibility2` COM 接口、官方 GUID 和 dispatch 成员；`build-native-word-addin.ps1` 使用 Windows 自带 .NET Framework 编译器把这些契约直接编译进 DLL，不从 Office/GAC 查找 PIA，也不下载第三方互操作包。安装脚本检测 Office 位数，在当前用户 `Software\Classes` 与 Word Addins 注册表中登记版本化 CodeBase，卸载脚本精确移除同一注册。终端仍须安装 Windows 桌面版 Word；构建机不需要安装 Office。该实现不支持 macOS 或 Word 网页版。
 
-NSIS 启动的首个 PowerShell 进程可能与 Office 位数不同。安装和卸载脚本不把含路径的参数数组直接交给 Windows PowerShell 5 `Start-Process`；它们把脚本、DLL 与平台值编码进 UTF-16LE `-EncodedCommand`，并用单引号字面量转义值，再由匹配 Office 位数的子进程执行。这条边界同时覆盖默认产品名中的空格和合法路径中的英文单引号，避免子进程在复制 DLL 或写注册表前把 `-File` 路径截断。
+NSIS 启动的首个 PowerShell 进程可能与 Office 位数不同。安装和卸载脚本不通过 `Start-Process` 二次包装命令行；它们把脚本、DLL 与平台值编码进 UTF-16LE `-EncodedCommand`，并用单引号字面量转义值，再由原生调用运算符直接启动并等待匹配 Office 位数的 PowerShell。这条边界同时覆盖默认产品名中的空格和合法路径中的英文单引号，避免子进程在复制 DLL 或写注册表前把 `-File` 路径截断，也兼容 GitHub Hosted Runner 的非交互服务会话。
 
 两个注册脚本保持纯 ASCII 源码，面向用户的中文 COM 描述由 Unicode 码点在运行时生成；因此 Windows PowerShell 5 即使按系统 ANSI 代码页读取无 BOM 脚本，也不会把注册表中的插件说明写成乱码。
 

@@ -70,9 +70,8 @@ function Relaunch-InOfficeBitness {
     "-ExecutionPolicy", "Bypass",
     "-EncodedCommand", $encodedCommand
   )
-  $process = Start-Process -FilePath $powerShell -ArgumentList $arguments `
-    -Wait -PassThru -WindowStyle Hidden
-  if ($process.ExitCode -ne 0) {
+  & $powerShell @arguments
+  if ($LASTEXITCODE -ne 0) {
     throw "Native Word add-in registration failed in the Office $Platform registry view."
   }
   return $true

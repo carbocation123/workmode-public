@@ -16,7 +16,7 @@ workmode-public-<version>-windows-x86_64-setup.exe
 
 NSIS 安装完成后调用 `install-native-word-addin.ps1`：检测 Office x86/x64 位数，把 DLL 复制到当前用户 `%LOCALAPPDATA%\WorkmodePublic\word-native-addin\<内容哈希>\`，再写入当前 registry view 的 `HKCU\Software\Classes` COM 信息和 `HKCU\Software\Microsoft\Office\Word\Addins\Workmode.WordAddin`。版本化目录允许 Word 仍加载旧 DLL 时先部署新版本；首次安装或更新后仍必须保存文档、关闭全部 Word 窗口并重新打开。卸载前调用对应脚本精确删除同一注册项和本地插件目录。该机制仅面向 Windows 桌面版 Word，不等同于 Microsoft Marketplace 分发。
 
-NSIS 安装器进程本身是 x86；目标 Office 为 x64 时，安装和卸载脚本会重启到 x64 Windows PowerShell。重启命令使用 UTF-16LE Base64 编码的 `-EncodedCommand`，路径值先转成 PowerShell 单引号字面量，因此默认产品目录、自定义含空格目录和含英文单引号目录都能原样传给子进程。`backend.tests.test_word_addin_registration` 会在不写注册表的前提下，用无效托管 DLL 验证跨位数重启确实完成了版本目录复制；安装包冒烟测试仍负责确认 NSIS 资源路径和真实 Word 注册。
+NSIS 安装器进程本身是 x86；目标 Office 为 x64 时，安装和卸载脚本会重启到 x64 Windows PowerShell。重启命令使用 UTF-16LE Base64 编码的 `-EncodedCommand`，路径值先转成 PowerShell 单引号字面量，因此默认产品目录、自定义含空格目录和含英文单引号目录都能原样传给子进程。父脚本通过原生调用运算符直接等待目标位数 PowerShell，不依赖非交互 Windows Runner 中行为不一致的 `Start-Process -WindowStyle Hidden`。`backend.tests.test_word_addin_registration` 会在不写注册表的前提下，用无效托管 DLL 验证跨位数重启确实完成了版本目录复制；安装包冒烟测试仍负责确认 NSIS 资源路径和真实 Word 注册。
 
 首次启动会显示可跳过的新手向导：模型草稿先做连接探测，成功后才落本机配置；DeepSeek 新用户可从向导打开官方注册、充值和 API Key 页面，并一键填入官方 V4 Pro/Flash 配置；随后用户选择教程或自己的项目，并通过六步界面高亮开始工作。外部链接由 Tauri Opener 在系统浏览器打开，capability 仅允许产品实际使用的 DeepSeek、MinerU、阿里云百炼官方平台与帮助文档域名，以及 `mailto:`；不会放行任意网页。百炼链接若被系统浏览器或权限层拒绝，转写指引会显示可手动复制的完整地址。引导、教程任务和成就状态保存在桌面 WebView 本地存储，不写进用户项目或模型上下文。
 
