@@ -71,6 +71,44 @@ class WordAddinApiTest(unittest.TestCase):
         self.assertEqual(len(bootstrap["styles"]), 5)
         self.assertEqual([paper["id"] for paper in papers["papers"]], ["paper-rutile"])
 
+    def test_paper_search_paginates_the_entire_library(self) -> None:
+        from app.word_addin import search_word_addin_papers
+
+        catalog_path = self.root / "catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["papers"] = [
+            {
+                "id": f"paper-{index:03d}",
+                "title": f"Catalysis paper {index:03d}",
+                "authors": "Zhang, San",
+                "journal": "ACS Catalysis",
+                "year": 2026,
+                "tags": [],
+                "tag_ids": [],
+                "group_ids": [],
+                "paths": {},
+            }
+            for index in range(125)
+        ]
+        catalog_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        first_page = search_word_addin_papers(query="", offset=0, limit=50)
+        last_page = search_word_addin_papers(query="", offset=100, limit=50)
+
+        self.assertEqual(first_page["total"], 125)
+        self.assertEqual(first_page["offset"], 0)
+        self.assertEqual(first_page["limit"], 50)
+        self.assertEqual(len(first_page["papers"]), 50)
+        self.assertEqual(last_page["total"], 125)
+        self.assertEqual(last_page["offset"], 100)
+        self.assertEqual(
+            [paper["id"] for paper in last_page["papers"]],
+            [f"paper-{index:03d}" for index in range(100, 125)],
+        )
+
     def test_insert_and_refresh_target_the_active_word_document(self) -> None:
         from app.word_addin import (
             WordAddinCitationRequest,

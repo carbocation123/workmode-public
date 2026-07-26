@@ -169,6 +169,28 @@ fn native_word_addin_is_registered_per_user_and_reuses_the_existing_backend() {
 }
 
 #[test]
+fn native_word_addin_paginates_large_libraries() {
+    let dialog = include_str!("../../../word-addin-native/CitationDialog.cs");
+
+    assert!(dialog.contains("PaperPageSize = 50"));
+    assert!(dialog.contains("&offset="));
+    assert!(dialog.contains("previousPageButton"));
+    assert!(dialog.contains("nextPageButton"));
+    assert!(dialog.contains("response.total"));
+}
+
+#[test]
+fn native_word_addin_ribbon_actions_have_office_icons() {
+    let ribbon = include_str!("../../../word-addin-native/Ribbon.xml");
+
+    assert!(ribbon.contains("imageMso=\"CitationInsert\""));
+    assert!(ribbon.contains("imageMso=\"BibliographyManageSources\""));
+    assert!(ribbon.contains("imageMso=\"FieldsRefresh\""));
+    assert!(ribbon.contains("imageMso=\"BibliographyInsert\""));
+    assert!(ribbon.contains("imageMso=\"BibliographyStyle\""));
+}
+
+#[test]
 fn native_word_addin_build_does_not_require_office_to_be_installed_on_ci() {
     let build_script = include_str!("../../../scripts/build-native-word-addin.ps1");
     let interop = include_str!("../../../word-addin-native/OfficeInterop.cs");
