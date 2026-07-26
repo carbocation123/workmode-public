@@ -7,24 +7,28 @@
           <button id="Workmode.InsertCitation"
                   label="插入引文"
                   size="large"
+                  imageMso="CitationInsert"
                   onAction="InsertCitation"
                   screentip="从 Workmode 文献库插入引文"
                   supertip="搜索当前 Workmode 文献库，并把所选文献插入当前 Word 文档。" />
           <button id="Workmode.ManageCitations"
                   label="管理引文"
                   size="large"
+                  imageMso="BibliographyManageSources"
                   onAction="ManageCitations"
                   screentip="管理当前文档中的 Workmode 引文"
                   supertip="查看或移除当前文档中的 Workmode 引文。" />
           <button id="Workmode.RefreshCitations"
                   label="刷新"
                   size="large"
+                  imageMso="FieldsRefresh"
                   onAction="RefreshCitations"
                   screentip="刷新全文引文"
                   supertip="按当前样式重新编号并刷新全文引文与参考文献。" />
           <button id="Workmode.CreateBibliography"
                   label="参考文献"
                   size="large"
+                  imageMso="BibliographyInsert"
                   onAction="CreateBibliography"
                   screentip="插入或刷新参考文献"
                   supertip="在当前 Word 文档中插入或刷新 Workmode 参考文献表。" />
@@ -33,6 +37,7 @@
           <menu id="Workmode.StyleMenu"
                 label="引文样式"
                 size="large"
+                imageMso="BibliographyStyle"
                 screentip="选择引文样式">
             <button id="Workmode.Style.GBT" label="GB/T 7714—2015" onAction="SetStyleGBT" />
             <button id="Workmode.Style.ACS" label="ACS" onAction="SetStyleACS" />

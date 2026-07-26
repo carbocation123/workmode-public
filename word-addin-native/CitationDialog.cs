@@ -11,6 +11,8 @@ namespace Workmode.WordAddin
 {
     internal sealed class CitationDialog : Form
     {
+        private const int PaperPageSize = 50;
+
         [DllImport("user32.dll")]
         private static extern uint GetDpiForWindow(IntPtr windowHandle);
 
@@ -25,6 +27,9 @@ namespace Workmode.WordAddin
         private readonly ComboBox styleBox;
         private readonly TextBox searchBox;
         private readonly CheckedListBox paperList;
+        private readonly Button previousPageButton;
+        private readonly Button nextPageButton;
+        private readonly Label paperPageLabel;
         private readonly TextBox prefixBox;
         private readonly TextBox suffixBox;
         private readonly ComboBox locatorLabelBox;
@@ -32,6 +37,8 @@ namespace Workmode.WordAddin
         private readonly CheckBox suppressAuthorBox;
         private readonly Label statusLabel;
         private readonly ListBox citationList;
+        private int currentPaperPage;
+        private string activePaperQuery = String.Empty;
 
         public CitationDialog(bool manage)
         {
@@ -141,6 +148,44 @@ namespace Workmode.WordAddin
             paperList.HorizontalScrollbar = true;
             paperList.Font = new Font("Microsoft YaHei UI", 9.5F);
 
+            previousPageButton = new Button();
+            previousPageButton.Text = "上一页";
+            previousPageButton.Dock = DockStyle.Left;
+            previousPageButton.Width = ScalePixel(96);
+            previousPageButton.Enabled = false;
+            previousPageButton.Click += async delegate
+            {
+                if (currentPaperPage > 0)
+                {
+                    await LoadPaperPageAsync(currentPaperPage - 1);
+                }
+            };
+
+            nextPageButton = new Button();
+            nextPageButton.Text = "下一页";
+            nextPageButton.Dock = DockStyle.Right;
+            nextPageButton.Width = ScalePixel(96);
+            nextPageButton.Enabled = false;
+            nextPageButton.Click += async delegate
+            {
+                await LoadPaperPageAsync(currentPaperPage + 1);
+            };
+
+            paperPageLabel = new Label();
+            paperPageLabel.AutoSize = false;
+            paperPageLabel.Dock = DockStyle.Fill;
+            paperPageLabel.Text = "第 1 / 1 页 · 共 0 篇";
+            paperPageLabel.TextAlign = ContentAlignment.MiddleCenter;
+            paperPageLabel.ForeColor = SystemColors.GrayText;
+
+            Panel paperPagePanel = new Panel();
+            paperPagePanel.Dock = DockStyle.Top;
+            paperPagePanel.Height = ScalePixel(42);
+            paperPagePanel.Padding = new Padding(0, ScalePixel(5), 0, ScalePixel(5));
+            paperPagePanel.Controls.Add(paperPageLabel);
+            paperPagePanel.Controls.Add(previousPageButton);
+            paperPagePanel.Controls.Add(nextPageButton);
+
             locatorLabelBox = new ComboBox();
             locatorLabelBox.DropDownStyle = ComboBoxStyle.DropDownList;
             locatorLabelBox.Width = ScalePixel(110);
@@ -211,6 +256,7 @@ namespace Workmode.WordAddin
 
             insertTab.Controls.Add(paperList);
             insertTab.Controls.Add(optionsPanel);
+            insertTab.Controls.Add(paperPagePanel);
             insertTab.Controls.Add(searchPanel);
             insertTab.Controls.Add(insertGuide);
 
@@ -348,18 +394,53 @@ namespace Workmode.WordAddin
 
         private async Task SearchPapersAsync()
         {
+            activePaperQuery = searchBox.Text.Trim();
+            await LoadPaperPageAsync(0);
+        }
+
+        private async Task LoadPaperPageAsync(int requestedPage)
+        {
             try
             {
                 UseWaitCursor = true;
                 SetStatus("正在搜索文献…", false);
+                int page = Math.Max(0, requestedPage);
+                int offset = page * PaperPageSize;
                 PapersResponse response = await ApiClient.GetAsync<PapersResponse>(
-                    "/papers?query=" + Uri.EscapeDataString(searchBox.Text.Trim()) + "&limit=100");
+                    "/papers?query="
+                        + Uri.EscapeDataString(activePaperQuery)
+                        + "&offset="
+                        + offset
+                        + "&limit="
+                        + PaperPageSize);
+                Paper[] papers = response.papers ?? new Paper[0];
+                int total = Math.Max(0, response.total);
+                int responseLimit = response.limit > 0 ? response.limit : PaperPageSize;
+                int responseOffset = Math.Max(0, response.offset);
+                currentPaperPage = responseOffset / responseLimit;
+                int totalPages = Math.Max(1, (total + responseLimit - 1) / responseLimit);
                 paperList.Items.Clear();
-                foreach (Paper paper in response.papers)
+                foreach (Paper paper in papers)
                 {
                     paperList.Items.Add(paper, false);
                 }
-                SetStatus("找到 " + response.papers.Length + " 篇文献。", false);
+                previousPageButton.Enabled = currentPaperPage > 0;
+                nextPageButton.Enabled = responseOffset + papers.Length < total;
+                paperPageLabel.Text =
+                    "第 "
+                    + (currentPaperPage + 1)
+                    + " / "
+                    + totalPages
+                    + " 页 · 共 "
+                    + total
+                    + " 篇";
+                int first = papers.Length == 0 ? 0 : responseOffset + 1;
+                int last = responseOffset + papers.Length;
+                SetStatus(
+                    papers.Length == 0
+                        ? "没有找到匹配的文献。"
+                        : "正在显示第 " + first + "–" + last + " 篇，共 " + total + " 篇。",
+                    false);
             }
             catch (Exception error)
             {
@@ -555,6 +636,9 @@ namespace Workmode.WordAddin
     internal sealed class PapersResponse
     {
         public Paper[] papers { get; set; }
+        public int total { get; set; }
+        public int offset { get; set; }
+        public int limit { get; set; }
     }
 
     internal sealed class Paper

@@ -128,11 +128,17 @@ def read_word_addin_bootstrap() -> dict[str, Any]:
 
 
 @router.get("/papers")
-def search_word_addin_papers(query: str = "", limit: int = 50) -> dict[str, Any]:
+def search_word_addin_papers(
+    query: str = "",
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
     _project, root = _active_literature_project()
     cleaned = query.strip().casefold()
+    bounded_offset = max(int(offset), 0)
     bounded_limit = min(max(int(limit), 1), 100)
     results = []
+    total = 0
     snapshot = literature_snapshot(root)
     tag_names = {
         str(tag.get("id") or ""): str(tag.get("name") or "")
@@ -164,10 +170,15 @@ def search_word_addin_papers(query: str = "", limit: int = 50) -> dict[str, Any]
         ).casefold()
         if cleaned and cleaned not in haystack:
             continue
-        results.append(summary)
-        if len(results) >= bounded_limit:
-            break
-    return {"papers": results}
+        if bounded_offset <= total < bounded_offset + bounded_limit:
+            results.append(summary)
+        total += 1
+    return {
+        "papers": results,
+        "total": total,
+        "offset": bounded_offset,
+        "limit": bounded_limit,
+    }
 
 
 @router.get("/citations/inspect")
